@@ -63,7 +63,8 @@ public:
     double gear_ratio = 35.0;
     double control_kp;          // CST 모드용 P 게인
     double control_kd;          // CST 모드용 D 게인
-    double pre_err = 0.0;       // CST 모드용 이전 오차 (PD 제어)
+    double pre_err = 0.0;       // CST 모드용 이전 오차
+    double pre_err_dot = 0.0;   // CST 모드용 이전 오차 미분
 
     double current_position = 0.0;
     double current_torque   = 0.0;

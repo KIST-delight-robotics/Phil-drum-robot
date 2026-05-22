@@ -81,7 +81,7 @@ Phil/
     │   ├── net/
     │   │   └── tcp_server.hpp          # TCP 서버 → CommandQueue
     │   ├── realtime/
-    │   │   └── controller.hpp          # CAN 송수신 루프 (1ms / 5ms)
+    │   │   └── controller.hpp          # CAN 송수신 루프
     │   └── trajectory/
     │       └── motion_planner.hpp      # 명령 파싱 → ControlQueue
     └── src/

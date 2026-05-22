@@ -203,6 +203,7 @@ double Controller::cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_
 
     double err_dot_filtered = alpha * err_dot_raw + (1.0 - alpha) * (maxon->pre_err / dt); // 근사 필터
     maxon->pre_err = err;
+    maxon->pre_err_dot = err_dot_filtered;
 
     double torque_mNm = maxon->control_kp * err + maxon->control_kd * err_dot_filtered;
 
