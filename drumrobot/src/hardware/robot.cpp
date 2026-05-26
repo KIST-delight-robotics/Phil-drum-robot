@@ -18,7 +18,7 @@ void Robot::initialize() {
     set_zero_tmotor();
     maxon_motor_enable();
     set_maxon_motor_mode("CSP");
-    // DXL
+    init_dynamicxel();
     // USBIO
     // logger
     // 아두이노
@@ -77,12 +77,13 @@ void Robot::init_motor_from_json() {
 
             // std::cout << "[Robot] motor setting: " << motor->name << "\n";
         } else if (type == "Dynamicxel") {
-            auto motor = std::make_shared<Dynamicxel>(id);
+            auto motor = std::make_shared<DynamixelMotor>(id);
             motor->name = m["name"];
             motor->direction_sign = m["direction_sign"];
             motor->initial_joint_angle = m["initial_joint_angle"].get<double>() * M_PI / 180.0;
             motor->min_angle = m["min_angle"].get<double>() * M_PI / 180.0;
             motor->max_angle = m["max_angle"].get<double>() * M_PI / 180.0;
+            motor->dxl_id = m["dxl_id"];
             motors[id] = motor;
 
             // std::cout << "[Robot] motor setting: " << motor->name << "\n";
@@ -356,4 +357,58 @@ void Robot::set_maxon_motor_mode(std::string targetMode) {
     }
 
     std::cout << "[Robot] Maxon Motor Mode: " << targetMode << "\n";
+}
+
+void Robot::init_dynamicxel() {
+    dynamixel::PortHandler *port;
+    dynamixel::PacketHandler *pkt;
+    
+    port = dynamixel::PortHandler::getPortHandler(DXL_PORT);
+    pkt = dynamixel::PacketHandler::getPacketHandler(2.0);
+
+    // Open port
+    if (port->openPort())
+    {
+        printf("[Robot] -------------- Open Dynamixel Port");
+    }
+    else
+    {
+        printf("[Robot] Failed to open the Dynamixel port!\n");
+        return;
+    }
+
+    // Set port baudrate
+    if (port->setBaudRate(4500000))
+    {
+        printf("[Robot] -------------- change the baudrate!\n");
+    }
+    else
+    {
+        printf("\n[Robot] Failed to change the baudrate!\n");
+        return;
+    }
+
+    uint8_t err = 0;
+    for (auto &[id, motor] : motors) {
+        auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
+        if (!dxl) continue;
+
+        uint16_t dxl_model_number = 0;
+        uint8_t dxl_error = 0;
+
+        int dxl_comm_result = pkt->ping(port, dxl->dxl_id, &dxl_model_number, &dxl_error);
+
+        if (dxl_comm_result == COMM_SUCCESS && dxl_error == 0) {
+            // DXL 토크 ON
+            pkt->write1ByteTxRx(port, dxl->dxl_id, 64, 1, &err);
+
+            dxl->port = port;
+            dxl->pkt = pkt;
+
+            printf("[Robot] --------------> ID:%03d Found! Model number: %d\n", dxl->dxl_id, dxl_model_number);
+        } else {
+            // TODO: 연결 안된 모터 삭제
+            printf("[Robot] ID:%03d COMM FAIL\n", dxl->dxl_id);
+        }
+    }
 }

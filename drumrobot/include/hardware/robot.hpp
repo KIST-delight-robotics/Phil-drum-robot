@@ -7,11 +7,14 @@
 #include <cmath>
 #include <vector>
 
+#include "dynamixel_sdk/dynamixel_sdk.h"
 #include "nlohmann/json.hpp"
 
 #include "hardware/can_interface.hpp"
 #include "hardware/motor_codec.hpp"
 #include "hardware/motor.hpp"
+
+constexpr const char* DXL_PORT = "/dev/ttyUSB0";
 
 class Robot {
 public:
@@ -37,4 +40,5 @@ private:
     void set_zero_tmotor();
     void maxon_motor_enable();
     void set_maxon_motor_mode(std::string targetMode);
+    void init_dynamicxel();
 };

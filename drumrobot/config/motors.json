@@ -177,7 +177,8 @@
             "direction_sign": 1.0,
             "initial_joint_angle": 0.0,
             "min_angle": -90.0,
-            "max_angle": 90.0
+            "max_angle": 90.0,
+            "dxl_id": 1
         },
         {
             "type": "Dynamicxel",
@@ -186,7 +187,8 @@
             "direction_sign": 1.0,
             "initial_joint_angle": 0.0,
             "min_angle": -90.0,
-            "max_angle": 90.0
+            "max_angle": 90.0,
+            "dxl_id": 2
         }
     ]
 }

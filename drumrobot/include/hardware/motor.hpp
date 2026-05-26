@@ -1,6 +1,15 @@
 #pragma once
 
+#include "dynamixel_sdk/dynamixel_sdk.h"
+
+#include <iostream>
 #include <string>
+#include <vector>
+#include <algorithm>
+#include <cmath>
+#include <memory>
+#include <cstring>
+#include <utility>
 
 class Motor{
 public:
@@ -19,8 +28,8 @@ public:
 
     double current_joint_angle = 0.0;
 
-    double joint_angle2motor_position(double joint_angle);
-    double motor_position2joint_angle(double motor_position);
+    double joint_angle_to_motor_position(double joint_angle);
+    double motor_position_to_joint_angle(double motor_position);
 private:
 };
 
@@ -72,8 +81,23 @@ public:
 private:
 };
 
-class Dynamicxel : public Motor {
+class DynamixelMotor : public Motor {
 public:
-    Dynamicxel(int id);
+    DynamixelMotor(int id);
+
+    dynamixel::PortHandler *port;
+    dynamixel::PacketHandler *pkt;
+    uint8_t dxl_id;
+
+    void dxl_torque_off();
+    void write_command(std::vector<float> command);
+    std::pair<bool, float> read_data();
+
 private:
+    std::unique_ptr<dynamixel::GroupSyncWrite> sw;
+    std::unique_ptr<dynamixel::GroupSyncRead> sr;
+
+    int32_t angle_to_tick(float angle);
+    float tick_to_angle(int32_t ticks);
+    void command_to_values(int32_t values[], std::vector<float> command);
 };

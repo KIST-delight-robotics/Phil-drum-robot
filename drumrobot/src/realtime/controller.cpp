@@ -131,7 +131,7 @@ void Controller::tmotor_send_task(const ControlData &data) {
         if (!tmotor) continue;
 
         ControlMode mode = data.mode[id];
-        double motor_position  = tmotor->joint_angle2motor_position(data.q[id]);
+        double motor_position  = tmotor->joint_angle_to_motor_position(data.q[id]);
         double motor_velocity = tmotor->direction_sign * data.qd[id];    // rad/s
  
         // 목표값 안전 체크 (전송 전)
@@ -175,7 +175,7 @@ void Controller::maxon_motor_send_task(const ControlData &data) {
         if (!maxon) continue;
  
         ControlMode mode = data.mode[id];
-        double motor_position  = maxon->joint_angle2motor_position(data.q[id]);
+        double motor_position  = maxon->joint_angle_to_motor_position(data.q[id]);
  
         if (mode == ControlMode::CSP) {
             m_codec.setPosition(maxon->tx_pdo_ids[1], &frame, motor_position);
@@ -263,7 +263,7 @@ void Controller::distribute_frames() {
                     tmotor->current_position     = pos;
                     tmotor->current_velocity     = spd;
                     tmotor->current_current      = cur;
-                    tmotor->current_joint_angle  = tmotor->motor_position2joint_angle(pos);
+                    tmotor->current_joint_angle  = tmotor->motor_position_to_joint_angle(pos);
 
                     if (!safety_check_recv_tmotor(tmotor)) {
                         is_safe = false;
@@ -277,7 +277,7 @@ void Controller::distribute_frames() {
                     maxon->current_position    = pos;
                     maxon->current_torque      = torque;
                     maxon->status_bit          = status;
-                    maxon->current_joint_angle = maxon->motor_position2joint_angle(pos);
+                    maxon->current_joint_angle = maxon->motor_position_to_joint_angle(pos);
 
                     if (!safety_check_recv_maxon(maxon)) {
                         is_safe = false;
