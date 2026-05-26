@@ -17,7 +17,7 @@ void MotionPlanner::run() {
 
         // send_active 이 후 motion_queue가 없으면 자동 생성
         if (ctx.send_active.load() && motion_queue.empty()) {
-            parse_command("auto");
+            parse_command("idle");
         }
 
         // control_queue 잔량이 임계값 이하면 다음 모션 생성
@@ -64,7 +64,7 @@ void MotionPlanner::init_poses_from_json() {
     const auto &init_pose = poses["init"];
     for (auto &[id, motor] : robot.motors) {
         double diff = std::abs(init_pose[id] - motor->initial_joint_angle);
-        
+
         if (diff > 1e-4) {
             std::cerr << "[MotionPlanner] init pose mismatch! "
                       << "joint " << id << " (" << motor->name << "): "
@@ -88,7 +88,7 @@ void MotionPlanner::parse_command(const std::string &cmd) {
         } else if (cmd == "quit" || cmd == "q") {
             motion_queue.push({MotionType::TRAPEZOIDAL, poses["shutdown"], 4.0});
             ctx.shutdown_requested = true;
-        } else if (cmd == "auto") {
+        } else if (cmd == "idle") {
             motion_queue.push({MotionType::TRAPEZOIDAL, last_q, 1.0});
         } else {
             std::cout << "[MotionPlanner] 알 수 없는 명령: " << cmd << "\n";
