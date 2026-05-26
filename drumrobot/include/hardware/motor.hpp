@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dynamixel_sdk/dynamixel_sdk.h"
+#include "dynamixel_sdk/include/dynamixel_sdk/dynamixel_sdk.h"
 
 #include <iostream>
 #include <string>

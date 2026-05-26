@@ -7,7 +7,7 @@
 #include <cmath>
 #include <vector>
 
-#include "dynamixel_sdk/dynamixel_sdk.h"
+#include "dynamixel_sdk/include/dynamixel_sdk/dynamixel_sdk.h"
 #include "nlohmann/json.hpp"
 
 #include "hardware/can_interface.hpp"
