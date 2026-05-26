@@ -171,7 +171,7 @@
             "control_kd": 6.0
         },
         {
-            "type": "Dynamicxel",
+            "type": "Dynamixel",
             "id": 11,
             "name": "head_yaw",
             "direction_sign": 1.0,
@@ -181,7 +181,7 @@
             "dxl_id": 1
         },
         {
-            "type": "Dynamicxel",
+            "type": "Dynamixel",
             "id": 12,
             "name": "head_pitch",
             "direction_sign": 1.0,

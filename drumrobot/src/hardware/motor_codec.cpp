@@ -492,7 +492,8 @@ void MaxonMotorCodec::getHomingMethodL(uint32_t can_send_id, struct can_frame *f
     frame->data[6] = 0x00;
     frame->data[7] = 0x00;
 
-    // getHomingMethodR 이랑 getHomingMethodL 이랑 동일한 함수인데 뭐지?
+    // getHomingMethodR 동일한 함수
+    // 현재 사용하지 않는 기능
 }
 
 void MaxonMotorCodec::getHomingMethodR(uint32_t can_send_id, struct can_frame *frame) {
@@ -507,7 +508,8 @@ void MaxonMotorCodec::getHomingMethodR(uint32_t can_send_id, struct can_frame *f
     frame->data[6] = 0x00;
     frame->data[7] = 0x00;
 
-    // getHomingMethodR 이랑 getHomingMethodL 이랑 동일한 함수인데 뭐지?
+    // getHomingMethodL 이랑 동일한 함수
+    // 현재 사용하지 않는 기능
 }
 
 void MaxonMotorCodec::getHomingMethodTest(uint32_t can_send_id, struct can_frame *frame) {

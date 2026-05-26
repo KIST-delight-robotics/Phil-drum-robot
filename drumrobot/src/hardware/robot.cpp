@@ -75,7 +75,7 @@ void Robot::init_motor_from_json() {
             motors[id] = motor;
 
             // std::cout << "[Robot] motor setting: " << motor->name << "\n";
-        } else if (type == "Dynamicxel") {
+        } else if (type == "Dynamixel") {
             auto motor = std::make_shared<DynamixelMotor>(id);
             motor->name = m["name"];
             motor->direction_sign = m["direction_sign"];
@@ -302,6 +302,7 @@ void Robot::maxon_motor_enable() {
 
         usleep(100000);
 
+        // 현재 사용하지 않는 기능
         // m_codec.getStartHoming(maxon->tx_pdo_ids[0], &frame);
         // can.sendFrame(maxon->socket, frame);
 
