@@ -14,7 +14,7 @@ Controller::Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot 
         }
     }
 
-    std::vector<std::string> header = {"a", "b"};
+    std::vector<std::string> header = {"id", "mode", "desired", "actual", "err", "torque", "input"};
     motor_log.set_header(header);
 }
 
