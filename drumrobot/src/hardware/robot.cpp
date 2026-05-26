@@ -20,7 +20,6 @@ void Robot::initialize() {
     set_maxon_motor_mode("CSP");
     init_dynamicxel();
     // USBIO
-    // logger
     // 아두이노
 
 }
@@ -362,7 +361,7 @@ void Robot::set_maxon_motor_mode(std::string targetMode) {
 void Robot::init_dynamicxel() {
     dynamixel::PortHandler *port;
     dynamixel::PacketHandler *pkt;
-    
+
     port = dynamixel::PortHandler::getPortHandler(DXL_PORT);
     pkt = dynamixel::PacketHandler::getPacketHandler(2.0);
 

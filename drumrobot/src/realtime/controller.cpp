@@ -1,7 +1,7 @@
 #include "realtime/controller.hpp"
 
 Controller::Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot &robotRef)
-    : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef)
+    : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef), motor_log("motor")
 {
     int n = robot.num_joint;
     curr_data = ControlData(n);

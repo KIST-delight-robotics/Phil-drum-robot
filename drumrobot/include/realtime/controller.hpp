@@ -6,11 +6,13 @@
 #include <memory>
 #include <pthread.h>
 #include <set>
+#include <string>
  
 #include "common/app_context.hpp"
 #include "common/control_queue.hpp"
 #include "hardware/motor_codec.hpp"
 #include "hardware/robot.hpp"
+#include "util/logger.hpp"
  
 class Controller {
 public:
@@ -55,4 +57,7 @@ private:
  
     // 소켓별 수신 프레임 임시 버퍼  (socket_fd, frames)
     std::map<int, std::vector<struct can_frame>> temp_frames;
+
+    // ===== log =====
+    Logger motor_log;
 };
