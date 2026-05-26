@@ -20,7 +20,7 @@ EXECUTABLE = main.out
 SOURCES := $(shell find $(SRCDIR) -name '*.cpp')
 OBJFILES := $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(SOURCES))
 
-DXL_SOURCES := $(shell find ./lib/dynamixel_sdk/src -name '*.cpp')
+DXL_SOURCES := $(shell find ./lib/dynamixel_sdk/src -maxdepth 1 -name '*.cpp')
 DXL_OBJECTS := $(patsubst ./lib/dynamixel_sdk/src/%.cpp, $(OBJDIR)/dxl/%.o, $(DXL_SOURCES))
 
 # ===== 기본 빌드 타깃 =====
@@ -30,10 +30,10 @@ all: directories $(BINDIR)/$(EXECUTABLE)
 directories:
 	mkdir -p $(BINDIR)
 	mkdir -p $(OBJDIR)/common $(OBJDIR)/hardware $(OBJDIR)/input $(OBJDIR)/kinematics $(OBJDIR)/net $(OBJDIR)/realtime $(OBJDIR)/trajectory
-	mkdir -p $(OBJDIR)/dxl/dynamixel_sdk
+	mkdir -p $(OBJDIR)/dxl
 
 # ===== 링크: .o 파일들 → 실행파일 =====
-$(BINDIR)/$(EXECUTABLE): $(OBJFILES)
+$(BINDIR)/$(EXECUTABLE): $(OBJFILES) $(DXL_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(INCLUDE) $(LDFLAGS)
 
 # ===== 컴파일: src/*.cpp → .o =====
