@@ -359,6 +359,7 @@ void Robot::set_maxon_motor_mode(std::string targetMode) {
 }
 
 void Robot::init_dynamicxel() {
+    // TODO: USB 속도 설정인가? 그런거 해야 함
     dynamixel::PortHandler *port;
     dynamixel::PacketHandler *pkt;
 
@@ -387,6 +388,9 @@ void Robot::init_dynamicxel() {
         return;
     }
 
+    // 연결 안된 모터
+    std::vector<int> to_remove;
+
     uint8_t err = 0;
     for (auto &[id, motor] : motors) {
         auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
@@ -406,8 +410,13 @@ void Robot::init_dynamicxel() {
 
             printf("[Robot] --------------> ID:%03d Found! Model number: %d\n", dxl->dxl_id, dxl_model_number);
         } else {
-            // TODO: 연결 안된 모터 삭제
             printf("[Robot] ID:%03d COMM FAIL\n", dxl->dxl_id);
+            to_remove.push_back(id);
         }
+    }
+
+    // 연결 안된 모터 삭제
+    for (int id : to_remove) {
+        motors.erase(id);
     }
 }

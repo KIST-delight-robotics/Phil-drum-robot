@@ -13,6 +13,9 @@ Controller::Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot 
             prev_data.q[id] = motor->initial_joint_angle;
         }
     }
+
+    std::vector<std::string> header = {"a", "b"};
+    motor_log.set_header(header);
 }
 
 Controller::~Controller() {}
@@ -113,7 +116,7 @@ void Controller::send_task_1ms(int cnt) {
 void Controller::send_task_5ms() {
     tmotor_send_task(curr_data);
     maxon_motor_send_task(curr_data);
-    dynamicxel_send_task();
+    dynamicxel_send_task(curr_data);
  
     // Sync 프레임: 소켓당 1회
     struct can_frame sync_frame;
@@ -150,6 +153,15 @@ void Controller::tmotor_send_task(const ControlData &data) {
  
         if (mode == ControlMode::POS) {
             t_codec.setPosition(tmotor->node_id, &frame, static_cast<float>(motor_position));
+
+            std::vector<double> values = {(double)tmotor->id,
+                1.0,    // mode
+                motor_position,
+                tmotor->current_position,
+                motor_position - tmotor->current_position,
+                tmotor->current_current
+            };
+            motor_log.record(values);
         } else if (mode == ControlMode::VEL) {
             double err = motor_position - tmotor->current_position;
             double ermp = motor_velocity * tmotor->pole * tmotor->gear_ratio * 60.0 / 2.0 / M_PI;
@@ -158,6 +170,16 @@ void Controller::tmotor_send_task(const ControlData &data) {
             control_input = std::clamp(control_input, -100000.0, 100000.0);
 
             t_codec.setVelocity(tmotor->node_id, &frame, static_cast<float>(control_input));
+
+            std::vector<double> values = {(double)tmotor->id,
+                2.0,    // mode
+                motor_position,
+                tmotor->current_position,
+                motor_position - tmotor->current_position,
+                tmotor->current_current,
+                control_input
+            };
+            motor_log.record(values);
         } else if (mode == ControlMode::None) {
             std::cerr << "[Controller] TMotor ControlMode 미설정 (" << tmotor->name << ")\n";
             continue;
@@ -179,9 +201,28 @@ void Controller::maxon_motor_send_task(const ControlData &data) {
  
         if (mode == ControlMode::CSP) {
             m_codec.setPosition(maxon->tx_pdo_ids[1], &frame, motor_position);
+
+            std::vector<double> values = {(double)maxon->id,
+                1.0,    // mode
+                motor_position,
+                maxon->current_position,
+                motor_position - maxon->current_position,
+                maxon->current_torque
+            };
+            motor_log.record(values);
         } else if (mode == ControlMode::CST) {
             double torque_mNm = cal_torque(maxon, motor_position);
             m_codec.setTorque(maxon->tx_pdo_ids[3], &frame, static_cast<int>(torque_mNm));
+
+            std::vector<double> values = {(double)maxon->id,
+                0.0,    // mode
+                motor_position,
+                maxon->current_position,
+                motor_position - maxon->current_position,
+                maxon->current_torque,
+                torque_mNm
+            };
+            motor_log.record(values);
         } else if (mode == ControlMode::CSV) {
             std::cerr << "[Controller] MaxonMotor CSV 모드 구현 안됨 (" << maxon->name << ")\n";
             continue;
@@ -230,8 +271,29 @@ double Controller::cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_
     return torque_mNm;
 }
 
-void Controller::dynamicxel_send_task() {
-    // 미구현
+void Controller::dynamicxel_send_task(const ControlData &data) {
+    for (auto &[id, motor] : robot.motors) {
+        auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
+        if (!dxl) continue;
+ 
+        double motor_position  = dxl->joint_angle_to_motor_position(data.q[id]);
+ 
+        std::vector<double> dxl_command = {0.0, 0.0, motor_position};   // 속도, 가속도가 0인 경우 계단 입력
+        dxl->write_command(dxl_command);
+
+        std::pair<bool, double> data = dxl->read_data();                // dxl은 별개로 read (5ms 주기)
+        if (data.first) {
+            dxl->current_position = data.second;
+            dxl->current_joint_angle = dxl->motor_position_to_joint_angle(data.second);
+        }
+
+        std::vector<double> values = {(double)dxl->id,
+            motor_position,
+            dxl->current_position,
+            motor_position - dxl->current_position
+        };
+        motor_log.record(values);
+    }
 }
 
 // ===== RECV =====

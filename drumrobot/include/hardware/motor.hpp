@@ -90,14 +90,16 @@ public:
     uint8_t dxl_id;
 
     void dxl_torque_off();
-    void write_command(std::vector<float> command);
-    std::pair<bool, float> read_data();
+    void write_command(std::vector<double> command);
+    std::pair<bool, double> read_data();
+
+    double current_position = 0.0;
 
 private:
     std::unique_ptr<dynamixel::GroupSyncWrite> sw;
     std::unique_ptr<dynamixel::GroupSyncRead> sr;
 
-    int32_t angle_to_tick(float angle);
-    float tick_to_angle(int32_t ticks);
-    void command_to_values(int32_t values[], std::vector<float> command);
+    int32_t angle_to_tick(double angle);
+    double tick_to_angle(int32_t ticks);
+    void command_to_values(int32_t values[], std::vector<double> command);
 };

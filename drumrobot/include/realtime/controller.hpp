@@ -39,7 +39,7 @@ private:
 
     void tmotor_send_task(const ControlData &data);
     void maxon_motor_send_task(const ControlData &data);
-    void dynamicxel_send_task();
+    void dynamicxel_send_task(const ControlData &data);
 
     double cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_position);
 

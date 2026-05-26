@@ -46,7 +46,7 @@ void DynamixelMotor::dxl_torque_off() {
     pkt->write1ByteTxRx(port, dxl_id, 64, 0, &err);
 }
 
-void DynamixelMotor::write_command(std::vector<float> command) {
+void DynamixelMotor::write_command(std::vector<double> command) {
     sw = std::make_unique<dynamixel::GroupSyncWrite>(port, pkt, 108, 12);
 
     // 목표 값 배열 정의
@@ -63,8 +63,8 @@ void DynamixelMotor::write_command(std::vector<float> command) {
     sw->clearParam();
 }
 
-std::pair<bool, float> DynamixelMotor::read_data() {
-    float position = 0.0;
+std::pair<bool, double> DynamixelMotor::read_data() {
+    double position = 0.0;
     bool available = true;
 
     // GroupSyncRead 생성 (주소 132 = Present Position, 길이 4byte)
@@ -94,24 +94,24 @@ std::pair<bool, float> DynamixelMotor::read_data() {
     return std::make_pair(available, position);;
 }
 
-int32_t DynamixelMotor::angle_to_tick(float angle)
+int32_t DynamixelMotor::angle_to_tick(double angle)
 {
-    float degree = angle * 180.0 / M_PI;
-    degree = std::clamp(degree, -180.f, 180.f);
-    const float ticks_per_degree = 4096.0 / 360.0;
-    float ticks = 2048.0 - (degree * ticks_per_degree);
+    double degree = angle * 180.0 / M_PI;
+    degree = std::clamp(degree, -180.0, 180.0);
+    const double ticks_per_degree = 4096.0 / 360.0;
+    double ticks = 2048.0 - (degree * ticks_per_degree);
 
     return static_cast<int32_t>(std::round(ticks));
 }
 
-float DynamixelMotor::tick_to_angle(int32_t ticks)
+double DynamixelMotor::tick_to_angle(int32_t ticks)
 {
-    const float degrees_per_tick = 360.0 / 4096.0;
-    float angle = (2048.0 - static_cast<double>(ticks)) * degrees_per_tick;
+    const double degrees_per_tick = 360.0 / 4096.0;
+    double angle = (2048.0 - static_cast<double>(ticks)) * degrees_per_tick;
     return angle * M_PI / 180.0;
 }
 
-void DynamixelMotor::command_to_values(int32_t values[], std::vector<float> command)
+void DynamixelMotor::command_to_values(int32_t values[], std::vector<double> command)
 {
     // Profile Acceleration
     values[0] = static_cast<int32_t>(1000*command[0]);  // ms
