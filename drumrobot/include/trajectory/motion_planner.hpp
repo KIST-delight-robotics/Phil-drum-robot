@@ -7,8 +7,6 @@
 #include <map>
 #include <vector>
 
-#include "nlohmann/json.hpp"
-
 #include "common/app_context.hpp"
 #include "common/command_queue.hpp"
 #include "common/control_queue.hpp"
@@ -39,10 +37,7 @@ private:
 
     const long unsigned int threshold = 20;     // 궤적 생성 임계값
 
-    std::map<std::string, std::vector<double>> poses;
-
     void initialize();
-    void init_poses_from_json();
 
     void parse_command(const std::string& cmd);
     void schedule_idle_motion();

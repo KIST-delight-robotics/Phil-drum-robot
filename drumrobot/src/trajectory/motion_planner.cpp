@@ -1,7 +1,8 @@
 #include "trajectory/motion_planner.hpp"
 
 MotionPlanner::MotionPlanner(AppContext &ctxRef, CommandQueue &commandQueueRef, ControlQueue &controlQueueRef, MotionQueue &motionQueueRef, Robot &robotRef)
-    : ctx(ctxRef), command_queue(commandQueueRef), control_queue(controlQueueRef), motion_queue(motionQueueRef), robot(robotRef), behavior_planner(ctxRef) {}
+    : ctx(ctxRef), command_queue(commandQueueRef), control_queue(controlQueueRef), motion_queue(motionQueueRef), robot(robotRef),
+    behavior_planner(ctxRef, robotRef) {}
 
 MotionPlanner::~MotionPlanner() {}
 
@@ -33,10 +34,10 @@ void MotionPlanner::run() {
 }
 
 void MotionPlanner::initialize() {
-    init_poses_from_json();
+    behavior_planner.init_poses_from_json();
 
     // init 포즈 vs 모터 initial_joint_angle 비교
-    const auto &init_pose = poses["init"];
+    const auto &init_pose = behavior_planner.poses["init"];
     for (auto &[id, motor] : robot.motors) {
         double diff = std::abs(init_pose[id] - motor->initial_joint_angle);
 
@@ -45,23 +46,6 @@ void MotionPlanner::initialize() {
                       << "joint " << id << " (" << motor->name << "): "
                       << "robot_poses.json="  << init_pose[id] * 180.0 / M_PI << "deg  "
                       << "motors.json="       << motor->initial_joint_angle * 180.0 / M_PI << "deg\n";
-        }
-    }
-}
-
-void MotionPlanner::init_poses_from_json() {
-    using json = nlohmann::json;
-
-    std::ifstream f("drumrobot/config/robot_poses.json");
-    if (!f.is_open()) {
-        std::cerr << "[MotionPlanner] Failed to open config/robot_poses.json\n";
-        return;
-    }
-    json config = json::parse(f);
-
-    for (auto &[name, angles] : config["poses"].items()) {
-        for (auto &a : angles) {
-            poses[name].push_back(a.get<double>() * M_PI / 180.0);
         }
     }
 }
