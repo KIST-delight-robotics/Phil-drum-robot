@@ -4,16 +4,16 @@ ControlQueue::ControlQueue() {}
 
 ControlQueue::~ControlQueue() {}
 
-void ControlQueue::push(ControlSetPoint data) {
+void ControlQueue::push(const ControlSetPoint& point) {
     std::lock_guard<std::mutex> lock(mutex_);
-    queue_.push(data);
+    queue_.push(point);
 }
 
 ControlSetPoint ControlQueue::pop() {
     std::lock_guard<std::mutex> lock(mutex_);
-    ControlSetPoint data = queue_.front();
+    ControlSetPoint point = queue_.front();
     queue_.pop();
-    return data;
+    return point;
 }
 
 bool ControlQueue::empty() {

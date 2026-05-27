@@ -1,6 +1,6 @@
 #include "util/logger.hpp"
 
-Logger::Logger(const std::string &name) {
+Logger::Logger(const std::string& name) {
     std::string filename = make_filename(name);
     file.open(filename);
     if (!file.is_open()) {
@@ -26,7 +26,7 @@ void Logger::set_header(const std::vector<std::string> &columns) {
     file << "\n";
 }
 
-void Logger::record(const std::vector<double> &values) {
+void Logger::record(const std::vector<double>& values) {
 
     auto now = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration<double>(now - start);
@@ -40,7 +40,7 @@ void Logger::record(const std::vector<double> &values) {
     file << "\n";
 }
 
-std::string Logger::make_filename(const std::string &name) {
+std::string Logger::make_filename(const std::string& name) {
     std::time_t now = std::time(nullptr);
     std::tm *t = std::localtime(&now);
 

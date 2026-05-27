@@ -32,7 +32,7 @@ public:
     ControlQueue();
     ~ControlQueue();
 
-    void push(ControlSetPoint cmd);
+    void push(const ControlSetPoint& point);
     ControlSetPoint pop();
     bool empty();
     size_t size();

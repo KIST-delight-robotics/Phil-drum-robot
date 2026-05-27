@@ -4,7 +4,7 @@ CommandQueue::CommandQueue() {}
 
 CommandQueue::~CommandQueue() {}
 
-void CommandQueue::push(std::string cmd) {
+void CommandQueue::push(const std::string& cmd) {
     std::lock_guard<std::mutex> lock(mutex_);
     queue_.push(cmd);
 }

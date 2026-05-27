@@ -4,16 +4,16 @@ MotionQueue::MotionQueue() {}
 
 MotionQueue::~MotionQueue() {}
 
-void MotionQueue::push(MotionPrimitive data) {
+void MotionQueue::push(const MotionPrimitive& motion) {
     std::lock_guard<std::mutex> lock(mutex_);
-    queue_.push(data);
+    queue_.push(motion);
 }
 
 MotionPrimitive MotionQueue::pop() {
     std::lock_guard<std::mutex> lock(mutex_);
-    MotionPrimitive data = queue_.front();
+    MotionPrimitive motion = queue_.front();
     queue_.pop();
-    return data;
+    return motion;
 }
 
 bool MotionQueue::empty() {

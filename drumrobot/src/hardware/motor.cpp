@@ -46,7 +46,7 @@ void DynamixelMotor::dxl_torque_off() {
     pkt->write1ByteTxRx(port, dxl_id, 64, 0, &err);
 }
 
-void DynamixelMotor::write_command(std::vector<double> command) {
+void DynamixelMotor::write_command(const std::vector<double>& command) {
     sw = std::make_unique<dynamixel::GroupSyncWrite>(port, pkt, 108, 12);
 
     // 목표 값 배열 정의
@@ -111,7 +111,7 @@ double DynamixelMotor::tick_to_angle(int32_t ticks)
     return angle * M_PI / 180.0;
 }
 
-void DynamixelMotor::command_to_values(int32_t values[], std::vector<double> command)
+void DynamixelMotor::command_to_values(int32_t values[], const std::vector<double>& command)
 {
     // Profile Acceleration
     values[0] = static_cast<int32_t>(1000*command[0]);  // ms

@@ -90,7 +90,7 @@ public:
     uint8_t dxl_id;
 
     void dxl_torque_off();
-    void write_command(std::vector<double> command);
+    void write_command(const std::vector<double>& command);
     std::pair<bool, double> read_data();
 
     double current_position = 0.0;
@@ -101,5 +101,5 @@ private:
 
     int32_t angle_to_tick(double angle);
     double tick_to_angle(int32_t ticks);
-    void command_to_values(int32_t values[], std::vector<double> command);
+    void command_to_values(int32_t values[], const std::vector<double>& command);
 };

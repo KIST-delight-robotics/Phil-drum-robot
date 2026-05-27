@@ -20,7 +20,7 @@ void MotionPlanner::run() {
         }
 
         // control_queue 잔량이 임계값 이하면 다음 모션 생성
-        if (control_queue.size() < threshold) {
+        if (control_queue.size() < threshold && !motion_queue.empty()) {
             generate_motion();
             if (!ctx.recv_active) ctx.recv_active = true;
             if (!ctx.send_active) ctx.send_active = true;

@@ -11,17 +11,17 @@
 
 class Logger {
 public:
-    Logger(const std::string &name);
+    Logger(const std::string& name);
     ~Logger();
 
-    void set_header(const std::vector<std::string> &columns);
-    void record(const std::vector<double> &values);
+    void set_header(const std::vector<std::string>& columns);
+    void record(const std::vector<double>& values);
 
 private:
     std::ofstream file;
     std::chrono::steady_clock::time_point start;
     const std::string base_path = "drumrobot/log/";
 
-    std::string make_filename(const std::string &name);
+    std::string make_filename(const std::string& name);
 };
  

@@ -39,6 +39,6 @@ private:
     void maxon_motor_setting();
     void set_zero_tmotor();
     void maxon_motor_enable();
-    void set_maxon_motor_mode(std::string targetMode);
+    void set_maxon_motor_mode(const std::string& targetMode);
     void init_dynamicxel();
 };

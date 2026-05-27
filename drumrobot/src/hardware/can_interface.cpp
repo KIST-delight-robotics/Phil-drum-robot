@@ -22,7 +22,7 @@ void CanInterface::initialize() {
     }
 }
 
-bool CanInterface::sendFrame(const std::string &ifname, const struct can_frame &frame) {
+bool CanInterface::sendFrame(const std::string &ifname, const can_frame &frame) {
     if (sockets.find(ifname) == sockets.end()) {
         std::cerr << "[CanInterface] Not connected: " << ifname << std::endl;
         return false;
@@ -37,7 +37,7 @@ bool CanInterface::sendFrame(const std::string &ifname, const struct can_frame &
     return true;
 }
 
-bool CanInterface::sendFrame(int socket, const struct can_frame &frame) {
+bool CanInterface::sendFrame(int socket, const can_frame &frame) {
     ssize_t bytes = write(socket, &frame, sizeof(struct can_frame));
     if (bytes != sizeof(struct can_frame)) {
         std::cerr << "[CanInterface] sendFrame() failed: socket " << socket << std::endl;
@@ -47,7 +47,7 @@ bool CanInterface::sendFrame(int socket, const struct can_frame &frame) {
     return true;
 }
 
-bool CanInterface::receiveFrame(const std::string &ifname, struct can_frame &frame) {
+bool CanInterface::receiveFrame(const std::string &ifname, can_frame &frame) {
     if (sockets.find(ifname) == sockets.end()) {
         std::cerr << "[CanInterface] Not connected: " << ifname << std::endl;
         return false;
@@ -62,7 +62,7 @@ bool CanInterface::receiveFrame(const std::string &ifname, struct can_frame &fra
     return true;
 }
 
-bool CanInterface::receiveFrame(int socket, struct can_frame &frame) {
+bool CanInterface::receiveFrame(int socket, can_frame &frame) {
     ssize_t bytes = read(socket, &frame, sizeof(struct can_frame));
     if (bytes != sizeof(struct can_frame)) {
         std::cerr << "[CanInterface] receiveFrame() failed: socket " << socket << std::endl;
@@ -72,7 +72,7 @@ bool CanInterface::receiveFrame(int socket, struct can_frame &frame) {
     return true;
 }
 
-bool CanInterface::sendandReceiveFrame(const std::string &ifname, struct can_frame &frame) {
+bool CanInterface::sendandReceiveFrame(const std::string &ifname, can_frame &frame) {
     if (!sendFrame(ifname, frame) || !receiveFrame(ifname, frame)) {
         perror("[CanInterface] Send and receive error");
         return false;
@@ -80,7 +80,7 @@ bool CanInterface::sendandReceiveFrame(const std::string &ifname, struct can_fra
     return true;
 }
 
-bool CanInterface::sendandReceiveFrame(int socket, struct can_frame &frame) {
+bool CanInterface::sendandReceiveFrame(int socket, can_frame &frame) {
     if (!sendFrame(socket, frame) || !receiveFrame(socket, frame)) {
         perror("[CanInterface] Send and receive error");
         return false;
@@ -219,7 +219,7 @@ void CanInterface::activateCanPort(const char *port) {
     sleep(2);
 }
 
-int CanInterface::createSocket(const std::string &ifname) {
+int CanInterface::createSocket(const std::string& ifname) {
     int result;
     struct sockaddr_can addr;
     struct ifreq ifr;

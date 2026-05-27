@@ -27,7 +27,7 @@ public:
     MotionQueue();
     ~MotionQueue();
 
-    void push(MotionPrimitive cmd);
+    void push(const MotionPrimitive& motion);
     MotionPrimitive pop();
     bool empty();
 

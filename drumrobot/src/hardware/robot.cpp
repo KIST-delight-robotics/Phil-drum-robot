@@ -315,7 +315,7 @@ void Robot::maxon_motor_enable() {
     std::cout << "[Robot] Maxon Motor Enable\n";
 }
 
-void Robot::set_maxon_motor_mode(std::string targetMode) {
+void Robot::set_maxon_motor_mode(const std::string& targetMode) {
     struct can_frame frame;
     can.setSocketsTimeout(0, 10000);
 

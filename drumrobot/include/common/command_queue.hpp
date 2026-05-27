@@ -13,7 +13,7 @@ public:
     CommandQueue();
     ~CommandQueue();
 
-    void push(std::string cmd);
+    void push(const std::string& cmd);
     std::string pop();
     bool empty();
 

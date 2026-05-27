@@ -26,14 +26,14 @@ public:
 
     void initialize();                                              // CAN 포트 초기화 : 사용가능 포트 확인 및 소켓 할당
 
-    bool sendFrame(const std::string &ifname, const struct can_frame &frame);
-    bool sendFrame(int socket, const struct can_frame &frame);
+    bool sendFrame(const std::string &ifname, const can_frame &frame);
+    bool sendFrame(int socket, const can_frame &frame);
  
-    bool receiveFrame(const std::string &ifname, struct can_frame &frame);
-    bool receiveFrame(int socket, struct can_frame &frame);
+    bool receiveFrame(const std::string &ifname, can_frame &frame);
+    bool receiveFrame(int socket, can_frame &frame);
 
-    bool sendandReceiveFrame(const std::string &ifname, struct can_frame &frame);
-    bool sendandReceiveFrame(int socket, struct can_frame &frame);
+    bool sendandReceiveFrame(const std::string &ifname, can_frame &frame);
+    bool sendandReceiveFrame(int socket, can_frame &frame);
 
     void setSocketNonBlock();
     void setSocketBlock();
@@ -52,7 +52,7 @@ private:
     std::vector<std::string> listAndActivateAvailableCANPorts();    // Down 상태인 CAN 포트 활성화 및 활성화 포트 저장
     bool getCanPortStatus(const char *port);                        // CAN 포트 활성화 상태 확인
     void activateCanPort(const char *port);                         // CAN 포트 활성화
-    int createSocket(const std::string &ifname);                    // CAN 소켓 생성 및 바인딩
+    int createSocket(const std::string& ifname);                    // CAN 소켓 생성 및 바인딩
 
     int setSocketTimeout(int socket, int sec, int usec);
     void clearCanBuffer(int canSocket);
