@@ -10,21 +10,26 @@ TrajectoryGenerator::~TrajectoryGenerator() {
 
 std::vector<ControlSetPoint> TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
     switch (motion.type) {
-    case MotionType::TRANSLATE:
+    case MotionType::TRANSLATE: {
         if (motion.space == TrajectorySpace::JOINT) {
             std::vector<ControlSetPoint> trajectory = generate_joint_space_trajectory(motion);
             return trajectory;
         } else if (motion.space == TrajectorySpace::TASK) {
             std::vector<ControlSetPoint> trajectory = generate_task_space_trajectory(motion);
             return trajectory;
+        } else {
+            std::cerr << "[TrajectoryGenerator] Unknown motion trajectory space\n";
+            return {ControlSetPoint(1)};
         }
-        break;
-    case MotionType::IDLE:
-        break;
+    }
+    case MotionType::IDLE: {
+        std::vector<ControlSetPoint> trajectory = generate_idle_trajectory();
+        return trajectory;
+    }
     }
 
-    std::vector<ControlSetPoint> err = {ControlSetPoint(1)};    // TODO: 에러 메세지 출력
-    return err;
+    std::cerr << "[TrajectoryGenerator] Unknown motion type\n";
+    return {ControlSetPoint(1)};
 }
 
 std::vector<ControlSetPoint> TrajectoryGenerator::generate_joint_space_trajectory(const MotionPrimitive& motion) {
@@ -35,21 +40,106 @@ std::vector<ControlSetPoint> TrajectoryGenerator::generate_joint_space_trajector
 
     std::vector<double> q0 = last_q;
     std::vector<double> q1 = motion.q_target;
+    int n = q0.size();
 
-    for (int k = 0; k < num_point; k++) {
-        ControlSetPoint set_point = sample(q0, q1, num_point, k, motion.profile);
+    for (int k = 1; k <= num_point; k++) {
+        auto [q, qd] = sample(q0, q1, num_point, k, motion.profile);
+
+        ControlSetPoint set_point(n);
+        set_point.q = q;
+        set_point.qd = qd;
         set_point.mode = modes;
         trajectory.push_back(set_point);
     }
 
     last_q  = q1;
-    last_qd = std::vector<double>(q0.size(), 0.0);
+    last_qd = std::vector<double>(n, 0.0);
 
     return trajectory;
 }
 
 std::vector<ControlSetPoint> TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& motion) {
+    std::vector<ControlSetPoint> trajectory;
 
+    std::vector<ControlMode> modes = get_modes();
+    int num_point = static_cast<int>(motion.t_total / dt);
+
+    std::vector<double> q0 = last_q;
+    std::vector<double> q1 = motion.q_target;
+    int n = q0.size();
+
+    std::vector<double> p0 = {
+        last_p_R[0], last_p_R[1], last_p_R[2],
+        last_p_L[0], last_p_L[1], last_p_L[2]
+    };
+
+    std::vector<double> p1 = {
+        motion.p_target_R[0], motion.p_target_R[1], motion.p_target_R[2],
+        motion.p_target_L[0], motion.p_target_L[1], motion.p_target_L[2]
+    };
+
+    for (int k = 1; k <= num_point; k++) {
+        auto [q, qd] = sample(q0, q1, num_point, k, motion.profile);
+        auto [p, pd] = sample(p0, p1, num_point, k, motion.profile);
+
+        std::array<double, 3> pR = {p[0], p[1], p[2]};
+        std::array<double, 3> pL = {p[3], p[4], p[5]};
+        double theta0 = q[0];
+        double theta7 = q[7];
+        double theta8 = q[8];
+        KinematicsSolver::IKResult result = solver.solve(pR, pL, theta0, theta7, theta8);
+
+        if (!result.success) {
+            // TODO: 에러 메세지 출력
+            break;
+        }
+
+        // 13차원 set_point 구성: IK 결과(0~8) + 관절 보간값(9~12)
+        ControlSetPoint set_point(n);
+        for (int i = 0; i < 9; i++) {
+            set_point.q[i] = result.q[i];   // 관절 0~8 (팔)
+            set_point.qd[i] = 0.0;          // TODO: 속도 계산
+        }
+        for (int i = 9; i < n; i++) {
+            set_point.q[i] = q[i];          // 관절 9~12 (페달, 머리)
+            set_point.qd[i] = qd[i]; 
+        }
+        set_point.mode = modes;
+        trajectory.push_back(set_point);
+    }
+
+    last_q  = q1;
+    last_qd = std::vector<double>(n, 0.0);
+    // TODO: last_p_R, last_p_L 갱신 필요
+
+    return trajectory;
+}
+
+std::vector<ControlSetPoint> TrajectoryGenerator::generate_idle_trajectory() {
+    std::vector<ControlSetPoint> trajectory;
+
+    std::vector<ControlMode> modes = get_modes();
+    double t_total = 1.0;
+    int num_point = static_cast<int>(t_total / dt);
+
+    std::vector<double> q0 = last_q;
+    std::vector<double> q1 = last_q;    // TODO: 미세한 움직임 구현
+    int n = q0.size();
+
+    for (int k = 1; k <= num_point; k++) {
+        auto [q, qd] = sample_cosine(q0, q1, num_point, k);
+
+        ControlSetPoint set_point(n);
+        set_point.q = q;
+        set_point.qd = qd;
+        set_point.mode = modes;
+        trajectory.push_back(set_point);
+    }
+
+    last_q  = q1;
+    last_qd = std::vector<double>(n, 0.0);
+
+    return trajectory;
 }
 
 std::vector<ControlMode> TrajectoryGenerator::get_modes() {
@@ -72,40 +162,149 @@ std::vector<ControlMode> TrajectoryGenerator::get_modes() {
     return modes;
 }
 
-ControlSetPoint TrajectoryGenerator::sample(std::vector<double>& q0, std::vector<double>& q1, double n, double k, TrajectoryProfile profile) {
-    ControlSetPoint set_point;
+std::pair<std::vector<double>, std::vector<double>>
+TrajectoryGenerator::sample(std::vector<double>& q0, std::vector<double>& q1, int n, int k, TrajectoryProfile profile) {
+    std::pair<std::vector<double>, std::vector<double>> result;
 
-    switch (profile)
-    {
+    switch (profile) {
     case TrajectoryProfile::TRAPEZOIDAL:
-        set_point = sample_trapezoidal(q0, q1, n, k);
+        result = sample_trapezoidal(q0, q1, n, k);
         break;
     case TrajectoryProfile::CUBIC:
-        set_point = sample_cubic(q0, q1, n, k);
+        result = sample_cubic(q0, q1, n, k);
         break;
     case TrajectoryProfile::QUINTIC:
-        set_point = sample_quintic(q0, q1, n, k);
+        result = sample_quintic(q0, q1, n, k);
         break;
     case TrajectoryProfile::COSINE:
-        set_point = sample_cosine(q0, q1, n, k);
+        result = sample_cosine(q0, q1, n, k);
         break;
     }
 
-    return set_point;
+    return result;
 }
 
-ControlSetPoint TrajectoryGenerator::sample_trapezoidal(std::vector<double>& q0, std::vector<double>& q1, double n, double k) {
+std::pair<std::vector<double>, std::vector<double>>
+TrajectoryGenerator::sample_trapezoidal(std::vector<double>& q0, std::vector<double>& q1, int n, int k) {
+    // 사다리꼴 속도 프로파일: 가속(1/4) - 등속(1/2) - 감속(1/4)
+    // 정규화 시간 s = k / n  (구간 [0, 1))
+    // 정규화 속도 = 위치 미분 / t_total  (qd = ds/dt · (q1 - q0), t_total = n·dt)
 
+    int dim = q0.size();
+    std::vector<double> q(dim, 0.0);
+    std::vector<double> qd(dim, 0.0);
+ 
+    double s = static_cast<double>(k) / static_cast<double>(n);   // 정규화 시간 [0, 1)
+    double t_total = n * dt;                                      // 실제 전체 시간 [s]
+ 
+    double s_pos;   // 정규화 위치 [0, 1]
+    double s_vel;   // 정규화 속도 ds/d(s_time)
+ 
+    const double t_acc = 0.25;      // 가속 구간 비율
+    const double v_max = 4.0 / 3.0; // 최대 정규화 속도 (등속 구간 속도)
+ 
+    if (s < t_acc) {
+        // 가속 구간
+        s_pos = 0.5 * v_max * (s * s) / t_acc;
+        s_vel = v_max * (s / t_acc);
+    } else if (s < 1.0 - t_acc) {
+        // 등속 구간
+        s_pos = 0.5 * v_max * t_acc + v_max * (s - t_acc);
+        s_vel = v_max;
+    } else {
+        // 감속 구간
+        double tau = 1.0 - s;
+        s_pos = 1.0 - 0.5 * v_max * (tau * tau) / t_acc;
+        s_vel = v_max * (tau / t_acc);
+    }
+    s_pos = std::clamp(s_pos, 0.0, 1.0);
+ 
+    for (int i = 0; i < dim; i++) {
+        double dq = q1[i] - q0[i];
+        q[i]  = q0[i] + s_pos * dq;
+        qd[i] = (s_vel / t_total) * dq;
+    }
+ 
+    return {q, qd};
 }
 
-ControlSetPoint TrajectoryGenerator::sample_cubic(std::vector<double>& q0, std::vector<double>& q1, double n, double k) {
-
+std::pair<std::vector<double>, std::vector<double>>
+TrajectoryGenerator::sample_cubic(std::vector<double>& q0, std::vector<double>& q1, int n, int k) {
+    // 3차 다항식 보간: 양 끝점에서 속도 0
+    // 정규화 시간 s = k / n  (구간 [0, 1))
+    // 정규화 속도 = 위치 미분 / t_total  (qd = ds/dt · (q1 - q0), t_total = n·dt)
+ 
+    int dim = q0.size();
+    std::vector<double> q(dim, 0.0);
+    std::vector<double> qd(dim, 0.0);
+ 
+    double s = static_cast<double>(k) / static_cast<double>(n);
+    double t_total = n * dt;
+ 
+    double s_pos = 3.0 * s * s - 2.0 * s * s * s;
+    double s_vel = 6.0 * s * (1.0 - s);
+ 
+    for (int i = 0; i < dim; i++) {
+        double dq = q1[i] - q0[i];
+        q[i]  = q0[i] + s_pos * dq;
+        qd[i] = (s_vel / t_total) * dq;
+    }
+ 
+    return {q, qd};
 }
 
-ControlSetPoint TrajectoryGenerator::sample_quintic(std::vector<double>& q0, std::vector<double>& q1, double n, double k) {
+std::pair<std::vector<double>, std::vector<double>>
+TrajectoryGenerator::sample_quintic(std::vector<double>& q0, std::vector<double>& q1, int n, int k) {
+    // 5차 다항식 보간: 양 끝점에서 속도와 가속도 모두 0
+    // 정규화 시간 s = k / n  (구간 [0, 1))
+    // 정규화 속도 = 위치 미분 / t_total  (qd = ds/dt · (q1 - q0), t_total = n·dt)
 
+    int dim = q0.size();
+    std::vector<double> q(dim, 0.0);
+    std::vector<double> qd(dim, 0.0);
+ 
+    double s = static_cast<double>(k) / static_cast<double>(n);
+    double t_total = n * dt;
+ 
+    double s2 = s * s;
+    double s3 = s2 * s;
+    double s4 = s3 * s;
+    double s5 = s4 * s;
+ 
+    double s_pos = 10.0 * s3 - 15.0 * s4 + 6.0 * s5;
+    double s_vel = 30.0 * s2 - 60.0 * s3 + 30.0 * s4;
+ 
+    for (int i = 0; i < dim; i++) {
+        double dq = q1[i] - q0[i];
+        q[i]  = q0[i] + s_pos * dq;
+        qd[i] = (s_vel / t_total) * dq;
+    }
+ 
+    return {q, qd};
 }
 
-ControlSetPoint TrajectoryGenerator::sample_cosine(std::vector<double>& q0, std::vector<double>& q1, double n, double k) {
-
+std::pair<std::vector<double>, std::vector<double>>
+TrajectoryGenerator::sample_cosine(std::vector<double>& q0, std::vector<double>& q1, int n, int k) {
+    // 사인(코사인) 보간: s(t) = (1 - cos(πt)) / 2
+    // 양 끝점에서 속도 0, 매끄러운 가속/감속
+    // 정규화 시간 s = k / n  (구간 [0, 1))
+    // 정규화 속도 = 위치 미분 / t_total  (qd = ds/dt · (q1 - q0), t_total = n·dt)
+ 
+    int dim = q0.size();
+    std::vector<double> q(dim, 0.0);
+    std::vector<double> qd(dim, 0.0);
+ 
+    double s = static_cast<double>(k) / static_cast<double>(n);
+    double t_total = n * dt;
+ 
+    double s_pos = 0.5 * (1.0 - std::cos(M_PI * s));
+    double s_vel = 0.5 * M_PI * std::sin(M_PI * s);
+ 
+    for (int i = 0; i < dim; i++) {
+        double dq = q1[i] - q0[i];
+        q[i]  = q0[i] + s_pos * dq;
+        qd[i] = (s_vel / t_total) * dq;
+    }
+ 
+    return {q, qd};
 }

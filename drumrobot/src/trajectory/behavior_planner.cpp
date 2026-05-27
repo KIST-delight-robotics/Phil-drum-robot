@@ -12,7 +12,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
 
 }
 
-// if (ctx.shutdown_requested.load()) return;
+
 
 // 명령 파싱 및 motion_queue에 적재
 // if (ctx.send_active) {
