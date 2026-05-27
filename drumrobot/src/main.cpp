@@ -8,6 +8,7 @@
 #include "common/app_context.hpp"
 #include "common/command_queue.hpp"
 #include "common/control_queue.hpp"
+#include "common/motion_queue.hpp"
 #include "hardware/robot.hpp"
 #include "input/keyboard_handler.hpp"
 #include "net/tcp_server.hpp"
@@ -36,6 +37,7 @@ int main(int argc, char* argv[]) {
     AppContext ctx;
     CommandQueue command_queue;
     ControlQueue control_queue;
+    MotionQueue motion_queue;
 
     Robot robot;
     robot.initialize();
@@ -43,7 +45,7 @@ int main(int argc, char* argv[]) {
     KeyboardHandler keyborad_handler(ctx, command_queue);
     TcpServer server(ctx, PORT, command_queue);
     Controller controller(ctx, control_queue, robot);
-    MotionPlanner motion_planner(ctx, command_queue, control_queue, robot);
+    MotionPlanner motion_planner(ctx, command_queue, control_queue, motion_queue, robot);
 
     std::thread send_thread(&Controller::send_loop, &controller);
     std::thread recv_thread(&Controller::recv_loop, &controller);
