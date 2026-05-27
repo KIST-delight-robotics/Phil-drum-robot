@@ -1,7 +1,7 @@
 #include "trajectory/motion_planner.hpp"
 
 MotionPlanner::MotionPlanner(AppContext &ctxRef, CommandQueue &commandQueueRef, ControlQueue &controlQueueRef, MotionQueue &motionQueueRef, Robot &robotRef)
-    : ctx(ctxRef), command_queue(commandQueueRef), control_queue(controlQueueRef), motion_queue(motionQueueRef), robot(robotRef) {}
+    : ctx(ctxRef), command_queue(commandQueueRef), control_queue(controlQueueRef), motion_queue(motionQueueRef), robot(robotRef), behavior_planner(ctxRef) {}
 
 MotionPlanner::~MotionPlanner() {}
 

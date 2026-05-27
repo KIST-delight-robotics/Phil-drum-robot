@@ -24,7 +24,10 @@ enum class Opcode {
     MOVE,       // 개별 관절 이동   args: motorName, angleDeg, [moveTime=2.0]
     POSE,       // 사전 정의 포즈   args: poseName (home / ready / shutdown)
     HIT,        // 드럼 타격       args: target (snare / hihat / kick / ...)
-    QUIT,       // 종료           args: 없음
+    
+    // args 없음
+    START,      // 시작
+    QUIT,       // 종료
     UNKNOWN
 };
 

@@ -76,6 +76,7 @@ Opcode CommandParser::to_opcode(const std::string& token) const {
     if (upper == "MOVE")    return Opcode::MOVE;
     if (upper == "POSE")    return Opcode::POSE;
     if (upper == "PICK")    return Opcode::HIT;
+    if (upper == "START")   return Opcode::START;
     if (upper == "QUIT" || upper == "Q") return Opcode::QUIT;
 
     return Opcode::UNKNOWN;
@@ -88,6 +89,7 @@ bool CommandParser::validate_args(Opcode opcode, const std::vector<std::string>&
         case Opcode::MOVE:      return args.size() >= 2;    // motorName, angleDeg, [moveTime]
         case Opcode::POSE:      return args.size() >= 1;    // poseName
         case Opcode::HIT:       return args.size() >= 1;    // target
+        case Opcode::START:     return true;                // 인자 없음
         case Opcode::QUIT:      return true;                // 인자 없음
         default:                return false;
     }
