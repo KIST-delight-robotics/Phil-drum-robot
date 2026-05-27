@@ -4,8 +4,8 @@ Controller::Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot 
     : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef), motor_log("motor")
 {
     int n = robot.num_joint;
-    curr_data = ControlData(n);
-    prev_data = ControlData(n);
+    curr_data = ControlSetPoint(n);
+    prev_data = ControlSetPoint(n);
 
     for (auto &[id, motor] : robot.motors) {
         if (id < n) {            
@@ -97,7 +97,7 @@ void Controller::recv_loop() {
 void Controller::send_task_1ms(int cnt) {
     double alpha = static_cast<double>(cnt + 1) / 5.0;
 
-    ControlData interp(curr_data.q.size());
+    ControlSetPoint interp(curr_data.q.size());
     interp.mode = curr_data.mode;
     for (size_t i = 0; i < curr_data.q.size(); ++i) {
         interp.q[i]    = prev_data.q[i] + alpha * (curr_data.q[i] - prev_data.q[i]);
@@ -126,7 +126,7 @@ void Controller::send_task_5ms() {
     }
 }
 
-void Controller::tmotor_send_task(const ControlData &data) {
+void Controller::tmotor_send_task(const ControlSetPoint &data) {
     struct can_frame frame;
  
     for (auto &[id, motor] : robot.motors) {
@@ -189,7 +189,7 @@ void Controller::tmotor_send_task(const ControlData &data) {
     }
 }
 
-void Controller::maxon_motor_send_task(const ControlData &data) {
+void Controller::maxon_motor_send_task(const ControlSetPoint &data) {
     struct can_frame frame;
  
     for (auto &[id, motor] : robot.motors) {
@@ -271,7 +271,7 @@ double Controller::cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_
     return torque_mNm;
 }
 
-void Controller::dynamicxel_send_task(const ControlData &data) {
+void Controller::dynamicxel_send_task(const ControlSetPoint &data) {
     for (auto &[id, motor] : robot.motors) {
         auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
         if (!dxl) continue;

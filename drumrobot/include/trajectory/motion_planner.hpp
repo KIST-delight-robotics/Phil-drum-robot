@@ -14,7 +14,6 @@
 #include "common/control_queue.hpp"
 #include "common/motion_queue.hpp"
 #include "hardware/robot.hpp"
-#include "kinematics/kinematics_solver.hpp"
 #include "trajectory/behavior_planner.hpp"
 #include "trajectory/command_parser.hpp"
 #include "trajectory/trajectory_generator.hpp"
@@ -34,7 +33,6 @@ private:
 
     Robot &robot;
 
-    KinematicsSolver solver;
     BehaviorPlanner behavior_planner;
     CommandParser command_parser;
     TrajectoryGenerator trajectory_generator;

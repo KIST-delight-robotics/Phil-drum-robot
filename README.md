@@ -145,12 +145,12 @@ Phil/
 | 4 | right_elbow | TMotor | AK70_10 |
 | 5 | left_shoulder_2 | TMotor | AK70_10 |
 | 6 | left_elbow | TMotor | AK70_10 |
-| 7 | right_wrist | MaxonMotor | (모델명) |
-| 8 | left_wrist | MaxonMotor | (모델명) |
-| 9 | right_pedal | MaxonMotor | (모델명) |
-| 10 | left_pedal | MaxonMotor | (모델명) |
-| 11 | head_yaw | DynamixelMotor | (모델명) |
-| 12 | head_pitch | DynamixelMotor | (모델명) |
+| 7 | right_wrist | MaxonMotor | DCX22L |
+| 8 | left_wrist | MaxonMotor | DCX22L |
+| 9 | right_pedal | MaxonMotor | DCX32L |
+| 10 | left_pedal | MaxonMotor | DCX32L |
+| 11 | head_yaw | DynamixelMotor | XM430-W210-T |
+| 12 | head_pitch | DynamixelMotor | XM430-W210-T |
 
 ### 지원 제어 모드
 

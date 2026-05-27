@@ -4,14 +4,14 @@ ControlQueue::ControlQueue() {}
 
 ControlQueue::~ControlQueue() {}
 
-void ControlQueue::push(ControlData data) {
+void ControlQueue::push(ControlSetPoint data) {
     std::lock_guard<std::mutex> lock(mutex_);
     queue_.push(data);
 }
 
-ControlData ControlQueue::pop() {
+ControlSetPoint ControlQueue::pop() {
     std::lock_guard<std::mutex> lock(mutex_);
-    ControlData data = queue_.front();
+    ControlSetPoint data = queue_.front();
     queue_.pop();
     return data;
 }

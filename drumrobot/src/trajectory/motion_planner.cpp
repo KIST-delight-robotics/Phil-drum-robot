@@ -33,8 +33,6 @@ void MotionPlanner::run() {
 }
 
 void MotionPlanner::initialize() {
-    solver.initialize();
-
     init_poses_from_json();
 
     // init 포즈 vs 모터 initial_joint_angle 비교
@@ -85,13 +83,15 @@ void MotionPlanner::schedule_idle_motion() {
     if (ctx.shutdown_requested.load()) return;
 
     MotionPrimitive idle_motion;
+
+    idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능
     motion_queue.push(idle_motion);
 }
 
 void MotionPlanner::generate_motion() {
     MotionPrimitive motion = motion_queue.pop();
 
-    std::vector<ControlData> trajectory = trajectory_generator.generate_trajectory(motion);
+    std::vector<ControlSetPoint> trajectory = trajectory_generator.generate_trajectory(motion);
 
     int n = trajectory.size();
     for (int i = 0; i < n; i++) {
