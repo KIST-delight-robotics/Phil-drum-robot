@@ -6,8 +6,6 @@
 #include <optional>
 
 enum class ControlMode {
-    None,
-    
     // T motor
     POS,
     VEL,
@@ -16,6 +14,9 @@ enum class ControlMode {
     CST,
     CSV,
     CSP,
+
+    // Dynamixel or None
+    None,
 };
 
 struct ControlSetPoint {

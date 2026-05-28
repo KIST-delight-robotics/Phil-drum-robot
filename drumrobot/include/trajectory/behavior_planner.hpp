@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <cmath>
+#include <fstream>
 
 #include "nlohmann/json.hpp"
 

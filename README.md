@@ -127,7 +127,7 @@ Phil/
 총 13개 관절. `motors.json`에 ID 순서대로 정의됨.
 
 | ID | 이름 | 타입 | 모델 |
-|---|---|---|---|---|
+|---|---|---|---|
 | 0 | waist | TMotor | AK10-9 |
 | 1 | right_shoulder_1 | TMotor | AK70-10 |
 | 2 | left_shoulder_1 | TMotor | AK70-10 |
@@ -154,7 +154,7 @@ Phil/
 ### 모터 통신
 
 | 모터 | 물리 계층 | 프로토콜 |
-|---|---|---|---|
+|---|---|---|
 | TMotor | CAN 1Mbps | TMotor 독자 Servo / MIT 모드 |
 | MaxonMotor | CAN 1Mbps | CANopen (SDO / PDO) |
 | DynamixelMotor | UART 4.5Mbps (`/dev/ttyUSB0`) | Dynamixel Protocol 2.0 |
@@ -181,9 +181,7 @@ OPCODE|arg1|arg2\n
 | `GESTURE` | `type` | 제스처 실행 (`nod` / `shake` / `wave` / `hi` / `hurray` / `happy`) | ✅ 완료 |
 | `MOVE` | `motor_name`, `angle_deg`, `[move_time=2.0]` | 개별 관절 이동 | ✅ 완료 |
 | `POSE` | `pose_name` | 사전 정의 포즈로 이동 (`home` / `ready` / `shutdown`) | ✅ 완료 |
-| `HIT` | `target` | 드럼 타격 (HIT 동의어) | ⚠️ 미구현 (프레임워크만 존재) |
-
-> **주의**: 현재 파서는 `HIT` 문자열을 인식하지 않습니다. 타격 명령은 반드시 `PICK`을 사용하세요.
+| `HIT` | `target` | 드럼 타격 | ⚠️ 미구현 (프레임워크만 존재) |
 
 ### 사전 정의 포즈 (`robot_poses.json`)
 

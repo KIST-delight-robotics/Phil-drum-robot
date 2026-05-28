@@ -42,7 +42,7 @@ int main(int argc, char* argv[]) {
     Robot robot;
     robot.initialize();
 
-    KeyboardHandler keyborad_handler(ctx, command_queue);
+    KeyboardHandler keyboard_handler(ctx, command_queue);
     TcpServer server(ctx, PORT, command_queue);
     Controller controller(ctx, control_queue, robot);
     MotionPlanner motion_planner(ctx, command_queue, control_queue, motion_queue, robot);
@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
     set_priority(motion_planning_thread, 20);
 
     if (mode == "keyboard") {
-        std::thread keyboard_input_thread(&KeyboardHandler::run, &keyborad_handler);
+        std::thread keyboard_input_thread(&KeyboardHandler::run, &keyboard_handler);
         set_priority(keyboard_input_thread, 10);
         keyboard_input_thread.join();
     } else if (mode == "llm") {
