@@ -114,7 +114,8 @@
             "rx_pdo_ids[0]": "0x187",
             "rx_pdo_ids[1]": "0x287",
             "control_kp": 60.0,
-            "control_kd": 6.0
+            "control_kd": 6.0,
+            "gear_ratio": 35
         },
         {
             "type": "MaxonMotor",
@@ -132,7 +133,8 @@
             "rx_pdo_ids[0]": "0x188",
             "rx_pdo_ids[1]": "0x288",
             "control_kp": 60.0,
-            "control_kd": 6.0
+            "control_kd": 6.0,
+            "gear_ratio": 35
         },
         {
             "type": "MaxonMotor",
@@ -150,7 +152,8 @@
             "rx_pdo_ids[0]": "0x18A",
             "rx_pdo_ids[1]": "0x28A",
             "control_kp": 60.0,
-            "control_kd": 6.0
+            "control_kd": 6.0,
+            "gear_ratio": 35
         },
         {
             "type": "MaxonMotor",
@@ -168,7 +171,8 @@
             "rx_pdo_ids[0]": "0x18B",
             "rx_pdo_ids[1]": "0x28B",
             "control_kp": 60.0,
-            "control_kd": 6.0
+            "control_kd": 6.0,
+            "gear_ratio": 35
         },
         {
             "type": "Dynamixel",

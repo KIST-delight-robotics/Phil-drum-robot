@@ -69,7 +69,7 @@ public:
     uint32_t tx_pdo_ids[4];
     uint32_t rx_pdo_ids[2];
 
-    double gear_ratio = 35.0;
+    double gear_ratio;
     double control_kp;          // CST 모드용 P 게인
     double control_kd;          // CST 모드용 D 게인
     double prev_err = 0.0;       // CST 모드용 이전 오차

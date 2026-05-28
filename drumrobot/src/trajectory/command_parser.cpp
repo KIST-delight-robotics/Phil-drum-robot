@@ -75,7 +75,7 @@ Opcode CommandParser::to_opcode(const std::string& token) const {
     if (upper == "GESTURE") return Opcode::GESTURE;
     if (upper == "MOVE")    return Opcode::MOVE;
     if (upper == "POSE")    return Opcode::POSE;
-    if (upper == "PICK")    return Opcode::HIT;
+    if (upper == "HIT")    return Opcode::HIT;
     if (upper == "START")   return Opcode::START;
     if (upper == "QUIT" || upper == "Q") return Opcode::QUIT;
 

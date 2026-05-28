@@ -72,6 +72,7 @@ void Robot::init_motor_from_json() {
             motor->rx_pdo_ids[1] = std::stoul(m["rx_pdo_ids[1]"].get<std::string>(), nullptr, 16);  // ActualPosition, ActualTorque
             motor->control_kp = m["control_kp"];
             motor->control_kd = m["control_kd"];
+            motor->gear_ratio = m["gear_ratio"];
             motors[id] = motor;
 
             // std::cout << "[Robot] motor setting: " << motor->name << "\n";
