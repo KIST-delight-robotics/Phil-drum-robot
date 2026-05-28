@@ -52,7 +52,10 @@ void TcpServer::run() {
                 command_queue.push(input);
             }
 
-            if (input == "quit" || input == "q") {
+            std::string upper = input;
+            std::transform(upper.begin(), upper.end(), upper.begin(),
+                        [](unsigned char c){ return std::toupper(c); });
+            if (upper == "QUIT" || upper == "Q") {
                 quitting = true;
                 break;
             }

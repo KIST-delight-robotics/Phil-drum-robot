@@ -5,7 +5,11 @@ Robot::Robot() {
 }
 
 Robot::~Robot() {
-    
+    if (dxl_port) {
+        dxl_port->closePort();
+        delete dxl_port;
+        dxl_port = nullptr;
+    }
 }
 
 void Robot::initialize() {
@@ -91,6 +95,8 @@ void Robot::init_motor_from_json() {
 }
 
 void Robot::set_motors_socket() {
+    // 각 모터에 대해 사용 가능한 모든 CAN 소켓을 순회하며 응답 여부로 연결 확인.
+    // 연결 안 된 모터는 마지막 시도 소켓 값이 남지만, 함수 끝에서 motors map에서 erase되므로 이후 사용되지 않음.
     struct can_frame frame;
     can.setSocketsTimeout(0, 10000);    // 타임아웃 10ms 설정
     can.clearReadBuffers();
@@ -435,18 +441,41 @@ void Robot::init_dynamicxel() {
         if (dxl_comm_result == COMM_SUCCESS && dxl_error == 0) {
             // DXL 토크 ON
             pkt->write1ByteTxRx(port, dxl->dxl_id, 64, 1, &err);
-
-            dxl->port = port;
-            dxl->pkt = pkt;
-
             printf("[Robot] --------------> ID:%03d Found! Model number: %d\n", dxl->dxl_id, dxl_model_number);
         } else {
-            printf("[Robot] ID:%03d COMM FAIL\n", dxl->dxl_id);
             to_remove.push_back(id);
+            printf("[Robot] ID:%03d COMM FAIL\n", dxl->dxl_id);
         }
     }
 
     for (int id : to_remove) {
         motors.erase(id);
     }
+
+    // group sync 생성
+    bool has_dxl = false;
+    for (auto &[id, motor] : motors) {
+        if (std::dynamic_pointer_cast<DynamixelMotor>(motor)) {
+            has_dxl = true;
+            break;
+        }
+    }
+    if (!has_dxl) {
+        return;  // group sync 생성 안 함
+    }
+
+    dxl_sw = std::make_unique<dynamixel::GroupSyncWrite>(port, pkt, 108, 12);
+    dxl_sr = std::make_unique<dynamixel::GroupSyncRead>(port, pkt, 132, 4);
+    for (auto &[id, motor] : motors) {
+        auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
+        if (!dxl) continue;
+        // read는 한 번만 등록하면 끝  
+        if (!dxl_sr->addParam(dxl->dxl_id)) {
+            std::cerr << "[Robot] dxl_sr addParam failed for ID:"
+                    << (int)dxl->dxl_id << "\n";
+            continue;
+        }
+    }
+    dxl_port = port;
+    dxl_pkt  = pkt;
 }

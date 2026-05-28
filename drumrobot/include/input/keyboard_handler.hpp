@@ -3,6 +3,8 @@
 #include <iostream>
 #include <string>
 #include <unistd.h>
+#include <algorithm>
+#include <cctype>
 
 #include "common/app_context.hpp"
 #include "common/command_queue.hpp"

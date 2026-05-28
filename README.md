@@ -135,12 +135,12 @@ Phil/
 | 4 | right_elbow | TMotor | AK70-10 |
 | 5 | left_shoulder_2 | TMotor | AK70-10 |
 | 6 | left_elbow | TMotor | AK70-10 |
-| 7 | right_wrist | MaxonMotor | DXL22L |
-| 8 | left_wrist | MaxonMotor | DXL22L |
-| 9 | right_pedal | MaxonMotor | DXL32L |
-| 10 | left_pedal | MaxonMotor | DXL32L |
-| 11 | head_yaw | DynamixelMotor | XM430-W210-T |
-| 12 | head_pitch | DynamixelMotor | XM430-W210-T |
+| 7 | right_wrist | MaxonMotor | DCX22L |
+| 8 | left_wrist | MaxonMotor | DCX22L |
+| 9 | right_pedal | MaxonMotor | DCX32L |
+| 10 | left_pedal | MaxonMotor | DCX32L |
+| 11 | head_yaw | Dynamixel | XM430-W210-T |
+| 12 | head_pitch | Dynamixel | XM430-W210-T |
 
 ### 지원 제어 모드
 
@@ -149,7 +149,7 @@ Phil/
 | TMotor | `POS` (SET_POS), `VEL` (SET_RPM + P 피드백), `SET_POS_SPD`, `SET_ORIGIN`, `CURRENT_BRAKE` |
 | TMotor (MIT) | Position-Velocity-Torque 통합 제어 코덱 구현됨. 단, Controller에서 현재 미사용 |
 | MaxonMotor | `CSP` (Cyclic Sync Position), `CST` (Cyclic Sync Torque), `HMM` (Homing). `CSV` 미구현 |
-| DynamixelMotor | 위치 제어 (Profile Acceleration / Velocity + Goal Position) |
+| Dynamixel | 위치 제어 (Profile Acceleration / Velocity + Goal Position) |
 
 ### 모터 통신
 
@@ -157,7 +157,7 @@ Phil/
 |---|---|---|
 | TMotor | CAN 1Mbps | TMotor 독자 Servo / MIT 모드 |
 | MaxonMotor | CAN 1Mbps | CANopen (SDO / PDO) |
-| DynamixelMotor | UART 4.5Mbps (`/dev/ttyUSB0`) | Dynamixel Protocol 2.0 |
+| Dynamixel | UART 4.5Mbps (`/dev/ttyUSB0`) | Dynamixel Protocol 2.0 |
 
 ---
 
@@ -274,5 +274,5 @@ python3 planner/main.py
 - **CAN bitrate**: 1Mbps (`can_interface.cpp::activateCanPort`)
 - **Maxon 보간**: `send_loop`에서 5ms 구간을 1ms×5 스텝으로 분할하여 CSP 위치 명령을 선형 보간 전송. 5ms 시점에서 TMotor / Maxon / Dynamixel을 동시 송신
 - **virtual_maxon_motor**: 소켓당 Maxon 모터 1개를 대표로 선정해 Sync 프레임(0x80) 전송에 사용
-- **Logger**: 런타임 시 `drumrobot/log/` 디렉토리에 `motor_MMDD_HHmm.csv` 형식의 파일 생성. 헤더 컬럼: `t, id, mode, desired, actual, err, torque, input` (TMotor VEL / Maxon CST 기준. Maxon CSP·Dynamixel은 `input` 없이 기록)
+- **Logger**: 런타임 시 `drumrobot/log/` 디렉토리에 `log_MMDD_HHmm_{name}.csv` 형식의 파일 생성. 헤더 컬럼: `t, id, mode, desired, actual, err, current/torque, input` (TMotor VEL / Maxon CST 기준. Maxon CSP·Dynamixel은 `input` 없이 기록)
 - **모드 초기값**: TMotor = `VEL`, Wrist(Maxon) = `CST`, Pedal(Maxon) = `CSP` (`trajectory_generator.hpp` 참조)

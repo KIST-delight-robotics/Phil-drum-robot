@@ -16,7 +16,7 @@ def main():
             if not msg:
                 continue
  
-            s.sendall(msg.encode())
+            s.sendall(msg.encode()) # TODO: 패킷 구분자 포함해서 형식 맞춰서 보내기
  
             if msg == "quit" or msg == "q":
                 break

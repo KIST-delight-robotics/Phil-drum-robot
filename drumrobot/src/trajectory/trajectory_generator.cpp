@@ -346,7 +346,7 @@ void TrajectoryGenerator::update_last_q(const std::vector<double>& q) {
     }
     
     last_p_R.assign(result.pR.begin(), result.pR.end());
-    last_p_R.assign(result.pL.begin(), result.pL.end());
+    last_p_L.assign(result.pL.begin(), result.pL.end());
 }
 
 void TrajectoryGenerator::update_last_q(const std::vector<double>& p, const std::vector<double>& q) {
@@ -373,5 +373,5 @@ void TrajectoryGenerator::update_last_q(const std::vector<double>& p, const std:
     last_qd = std::vector<double>(num_joint, 0.0);
 
     last_p_R.assign(pR.begin(), pR.end());
-    last_p_R.assign(pL.begin(), pL.end());
+    last_p_L.assign(pL.begin(), pL.end());
 }

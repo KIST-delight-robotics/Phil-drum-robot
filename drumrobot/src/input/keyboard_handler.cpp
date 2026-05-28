@@ -21,10 +21,14 @@ void KeyboardHandler::run() {
 
         // 명령을 CommandQueue 에 push
         if (!input.empty()) {
-            command_queue.push(input);
+            command_queue.push(input);  // TODO: 패킷 구분자 포함해서 형식 맞춰서 보내기
         }
 
-        if (input == "quit" || input == "q") {
+        // quit 비교는 대문자로 정규화해서
+        std::string upper = input;
+        std::transform(upper.begin(), upper.end(), upper.begin(),
+                    [](unsigned char c){ return std::toupper(c); });
+        if (upper == "QUIT" || upper == "Q") {
             quitting = true;
         }
     }

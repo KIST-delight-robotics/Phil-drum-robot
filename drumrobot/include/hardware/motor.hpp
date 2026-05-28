@@ -88,21 +88,12 @@ class DynamixelMotor : public Motor {
 public:
     DynamixelMotor(int id);
 
-    dynamixel::PortHandler *port;
-    dynamixel::PacketHandler *pkt;
     uint8_t dxl_id;
 
-    void dxl_torque_off();
-    void write_command(const std::vector<double>& command);
-    std::pair<bool, double> read_data();
+    int32_t angle_to_tick(double angle);
+    double tick_to_angle(int32_t ticks);
 
     double current_position = 0.0;
 
 private:
-    std::unique_ptr<dynamixel::GroupSyncWrite> sw;
-    std::unique_ptr<dynamixel::GroupSyncRead> sr;
-
-    int32_t angle_to_tick(double angle);
-    double tick_to_angle(int32_t ticks);
-    void command_to_values(int32_t values[], const std::vector<double>& command);
 };

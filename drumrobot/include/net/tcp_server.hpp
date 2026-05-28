@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <algorithm>
+#include <cctype>
  
 #include "common/app_context.hpp"
 #include "common/command_queue.hpp"

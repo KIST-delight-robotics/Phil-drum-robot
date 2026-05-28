@@ -272,22 +272,59 @@ double Controller::cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_
 }
 
 void Controller::dynamicxel_send_task(const ControlSetPoint &point) {
+    if (!robot.dxl_sw || !robot.dxl_sr) return;
+
+    // 모든 dxl 모터의 목표값을 dxl_sw에 한 번에 등록
     for (auto &[id, motor] : robot.motors) {
         auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
         if (!dxl) continue;
- 
-        double motor_position  = dxl->joint_angle_to_motor_position(point.q[id]);
- 
-        std::vector<double> dxl_command = {0.0, 0.0, motor_position};   // 속도, 가속도가 0인 경우 계단 입력
-        dxl->write_command(dxl_command);
 
-        std::pair<bool, double> data = dxl->read_data();                // dxl은 별개로 read (5ms 주기)
-        if (data.first) {
-            dxl->current_position = data.second;
-            dxl->current_joint_angle = dxl->motor_position_to_joint_angle(data.second);
+        double motor_position = dxl->joint_angle_to_motor_position(point.q[id]);
+
+        int32_t values[3];
+        uint8_t param[12];
+        // Profile Acceleration, Velocity, Goal Position
+        values[0] = 0;  // ms
+        values[1] = 0;  // ms
+        values[2] = dxl->angle_to_tick(motor_position);
+        memcpy(param, values, sizeof(values));
+
+        if (!robot.dxl_sw->addParam(dxl->dxl_id, param)) {
+            std::cerr << "[Controller] dxl_sw addParam failed for ID:"
+                    << (int)dxl->dxl_id << "\n";
+            continue;
         }
+    }
 
-        std::vector<double> values = {(double)dxl->id,
+    // 한 번에 송신
+    robot.dxl_sw->txPacket();
+    robot.dxl_sw->clearParam();
+
+    // 한 번에 수신
+    int comm = robot.dxl_sr->txRxPacket();
+    if (comm != COMM_SUCCESS) {
+        // 로그만 남기고 진행
+    } else {
+        for (auto &[id, motor] : robot.motors) {
+            auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
+            if (!dxl) continue;
+
+            if (robot.dxl_sr->isAvailable(dxl->dxl_id, 132, 4)) {
+                int32_t tick = robot.dxl_sr->getData(dxl->dxl_id, 132, 4);
+                double pos   = dxl->tick_to_angle(tick);
+                dxl->current_position    = pos;
+                dxl->current_joint_angle = dxl->motor_position_to_joint_angle(pos);
+            }
+        }
+    }
+
+    // 로깅
+    for (auto &[id, motor] : robot.motors) {
+        auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
+        if (!dxl) continue;
+        double motor_position = dxl->joint_angle_to_motor_position(point.q[id]);
+        std::vector<double> values = {
+            (double)dxl->id,
             motor_position,
             dxl->current_position,
             motor_position - dxl->current_position
