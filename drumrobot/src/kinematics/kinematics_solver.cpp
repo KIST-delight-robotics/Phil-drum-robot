@@ -31,9 +31,25 @@ void KinematicsSolver::initialize() {
               << " upper_arm=" << link_length.upper_arm
               << " forearm="   << link_length.forearm
               << " stick="     << link_length.stick << "\n";
+
+    // 기구학 함수 검증
+    // verify_fk_ik();
+
+    // ========== FK-IK Round-trip Verification ==========
+    // Total tests              : 1000
+    // Pass (joint match)     : 467
+    // Mismatch (same endpt)  : 85   <- IK multi-solution, OK
+    // Mismatch (diff endpt)  : 0   <- formula bug suspected
+    // FK failed              : 0
+    // IK failed              : 448
+    // Joint tolerance          : 0.01 deg
+    // Endpoint tolerance       : 0.1 mm
+    // ===================================================
+
+    // IK failed은 왜 저렇게 많은지 이해는 안되는데 문제는 없다고 함.
 }
 
-KinematicsSolver::IKResult KinematicsSolver::solve(
+KinematicsSolver::IKResult KinematicsSolver::ik_solve(
     const std::array<double, 3>& pR,
     const std::array<double, 3>& pL,
     double theta0,
@@ -124,6 +140,288 @@ KinematicsSolver::IKResult KinematicsSolver::solve(
     return result;
 }
 
+KinematicsSolver::FKResult KinematicsSolver::fk_solve(const std::vector<double>& q) {
+    FKResult result;
+ 
+    if (q.size() < 9) {
+        std::cerr << "[KinematicsSolver] forward(): q size < 9 ("
+                  << q.size() << ")\n";
+        return result;
+    }
+ 
+    // 관절 매핑
+    const double Q1 = q[0];   // waist
+    const double Q2 = q[1];   // right_shoulder_1
+    const double Q3 = q[2];   // left_shoulder_1
+    const double Q4 = q[3];   // right_shoulder_2
+    const double Q5 = q[4];   // right_elbow
+    const double Q6 = q[5];   // left_shoulder_2
+    const double Q7 = q[6];   // left_elbow
+    const double Q8 = q[7];   // right_wrist
+    const double Q9 = q[8];   // left_wrist
+ 
+    // 링크 파라미터
+    const double z0    = 0.0;                       // 베이스 높이 (kinematics.json에 z0 없음 — 필요 시 추가)
+    const double s     = link_length.waist;         // 어깨 간격
+    const double r1    = link_length.upper_arm;     // 오른팔 상완
+    const double r2    = link_length.forearm;       // 오른팔 하완
+    const double L1    = link_length.upper_arm;     // 왼팔 상완 (좌우 동일 가정)
+    const double L2    = link_length.forearm;       // 왼팔 하완
+    const double stick = link_length.stick;
+ 
+    // ===== 오른팔 FK =====
+    // MATLAB:
+    //   DH = [0    0       z0   Q(1);
+    //         0    0.5*s   0    Q(2);
+    //         pi/2 0       0    Q(4)-pi/2;
+    //         0    r1      0    Q(5);
+    //         0    r2      0    Q(8);
+    //         0    stick   0    0     ];
+    {
+        const double dh_R[6][4] = {
+            { 0.0,         0.0,      z0,    Q1            },
+            { 0.0,         0.5 * s,  0.0,   Q2            },
+            { M_PI / 2.0,  0.0,      0.0,   Q4 - M_PI / 2.0 },
+            { 0.0,         r1,       0.0,   Q5            },
+            { 0.0,         r2,       0.0,   Q8            },
+            { 0.0,         stick,    0.0,   0.0           }
+        };
+ 
+        std::array<std::array<double, 4>, 4> TR = {{
+            {1.0, 0.0, 0.0, 0.0},
+            {0.0, 1.0, 0.0, 0.0},
+            {0.0, 0.0, 1.0, 0.0},
+            {0.0, 0.0, 0.0, 1.0}
+        }};
+ 
+        for (int i = 0; i < 6; ++i) {
+            const double alpha = dh_R[i][0];
+            const double a     = dh_R[i][1];
+            const double d     = dh_R[i][2];
+            const double theta = dh_R[i][3];
+            auto Ti = dh_transform(a, alpha, d, theta);
+            mat4_mul_inplace(TR, Ti);
+        }
+ 
+        result.pR[0] = TR[0][3];
+        result.pR[1] = TR[1][3];
+        result.pR[2] = TR[2][3];
+    }
+ 
+    // ===== 왼팔 FK =====
+    // MATLAB:
+    //   DH = [0    0        z0   Q(1);
+    //         0    -0.5*s   0    Q(3);
+    //         pi/2 0        0    Q(6)-pi/2;
+    //         0    L1       0    Q(7);
+    //         0    L2       0    Q(9);
+    //         0    stick    0    0     ];
+    {
+        const double dh_L[6][4] = {
+            { 0.0,         0.0,       z0,    Q1            },
+            { 0.0,        -0.5 * s,   0.0,   Q3            },
+            { M_PI / 2.0,  0.0,       0.0,   Q6 - M_PI / 2.0 },
+            { 0.0,         L1,        0.0,   Q7            },
+            { 0.0,         L2,        0.0,   Q9            },
+            { 0.0,         stick,     0.0,   0.0           }
+        };
+ 
+        std::array<std::array<double, 4>, 4> TL = {{
+            {1.0, 0.0, 0.0, 0.0},
+            {0.0, 1.0, 0.0, 0.0},
+            {0.0, 0.0, 1.0, 0.0},
+            {0.0, 0.0, 0.0, 1.0}
+        }};
+ 
+        for (int i = 0; i < 6; ++i) {
+            const double alpha = dh_L[i][0];
+            const double a     = dh_L[i][1];
+            const double d     = dh_L[i][2];
+            const double theta = dh_L[i][3];
+            auto Ti = dh_transform(a, alpha, d, theta);
+            mat4_mul_inplace(TL, Ti);
+        }
+ 
+        result.pL[0] = TL[0][3];
+        result.pL[1] = TL[1][3];
+        result.pL[2] = TL[2][3];
+    }
+ 
+    // NaN / Inf 체크
+    for (int i = 0; i < 3; ++i) {
+        if (std::isnan(result.pR[i]) || std::isinf(result.pR[i]) ||
+            std::isnan(result.pL[i]) || std::isinf(result.pL[i])) {
+            std::cerr << "[KinematicsSolver] forward(): NaN/Inf in result\n";
+            return result;
+        }
+    }
+ 
+    result.success = true;
+    return result;
+}
+
+void KinematicsSolver::verify_fk_ik(int num_tests, double tolerance_deg) {
+    if (joint_limits.size() < 9) {
+        std::cerr << "[KinematicsSolver] verify_fk_ik(): joint_limits 미초기화\n";
+        return;
+    }
+ 
+    std::mt19937 rng(std::random_device{}());
+ 
+    std::array<std::uniform_real_distribution<double>, 9> dists;
+    for (int i = 0; i < 9; ++i) {
+        auto it = joint_limits.find(i);
+        if (it == joint_limits.end()) {
+            std::cerr << "[KinematicsSolver] verify_fk_ik(): joint " << i
+                      << " 한계 없음\n";
+            return;
+        }
+        dists[i] = std::uniform_real_distribution<double>(
+            it->second.min_angle,
+            it->second.max_angle
+        );
+    }
+ 
+    const double tolerance_rad = tolerance_deg * M_PI / 180.0;
+ 
+    int pass = 0;
+    int fk_fail = 0;
+    int ik_fail = 0;
+    int mismatch_same_endpoint = 0;   // 관절각은 다른데 손끝 위치 같음 (IK 다중해)
+    int mismatch_diff_endpoint = 0;   // 손끝 위치도 다름 (공식 버그 가능성)
+ 
+    // 최악 사례 추적
+    double max_endpoint_err = 0.0;
+    std::vector<double> worst_q_in(9, 0.0);
+    std::vector<double> worst_q_out(9, 0.0);
+    std::array<double, 3> worst_pR_target{};
+    std::array<double, 3> worst_pR_actual{};
+    std::array<double, 3> worst_pL_target{};
+    std::array<double, 3> worst_pL_actual{};
+ 
+    for (int t = 0; t < num_tests; ++t) {
+        std::vector<double> q_in(9, 0.0);
+        for (int i = 0; i < 9; ++i) {
+            q_in[i] = dists[i](rng);
+        }
+ 
+        // FK: q_in → (pR, pL)
+        FKResult fk = fk_solve(q_in);
+        if (!fk.success) {
+            fk_fail++;
+            continue;
+        }
+ 
+        // IK: (pR, pL, theta0, theta7, theta8) → q_out
+        IKResult ik = ik_solve(fk.pR, fk.pL, q_in[0], q_in[7], q_in[8]);
+        if (!ik.success) {
+            ik_fail++;
+            continue;
+        }
+ 
+        // 관절각 비교
+        bool joint_match = true;
+        for (int i = 0; i < 9; ++i) {
+            double err = std::abs(q_in[i] - ik.q[i]);
+            err = std::fmod(err, 2.0 * M_PI);
+            if (err > M_PI) err = 2.0 * M_PI - err;
+            if (err > tolerance_rad) {
+                joint_match = false;
+                break;
+            }
+        }
+ 
+        if (joint_match) {
+            pass++;
+            continue;
+        }
+ 
+        // 관절각 mismatch → IK 결과를 다시 FK로 검증
+        FKResult fk2 = fk_solve(ik.q);
+        if (!fk2.success) {
+            mismatch_diff_endpoint++;
+            continue;
+        }
+ 
+        double dxR = fk.pR[0] - fk2.pR[0];
+        double dyR = fk.pR[1] - fk2.pR[1];
+        double dzR = fk.pR[2] - fk2.pR[2];
+        double dxL = fk.pL[0] - fk2.pL[0];
+        double dyL = fk.pL[1] - fk2.pL[1];
+        double dzL = fk.pL[2] - fk2.pL[2];
+ 
+        double endpoint_err_R = std::sqrt(dxR*dxR + dyR*dyR + dzR*dzR);
+        double endpoint_err_L = std::sqrt(dxL*dxL + dyL*dyL + dzL*dzL);
+        double endpoint_err = std::max(endpoint_err_R, endpoint_err_L);
+ 
+        const double ENDPOINT_TOL = 1e-4;   // 0.1 mm
+        if (endpoint_err < ENDPOINT_TOL) {
+            mismatch_same_endpoint++;
+        } else {
+            mismatch_diff_endpoint++;
+ 
+            if (endpoint_err > max_endpoint_err) {
+                max_endpoint_err = endpoint_err;
+                worst_q_in = q_in;
+                worst_q_out = ik.q;
+                worst_pR_target = fk.pR;
+                worst_pR_actual = fk2.pR;
+                worst_pL_target = fk.pL;
+                worst_pL_actual = fk2.pL;
+            }
+        }
+    }
+ 
+    // ===== 결과 출력 =====
+    std::cout << "\n========== FK-IK Round-trip Verification ==========\n";
+    std::cout << "Total tests              : " << num_tests << "\n";
+    std::cout << "  Pass (joint match)     : " << pass << "\n";
+    std::cout << "  Mismatch (same endpt)  : " << mismatch_same_endpoint
+              << "   <- IK multi-solution, OK\n";
+    std::cout << "  Mismatch (diff endpt)  : " << mismatch_diff_endpoint
+              << "   <- formula bug suspected\n";
+    std::cout << "  FK failed              : " << fk_fail << "\n";
+    std::cout << "  IK failed              : " << ik_fail << "\n";
+    std::cout << "Joint tolerance          : " << tolerance_deg << " deg\n";
+    std::cout << "Endpoint tolerance       : 0.1 mm\n";
+ 
+    if (mismatch_diff_endpoint > 0) {
+        std::cout << "\n[Worst case — endpoint mismatch]\n";
+        std::cout << std::fixed << std::setprecision(4);
+        std::cout << "  Max endpoint error     : "
+                  << max_endpoint_err * 1000.0 << " mm\n";
+        std::cout << "  q_in  [deg]: ";
+        for (int i = 0; i < 9; ++i) {
+            std::cout << std::setw(9) << worst_q_in[i] * 180.0 / M_PI;
+            if (i < 8) std::cout << ",";
+        }
+        std::cout << "\n";
+        std::cout << "  q_out [deg]: ";
+        for (int i = 0; i < 9; ++i) {
+            std::cout << std::setw(9) << worst_q_out[i] * 180.0 / M_PI;
+            if (i < 8) std::cout << ",";
+        }
+        std::cout << "\n";
+        std::cout << "  pR target  [m]: ("
+                  << worst_pR_target[0] << ", "
+                  << worst_pR_target[1] << ", "
+                  << worst_pR_target[2] << ")\n";
+        std::cout << "  pR actual  [m]: ("
+                  << worst_pR_actual[0] << ", "
+                  << worst_pR_actual[1] << ", "
+                  << worst_pR_actual[2] << ")\n";
+        std::cout << "  pL target  [m]: ("
+                  << worst_pL_target[0] << ", "
+                  << worst_pL_target[1] << ", "
+                  << worst_pL_target[2] << ")\n";
+        std::cout << "  pL actual  [m]: ("
+                  << worst_pL_actual[0] << ", "
+                  << worst_pL_actual[1] << ", "
+                  << worst_pL_actual[2] << ")\n";
+    }
+    std::cout << "===================================================\n\n";
+}
+
 bool KinematicsSolver::check_joint_limits(const std::vector<double>& q) const {
     for (int i = 0; i < static_cast<int>(q.size()); ++i) {
         auto it = joint_limits.find(i);
@@ -151,4 +449,41 @@ double KinematicsSolver::get_effective_theta(double theta_wrist) const {
     double x = link_length.forearm + link_length.stick * std::cos(theta_wrist);
     double y = link_length.stick   * std::sin(theta_wrist);
     return std::atan2(y, x);
+}
+
+std::array<std::array<double, 4>, 4> KinematicsSolver::dh_transform(double a, double alpha, double d, double theta) {
+    // Craig (modified) DH 변환 행렬
+    // T = [ ct,    -st,    0,      a;
+    //       st*ca, ct*ca, -sa,    -d*sa;
+    //       st*sa, ct*sa,  ca,     d*ca;
+    //       0,     0,      0,      1 ]
+
+    const double ca = std::cos(alpha);
+    const double sa = std::sin(alpha);
+    const double ct = std::cos(theta);
+    const double st = std::sin(theta);
+ 
+    std::array<std::array<double, 4>, 4> T = {{
+        { ct,     -st,     0.0,    a       },
+        { st*ca,   ct*ca, -sa,    -d*sa    },
+        { st*sa,   ct*sa,  ca,     d*ca    },
+        { 0.0,     0.0,    0.0,    1.0     }
+    }};
+    return T;
+}
+
+void KinematicsSolver::mat4_mul_inplace(std::array<std::array<double, 4>, 4>& A, const std::array<std::array<double, 4>, 4>& B) {
+    // 4x4 행렬 곱 A = A * B
+
+    std::array<std::array<double, 4>, 4> R{};
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            double sum = 0.0;
+            for (int k = 0; k < 4; ++k) {
+                sum += A[i][k] * B[k][j];
+            }
+            R[i][j] = sum;
+        }
+    }
+    A = R;
 }

@@ -2,7 +2,7 @@
 
 MotionPlanner::MotionPlanner(AppContext &ctxRef, CommandQueue &commandQueueRef, ControlQueue &controlQueueRef, MotionQueue &motionQueueRef, Robot &robotRef)
     : ctx(ctxRef), command_queue(commandQueueRef), control_queue(controlQueueRef), motion_queue(motionQueueRef), robot(robotRef),
-    behavior_planner(ctxRef, robotRef) {}
+    behavior_planner(ctxRef, robotRef), trajectory_generator(control_queue) {}
 
 MotionPlanner::~MotionPlanner() {}
 
@@ -10,20 +10,21 @@ void MotionPlanner::run() {
     initialize();
 
     while (ctx.running.load()) {
-        if (!command_queue.empty()) {
+        if (auto cmd = command_queue.try_pop()) {
             // 명령이 있으면 파싱해서 motion_queue에 적재
-            std::string cmd = command_queue.pop();
-            parse_command(cmd);
+            parse_command(*cmd);
         } else if (ctx.send_active.load() && motion_queue.empty()) {
             // send_active 이 후 motion_queue가 없으면 대기 모션
             schedule_idle_motion();
         }
 
         // control_queue 잔량이 임계값 이하면 다음 모션 생성
-        if (control_queue.size() < threshold && !motion_queue.empty()) {
-            generate_motion();
-            if (!ctx.recv_active) ctx.recv_active = true;
-            if (!ctx.send_active) ctx.send_active = true;
+        if (control_queue.size() < threshold) {
+            if (auto motion = motion_queue.try_pop()) {
+                trajectory_generator.generate_trajectory(*motion);
+                if (!ctx.recv_active) ctx.recv_active = true;
+                if (!ctx.send_active) ctx.send_active = true;
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -70,15 +71,4 @@ void MotionPlanner::schedule_idle_motion() {
 
     idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능
     motion_queue.push(idle_motion);
-}
-
-void MotionPlanner::generate_motion() {
-    MotionPrimitive motion = motion_queue.pop();
-
-    std::vector<ControlSetPoint> trajectory = trajectory_generator.generate_trajectory(motion);
-
-    int n = trajectory.size();
-    for (int i = 0; i < n; i++) {
-        control_queue.push(trajectory[i]);
-    }
 }

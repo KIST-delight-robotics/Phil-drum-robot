@@ -9,14 +9,16 @@ void MotionQueue::push(const MotionPrimitive& motion) {
     queue_.push(motion);
 }
 
-MotionPrimitive MotionQueue::pop() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    MotionPrimitive motion = queue_.front();
-    queue_.pop();
-    return motion;
-}
-
 bool MotionQueue::empty() {
     std::lock_guard<std::mutex> lock(mutex_);
     return queue_.empty();
+}
+
+// MotionPrimitive 타입 값이 있을수도 있고 없을 수도 있음
+std::optional<MotionPrimitive> MotionQueue::try_pop() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (queue_.empty()) return std::nullopt;
+    MotionPrimitive motion = queue_.front();
+    queue_.pop();
+    return motion;
 }

@@ -13,7 +13,7 @@ public:
     void setOrigin(uint32_t node_id, struct can_frame *frame, uint8_t set_origin_mode);
     
     // node_id: motor.node_id, pos [rad], speed[erpm], acceleration [erpm/s^2]
-    void setPosirionVelocity(uint32_t node_id, struct can_frame *frame, float pos, int32_t spd, int32_t RPA);
+    void setPositionVelocity(uint32_t node_id, struct can_frame *frame, float pos, int16_t spd, int16_t RPA);
 
     // id, position, speed, current, temperature, error
     std::tuple<int, float, float, float, int8_t, int8_t> parseRecieveCommand(struct can_frame *frame);
@@ -77,9 +77,6 @@ public:
 
     // node_id: motor.node_id
     void getStop(uint32_t node_id, struct can_frame *frame);
-
-    // tx_pdo_id_0: motor.tx_pdo_ids[0]
-    void getQuickStop(uint32_t tx_pdo_id_0, struct can_frame *frame);
 
     // node_id: motor.node_id
     void getOperational(uint32_t node_id, struct can_frame *frame);

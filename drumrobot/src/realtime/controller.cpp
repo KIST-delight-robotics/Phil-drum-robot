@@ -38,8 +38,8 @@ void Controller::send_loop() {
             if (cnt == 0) {
                 // 1ms: 큐에서 새 목표값 가져오고, 맥슨 보간 1번째 송신
                 prev_data = curr_data;
-                if (!control_queue.empty()) {
-                    curr_data = control_queue.pop();
+                if (auto sp = control_queue.try_pop()) {
+                    curr_data = *sp;
                 } else {
                     static int err_cnt = 0;
                     if (err_cnt++ % 100 == 0) std::cerr << "[Controller] control_queue underflow\n";
@@ -375,9 +375,9 @@ bool Controller::safety_check_recv_maxon(std::shared_ptr<MaxonMotor> &motor) {
         std::cerr << "[Controller] MaxonMotor 범위 초과 (" << motor->name << ")"
                   << "  joint=" << angle * 180.0 / M_PI << "deg\n";
 
-        // QuickStop 송신
+        // getShutdown 송신
         struct can_frame frame;
-        m_codec.getQuickStop(motor->tx_pdo_ids[0], &frame);
+        m_codec.getShutdown(motor->tx_pdo_ids[0], &frame);
         robot.can.sendFrame(motor->socket, frame);
 
         struct can_frame sync_frame;

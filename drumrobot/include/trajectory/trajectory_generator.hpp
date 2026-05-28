@@ -9,17 +9,19 @@
 #include <utility>
 
 #include "common/motion_queue.hpp"  // MotionPrimitive
-#include "common/control_queue.hpp" // ControlSetPoint
+#include "common/control_queue.hpp"
 #include "kinematics/kinematics_solver.hpp"
 
 class TrajectoryGenerator {
 public:
-    TrajectoryGenerator();
+    TrajectoryGenerator(ControlQueue &controlQueueRef);
     ~TrajectoryGenerator();
 
-    std::vector<ControlSetPoint> generate_trajectory(const MotionPrimitive& motion);
+    void generate_trajectory(const MotionPrimitive& motion);
  
 private:
+    ControlQueue &control_queue;
+
     KinematicsSolver solver;
 
     const double dt = 0.005;        // 데이터 시간 간격 5ms
@@ -35,9 +37,9 @@ private:
     ControlMode wrist_control_mode = ControlMode::CST;
     ControlMode pedal_control_mode = ControlMode::CSP;
     
-    std::vector<ControlSetPoint> generate_joint_space_trajectory(const MotionPrimitive& motion);
-    std::vector<ControlSetPoint> generate_task_space_trajectory(const MotionPrimitive& motion);
-    std::vector<ControlSetPoint> generate_idle_trajectory();
+    void generate_joint_space_trajectory(const MotionPrimitive& motion);
+    void generate_task_space_trajectory(const MotionPrimitive& motion);
+    void generate_idle_trajectory();
 
     std::vector<ControlMode> get_modes();
     std::pair<std::vector<double>, std::vector<double>>

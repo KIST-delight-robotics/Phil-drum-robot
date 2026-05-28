@@ -3,6 +3,7 @@
 #include <queue>
 #include <mutex>
 #include <string>
+#include <optional>
 
 struct Command {
     std::string s;
@@ -14,8 +15,8 @@ public:
     ~CommandQueue();
 
     void push(const std::string& cmd);
-    std::string pop();
     bool empty();
+    std::optional<std::string> try_pop();
 
 private:
     std::queue<std::string> queue_;

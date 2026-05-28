@@ -2,6 +2,7 @@
 
 #include <queue>
 #include <mutex>
+#include <optional>
 
 enum class MotionType { TRANSLATE, IDLE };
 enum class TrajectorySpace { JOINT, TASK };
@@ -28,8 +29,8 @@ public:
     ~MotionQueue();
 
     void push(const MotionPrimitive& motion);
-    MotionPrimitive pop();
     bool empty();
+    std::optional<MotionPrimitive> try_pop();
 
 private:
     std::queue<MotionPrimitive> queue_;

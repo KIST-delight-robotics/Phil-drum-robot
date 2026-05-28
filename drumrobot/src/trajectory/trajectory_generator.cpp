@@ -1,6 +1,7 @@
 #include "trajectory/trajectory_generator.hpp"
 
-TrajectoryGenerator::TrajectoryGenerator() {
+TrajectoryGenerator::TrajectoryGenerator(ControlQueue &controlQueueRef)
+    : control_queue(controlQueueRef) {
     solver.initialize();
 }
 
@@ -8,65 +9,55 @@ TrajectoryGenerator::~TrajectoryGenerator() {
 
 }
 
-std::vector<ControlSetPoint> TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
+void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
     switch (motion.type) {
-    case MotionType::TRANSLATE: {
+    case MotionType::TRANSLATE:
         if (motion.space == TrajectorySpace::JOINT) {
-            std::vector<ControlSetPoint> trajectory = generate_joint_space_trajectory(motion);
-            return trajectory;
+            generate_joint_space_trajectory(motion);
         } else if (motion.space == TrajectorySpace::TASK) {
-            std::vector<ControlSetPoint> trajectory = generate_task_space_trajectory(motion);
-            return trajectory;
+            generate_task_space_trajectory(motion);
         } else {
             std::cerr << "[TrajectoryGenerator] Unknown motion trajectory space\n";
-            return {ControlSetPoint(1)};
         }
+        break;
+    case MotionType::IDLE:
+        generate_idle_trajectory();
+        break;
+    default:
+        std::cerr << "[TrajectoryGenerator] Unknown motion type\n";
+        break;
     }
-    case MotionType::IDLE: {
-        std::vector<ControlSetPoint> trajectory = generate_idle_trajectory();
-        return trajectory;
-    }
-    }
-
-    std::cerr << "[TrajectoryGenerator] Unknown motion type\n";
-    return {ControlSetPoint(1)};
 }
 
-std::vector<ControlSetPoint> TrajectoryGenerator::generate_joint_space_trajectory(const MotionPrimitive& motion) {
-    std::vector<ControlSetPoint> trajectory;
-
+void TrajectoryGenerator::generate_joint_space_trajectory(const MotionPrimitive& motion) {
     std::vector<ControlMode> modes = get_modes();
     int num_point = static_cast<int>(motion.t_total / dt);
 
     std::vector<double> q0 = last_q;
     std::vector<double> q1 = motion.q_target;
-    int n = q0.size();
+    int num_joint = q0.size();
 
     for (int k = 1; k <= num_point; k++) {
         auto [q, qd] = sample(q0, q1, num_point, k, motion.profile);
 
-        ControlSetPoint set_point(n);
+        ControlSetPoint set_point(num_joint);
         set_point.q = q;
         set_point.qd = qd;
         set_point.mode = modes;
-        trajectory.push_back(set_point);
+        control_queue.push(set_point);
     }
 
     last_q  = q1;
-    last_qd = std::vector<double>(n, 0.0);
-
-    return trajectory;
+    last_qd = std::vector<double>(num_joint, 0.0);
 }
 
-std::vector<ControlSetPoint> TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& motion) {
-    std::vector<ControlSetPoint> trajectory;
-
+void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& motion) {
     std::vector<ControlMode> modes = get_modes();
     int num_point = static_cast<int>(motion.t_total / dt);
 
     std::vector<double> q0 = last_q;
     std::vector<double> q1 = motion.q_target;
-    int n = q0.size();
+    int num_joint = q0.size();
 
     std::vector<double> p0 = {
         last_p_R[0], last_p_R[1], last_p_R[2],
@@ -87,7 +78,7 @@ std::vector<ControlSetPoint> TrajectoryGenerator::generate_task_space_trajectory
         double theta0 = q[0];
         double theta7 = q[7];
         double theta8 = q[8];
-        KinematicsSolver::IKResult result = solver.solve(pR, pL, theta0, theta7, theta8);
+        KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8);
 
         if (!result.success) {
             // TODO: 에러 메세지 출력
@@ -95,51 +86,45 @@ std::vector<ControlSetPoint> TrajectoryGenerator::generate_task_space_trajectory
         }
 
         // 13차원 set_point 구성: IK 결과(0~8) + 관절 보간값(9~12)
-        ControlSetPoint set_point(n);
+        ControlSetPoint set_point(num_joint);
         for (int i = 0; i < 9; i++) {
             set_point.q[i] = result.q[i];   // 관절 0~8 (팔)
             set_point.qd[i] = 0.0;          // TODO: 속도 계산
         }
-        for (int i = 9; i < n; i++) {
+        for (int i = 9; i < num_joint; i++) {
             set_point.q[i] = q[i];          // 관절 9~12 (페달, 머리)
             set_point.qd[i] = qd[i]; 
         }
         set_point.mode = modes;
-        trajectory.push_back(set_point);
+        control_queue.push(set_point);
     }
 
     last_q  = q1;
-    last_qd = std::vector<double>(n, 0.0);
+    last_qd = std::vector<double>(num_joint, 0.0);
     // TODO: last_p_R, last_p_L 갱신 필요
-
-    return trajectory;
 }
 
-std::vector<ControlSetPoint> TrajectoryGenerator::generate_idle_trajectory() {
-    std::vector<ControlSetPoint> trajectory;
-
+void TrajectoryGenerator::generate_idle_trajectory() {
     std::vector<ControlMode> modes = get_modes();
     double t_total = 1.0;
     int num_point = static_cast<int>(t_total / dt);
 
     std::vector<double> q0 = last_q;
     std::vector<double> q1 = last_q;    // TODO: 미세한 움직임 구현
-    int n = q0.size();
+    int num_joint = q0.size();
 
     for (int k = 1; k <= num_point; k++) {
         auto [q, qd] = sample_cosine(q0, q1, num_point, k);
 
-        ControlSetPoint set_point(n);
+        ControlSetPoint set_point(num_joint);
         set_point.q = q;
         set_point.qd = qd;
         set_point.mode = modes;
-        trajectory.push_back(set_point);
+        control_queue.push(set_point);
     }
 
     last_q  = q1;
-    last_qd = std::vector<double>(n, 0.0);
-
-    return trajectory;
+    last_qd = std::vector<double>(num_joint, 0.0);
 }
 
 std::vector<ControlMode> TrajectoryGenerator::get_modes() {

@@ -3,6 +3,7 @@
 #include <queue>
 #include <mutex>
 #include <vector>
+#include <optional>
 
 enum class ControlMode {
     None,
@@ -33,9 +34,9 @@ public:
     ~ControlQueue();
 
     void push(const ControlSetPoint& point);
-    ControlSetPoint pop();
     bool empty();
     size_t size();
+    std::optional<ControlSetPoint> try_pop();
 
 private:
     std::queue<ControlSetPoint> queue_;

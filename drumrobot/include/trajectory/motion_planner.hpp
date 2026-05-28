@@ -41,5 +41,4 @@ private:
 
     void parse_command(const std::string& cmd);
     void schedule_idle_motion();
-    void generate_motion();
 };

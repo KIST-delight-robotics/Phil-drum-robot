@@ -33,7 +33,7 @@ void TMotorServoCodec::setOrigin(uint32_t node_id, struct can_frame *frame, uint
     frame->data[0] = set_origin_mode; 
 }
 
-void TMotorServoCodec::setPosirionVelocity(uint32_t node_id, struct can_frame *frame, float pos, int32_t spd, int32_t RPA) {
+void TMotorServoCodec::setPositionVelocity(uint32_t node_id, struct can_frame *frame, float pos, int16_t spd, int16_t RPA) {
     // 라디안에서 도로 변환
     float pos_deg = pos * (180.0 / M_PI);
 
@@ -290,19 +290,6 @@ void MaxonMotorCodec::getStop(uint32_t node_id, struct can_frame *frame) {
     frame->can_dlc = 8;
     frame->data[0] = 0x02;
     frame->data[1] = node_id;
-    frame->data[2] = 0x00;
-    frame->data[3] = 0x00;
-    frame->data[4] = 0x00;
-    frame->data[5] = 0x00;
-    frame->data[6] = 0x00;
-    frame->data[7] = 0x00;
-}
-
-void MaxonMotorCodec::getQuickStop(uint32_t tx_pdo_id_0, struct can_frame *frame) {
-    frame->can_id = tx_pdo_id_0;
-    frame->can_dlc = 8;
-    frame->data[0] = 0x06;
-    frame->data[1] = 0x00;
     frame->data[2] = 0x00;
     frame->data[3] = 0x00;
     frame->data[4] = 0x00;
