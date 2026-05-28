@@ -82,6 +82,7 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
 
         if (!result.success) {
             // TODO: 에러 메세지 출력
+            // TODO: 오류 시 last_q 갱신 잘못되는거 해결
             break;
         }
 
