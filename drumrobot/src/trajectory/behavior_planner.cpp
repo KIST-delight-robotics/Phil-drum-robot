@@ -56,7 +56,6 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
             return sequence;
         }
     }
-    // TODO: send_active 언제 함?
 
     // ===== send_active 후 =====
     switch (opcode) {
@@ -217,7 +216,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
 }
 
 // MOVE motor_name angle_deg [move_time]
-std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std::string>& args) {
+std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std::string>& args) {   // TODO: 여러개의 관절 동시에 움직이기
     std::vector<MotionPrimitive> sequence;
 
     const std::string& motor_name = args[0];
@@ -271,8 +270,6 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::
     const std::string& target = args[0];
 
     std::cout << "[BehaviorPlanner] HIT not yet implemented (target=" << target << ")\n";
-    // TODO: target별 위치 매핑 + 들어올림/내려침/복귀 시퀀스 생성
-    // TODO: MotionType 추가 (HIT) 또는 TRANSLATE 시퀀스로 분해
 
     return sequence;
 }

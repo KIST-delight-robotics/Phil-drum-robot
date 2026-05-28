@@ -51,6 +51,9 @@ public:
     double current_position = 0.0;
     double current_velocity = 0.0;
     double current_current  = 0.0;
+
+    // 과전류 체크 카운터
+    int cnt = 0;
 private:
 };
 

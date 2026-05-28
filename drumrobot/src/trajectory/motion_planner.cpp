@@ -2,7 +2,7 @@
 
 MotionPlanner::MotionPlanner(AppContext &ctxRef, CommandQueue &commandQueueRef, ControlQueue &controlQueueRef, MotionQueue &motionQueueRef, Robot &robotRef)
     : ctx(ctxRef), command_queue(commandQueueRef), control_queue(controlQueueRef), motion_queue(motionQueueRef), robot(robotRef),
-    behavior_planner(ctxRef, robotRef), trajectory_generator(control_queue) {}
+    behavior_planner(ctxRef, robotRef), trajectory_generator(control_queue), motion_log("motion_command") {}
 
 MotionPlanner::~MotionPlanner() {}
 
@@ -24,6 +24,8 @@ void MotionPlanner::run() {
                 trajectory_generator.generate_trajectory(*motion);
                 if (!ctx.recv_active) ctx.recv_active = true;
                 if (!ctx.send_active) ctx.send_active = true;
+
+                record_motion(*motion);
             }
         }
 
@@ -49,6 +51,8 @@ void MotionPlanner::initialize() {
                       << "motors.json="       << motor->initial_joint_angle * 180.0 / M_PI << "deg\n";
         }
     }
+
+    trajectory_generator.initialize(behavior_planner.poses["init"]);
 }
 
 void MotionPlanner::parse_command(const std::string& cmd) {
@@ -62,6 +66,8 @@ void MotionPlanner::parse_command(const std::string& cmd) {
     for (int i = 0; i < n; i++) {
         motion_queue.push(motion_sequence[i]);
     }
+
+    record_command(cmd);
 }
 
 void MotionPlanner::schedule_idle_motion() {
@@ -71,4 +77,23 @@ void MotionPlanner::schedule_idle_motion() {
 
     idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능
     motion_queue.push(idle_motion);
+
+    record_motion(idle_motion);
+}
+
+// ===== log =====
+void MotionPlanner::record_command(const std::string& cmd) {
+    std::vector<std::string> log = {"CMD", cmd};
+    motion_log.record(log);
+}
+
+void MotionPlanner::record_motion(const MotionPrimitive& motion) {
+    std::vector<std::string> log = {"MOTION"};
+
+    if (motion.type == MotionType::IDLE) log.push_back("idle");
+    else if (motion.type == MotionType::TRANSLATE) log.push_back("translate");
+
+    // TODO: 모션 로그 더 구체적으로 작성하기
+
+    motion_log.record(log);
 }

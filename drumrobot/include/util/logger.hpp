@@ -16,6 +16,7 @@ public:
 
     void set_header(const std::vector<std::string>& columns);
     void record(const std::vector<double>& values);
+    void record(const std::vector<std::string>& values);
 
 private:
     std::ofstream file;

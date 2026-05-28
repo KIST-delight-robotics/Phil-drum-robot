@@ -34,19 +34,6 @@ void KinematicsSolver::initialize() {
 
     // 기구학 함수 검증
     // verify_fk_ik();
-
-    // ========== FK-IK Round-trip Verification ==========
-    // Total tests              : 1000
-    // Pass (joint match)     : 467
-    // Mismatch (same endpt)  : 85   <- IK multi-solution, OK
-    // Mismatch (diff endpt)  : 0   <- formula bug suspected
-    // FK failed              : 0
-    // IK failed              : 448
-    // Joint tolerance          : 0.01 deg
-    // Endpoint tolerance       : 0.1 mm
-    // ===================================================
-
-    // IK failed은 왜 저렇게 많은지 이해는 안되는데 문제는 없다고 함.
 }
 
 KinematicsSolver::IKResult KinematicsSolver::ik_solve(

@@ -1,12 +1,24 @@
 #include "trajectory/trajectory_generator.hpp"
 
 TrajectoryGenerator::TrajectoryGenerator(ControlQueue &controlQueueRef)
-    : control_queue(controlQueueRef) {
-    solver.initialize();
+    : control_queue(controlQueueRef), trajectory_log("trajectory") {
+    
+    std::vector<std::string> header = {
+        "joint 0", "joint 1", "joint 2", "joint 3", "joint 4",
+        "joint 5", "joint 6", "joint 7", "joint 8",
+        "joint 9", "joint 10", "joint 11", "joint 12"
+    };
+    trajectory_log.set_header(header);
 }
 
 TrajectoryGenerator::~TrajectoryGenerator() {
 
+}
+
+void TrajectoryGenerator::initialize(const std::vector<double>& init_pose) {
+    solver.initialize();
+
+    update_last_q(init_pose);
 }
 
 void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
@@ -45,10 +57,11 @@ void TrajectoryGenerator::generate_joint_space_trajectory(const MotionPrimitive&
         set_point.qd = qd;
         set_point.mode = modes;
         control_queue.push(set_point);
+
+        trajectory_log.record(set_point.q);
     }
 
-    last_q  = q1;
-    last_qd = std::vector<double>(num_joint, 0.0);
+    update_last_q(q1);
 }
 
 void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& motion) {
@@ -69,6 +82,9 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
         motion.p_target_L[0], motion.p_target_L[1], motion.p_target_L[2]
     };
 
+    // 속도 계산을 위한 이전 관절각
+    std::vector<double> prev_q = q0;
+
     for (int k = 1; k <= num_point; k++) {
         auto [q, qd] = sample(q0, q1, num_point, k, motion.profile);
         auto [p, pd] = sample(p0, p1, num_point, k, motion.profile);
@@ -81,16 +97,15 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
         KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8);
 
         if (!result.success) {
-            // TODO: 에러 메세지 출력
-            // TODO: 오류 시 last_q 갱신 잘못되는거 해결
-            break;
+            std::cerr << "[TrajectoryGenerator] Failed to solve inverse kinematics\n";
+            return;
         }
 
         // 13차원 set_point 구성: IK 결과(0~8) + 관절 보간값(9~12)
         ControlSetPoint set_point(num_joint);
         for (int i = 0; i < 9; i++) {
             set_point.q[i] = result.q[i];   // 관절 0~8 (팔)
-            set_point.qd[i] = 0.0;          // TODO: 속도 계산
+            set_point.qd[i] = (result.q[i] - prev_q[i]) / dt;
         }
         for (int i = 9; i < num_joint; i++) {
             set_point.q[i] = q[i];          // 관절 9~12 (페달, 머리)
@@ -98,11 +113,13 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
         }
         set_point.mode = modes;
         control_queue.push(set_point);
+
+        prev_q = result.q;
+
+        trajectory_log.record(set_point.q);
     }
 
-    last_q  = q1;
-    last_qd = std::vector<double>(num_joint, 0.0);
-    // TODO: last_p_R, last_p_L 갱신 필요
+    update_last_q(p1, q1);
 }
 
 void TrajectoryGenerator::generate_idle_trajectory() {
@@ -122,10 +139,11 @@ void TrajectoryGenerator::generate_idle_trajectory() {
         set_point.qd = qd;
         set_point.mode = modes;
         control_queue.push(set_point);
+
+        trajectory_log.record(set_point.q);
     }
 
-    last_q  = q1;
-    last_qd = std::vector<double>(num_joint, 0.0);
+    update_last_q(q1);
 }
 
 std::vector<ControlMode> TrajectoryGenerator::get_modes() {
@@ -148,8 +166,13 @@ std::vector<ControlMode> TrajectoryGenerator::get_modes() {
     return modes;
 }
 
-std::pair<std::vector<double>, std::vector<double>>
-TrajectoryGenerator::sample(std::vector<double>& q0, std::vector<double>& q1, int n, int k, TrajectoryProfile profile) {
+std::pair<std::vector<double>, std::vector<double>> TrajectoryGenerator::sample(
+    const std::vector<double>& q0,
+    const std::vector<double>& q1,
+    int n,
+    int k,
+    TrajectoryProfile profile
+) {
     std::pair<std::vector<double>, std::vector<double>> result;
 
     switch (profile) {
@@ -170,8 +193,12 @@ TrajectoryGenerator::sample(std::vector<double>& q0, std::vector<double>& q1, in
     return result;
 }
 
-std::pair<std::vector<double>, std::vector<double>>
-TrajectoryGenerator::sample_trapezoidal(std::vector<double>& q0, std::vector<double>& q1, int n, int k) {
+std::pair<std::vector<double>, std::vector<double>> TrajectoryGenerator::sample_trapezoidal(
+    const std::vector<double>& q0,
+    const std::vector<double>& q1,
+    int n,
+    int k
+) {
     // 사다리꼴 속도 프로파일: 가속(1/4) - 등속(1/2) - 감속(1/4)
     // 정규화 시간 s = k / n  (구간 [0, 1))
     // 정규화 속도 = 위치 미분 / t_total  (qd = ds/dt · (q1 - q0), t_total = n·dt)
@@ -214,8 +241,12 @@ TrajectoryGenerator::sample_trapezoidal(std::vector<double>& q0, std::vector<dou
     return {q, qd};
 }
 
-std::pair<std::vector<double>, std::vector<double>>
-TrajectoryGenerator::sample_cubic(std::vector<double>& q0, std::vector<double>& q1, int n, int k) {
+std::pair<std::vector<double>, std::vector<double>> TrajectoryGenerator::sample_cubic(
+    const std::vector<double>& q0,
+    const std::vector<double>& q1,
+    int n,
+    int k
+) {
     // 3차 다항식 보간: 양 끝점에서 속도 0
     // 정규화 시간 s = k / n  (구간 [0, 1))
     // 정규화 속도 = 위치 미분 / t_total  (qd = ds/dt · (q1 - q0), t_total = n·dt)
@@ -239,8 +270,12 @@ TrajectoryGenerator::sample_cubic(std::vector<double>& q0, std::vector<double>& 
     return {q, qd};
 }
 
-std::pair<std::vector<double>, std::vector<double>>
-TrajectoryGenerator::sample_quintic(std::vector<double>& q0, std::vector<double>& q1, int n, int k) {
+std::pair<std::vector<double>, std::vector<double>> TrajectoryGenerator::sample_quintic(
+    const std::vector<double>& q0,
+    const std::vector<double>& q1,
+    int n,
+    int k
+) {
     // 5차 다항식 보간: 양 끝점에서 속도와 가속도 모두 0
     // 정규화 시간 s = k / n  (구간 [0, 1))
     // 정규화 속도 = 위치 미분 / t_total  (qd = ds/dt · (q1 - q0), t_total = n·dt)
@@ -269,8 +304,12 @@ TrajectoryGenerator::sample_quintic(std::vector<double>& q0, std::vector<double>
     return {q, qd};
 }
 
-std::pair<std::vector<double>, std::vector<double>>
-TrajectoryGenerator::sample_cosine(std::vector<double>& q0, std::vector<double>& q1, int n, int k) {
+std::pair<std::vector<double>, std::vector<double>> TrajectoryGenerator::sample_cosine(
+    const std::vector<double>& q0,
+    const std::vector<double>& q1,
+    int n,
+    int k
+) {
     // 사인(코사인) 보간: s(t) = (1 - cos(πt)) / 2
     // 양 끝점에서 속도 0, 매끄러운 가속/감속
     // 정규화 시간 s = k / n  (구간 [0, 1))
@@ -293,4 +332,46 @@ TrajectoryGenerator::sample_cosine(std::vector<double>& q0, std::vector<double>&
     }
  
     return {q, qd};
+}
+
+void TrajectoryGenerator::update_last_q(const std::vector<double>& q) {
+    last_q  = q;
+    last_qd = std::vector<double>(q.size(), 0.0);
+
+    KinematicsSolver::FKResult result = solver.fk_solve(last_q);
+
+    if (!result.success) {
+        std::cerr << "[TrajectoryGenerator] Failed to solve forward kinematics\n";
+        return;
+    }
+    
+    last_p_R.assign(result.pR.begin(), result.pR.end());
+    last_p_R.assign(result.pL.begin(), result.pL.end());
+}
+
+void TrajectoryGenerator::update_last_q(const std::vector<double>& p, const std::vector<double>& q) {
+    std::array<double, 3> pR = {p[0], p[1], p[2]};
+    std::array<double, 3> pL = {p[3], p[4], p[5]};
+    double theta0 = q[0];
+    double theta7 = q[7];
+    double theta8 = q[8];
+    KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8);
+
+    if (!result.success) {
+        std::cerr << "[TrajectoryGenerator] Failed to solve inverse kinematics\n";
+        return;
+    }
+
+    // 13차원 last_q 구성: IK 결과(0~8) + 관절 보간값(9~12)
+    int num_joint = q.size();
+    for (int i = 0; i < 9; i++) {
+        last_q[i] = result.q[i];
+    }
+    for (int i = 9; i < num_joint; i++) {
+        last_q[i] = q[i];
+    }
+    last_qd = std::vector<double>(num_joint, 0.0);
+
+    last_p_R.assign(pR.begin(), pR.end());
+    last_p_R.assign(pL.begin(), pL.end());
 }

@@ -33,7 +33,7 @@ private:
     std::vector<double> last_q_target;
 
     // 기본 이동 시간 [s]
-    const double DEFAULT_MOVE_TIME = 2.0;
+    const double DEFAULT_MOVE_TIME = 3.0;
     const double LOOK_MOVE_TIME    = 1.0;
     const double GESTURE_MOVE_TIME = 1.0;
 

@@ -116,7 +116,6 @@ char *PortHandlerLinux::getPortName()
   return port_name_;
 }
 
-// TODO: baud number ??
 bool PortHandlerLinux::setBaudRate(const int baudrate)
 {
   int baud = getCFlagBaud(baudrate);

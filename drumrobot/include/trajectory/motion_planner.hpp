@@ -15,6 +15,7 @@
 #include "trajectory/behavior_planner.hpp"
 #include "trajectory/command_parser.hpp"
 #include "trajectory/trajectory_generator.hpp"
+#include "util/logger.hpp"
 
 class MotionPlanner {
 public:
@@ -41,4 +42,10 @@ private:
 
     void parse_command(const std::string& cmd);
     void schedule_idle_motion();
+
+    // ===== log =====
+    Logger motion_log;
+
+    void record_command(const std::string& cmd);
+    void record_motion(const MotionPrimitive& motion);
 };

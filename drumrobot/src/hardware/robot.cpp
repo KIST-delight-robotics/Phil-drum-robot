@@ -19,9 +19,8 @@ void Robot::initialize() {
     maxon_motor_enable();
     set_maxon_motor_mode("CSP");
     init_dynamicxel();
-    // USBIO
-    // 아두이노
-
+    // TODO: USBIO
+    // TODO: 아두이노
 }
 
 void Robot::init_motor_from_json() {
@@ -376,6 +375,21 @@ void Robot::init_dynamicxel() {
     else
     {
         printf("[Robot] Failed to open the Dynamixel port!\n");
+
+        // 다이나믹셀 모터 삭제
+        std::vector<int> to_remove;
+
+        for (auto &[id, motor] : motors) {
+            auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
+            if (dxl) {
+                to_remove.push_back(id);
+            }
+        }
+
+        for (int id : to_remove) {
+            motors.erase(id);
+        }
+
         return;
     }
 
@@ -387,10 +401,25 @@ void Robot::init_dynamicxel() {
     else
     {
         printf("\n[Robot] Failed to change the baudrate!\n");
+
+        // 다이나믹셀 모터 삭제
+        std::vector<int> to_remove;
+
+        for (auto &[id, motor] : motors) {
+            auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
+            if (dxl) {
+                to_remove.push_back(id);
+            }
+        }
+
+        for (int id : to_remove) {
+            motors.erase(id);
+        }
+
         return;
     }
 
-    // 연결 안된 모터
+    // 모터 연결 확인 및 연결 안된 모터 삭제
     std::vector<int> to_remove;
 
     uint8_t err = 0;
@@ -417,7 +446,6 @@ void Robot::init_dynamicxel() {
         }
     }
 
-    // 연결 안된 모터 삭제
     for (int id : to_remove) {
         motors.erase(id);
     }

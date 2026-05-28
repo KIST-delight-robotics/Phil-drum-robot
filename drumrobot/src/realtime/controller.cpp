@@ -4,17 +4,17 @@ Controller::Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot 
     : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef), motor_log("motor")
 {
     int n = robot.num_joint;
-    curr_data = ControlSetPoint(n);
-    prev_data = ControlSetPoint(n);
+    curr_point = ControlSetPoint(n);
+    prev_point = ControlSetPoint(n);
 
     for (auto &[id, motor] : robot.motors) {
         if (id < n) {            
-            curr_data.q[id] = motor->initial_joint_angle;
-            prev_data.q[id] = motor->initial_joint_angle;
+            curr_point.q[id] = motor->initial_joint_angle;
+            prev_point.q[id] = motor->initial_joint_angle;
         }
     }
 
-    std::vector<std::string> header = {"id", "mode", "desired", "actual", "err", "torque", "input"};
+    std::vector<std::string> header = {"id", "mode", "desired", "actual", "err", "current/torque", "input"};
     motor_log.set_header(header);
 }
 
@@ -37,9 +37,9 @@ void Controller::send_loop() {
 
             if (cnt == 0) {
                 // 1ms: 큐에서 새 목표값 가져오고, 맥슨 보간 1번째 송신
-                prev_data = curr_data;
+                prev_point = curr_point;
                 if (auto sp = control_queue.try_pop()) {
-                    curr_data = *sp;
+                    curr_point = *sp;
                 } else {
                     static int err_cnt = 0;
                     if (err_cnt++ % 100 == 0) std::cerr << "[Controller] control_queue underflow\n";
@@ -97,10 +97,10 @@ void Controller::recv_loop() {
 void Controller::send_task_1ms(int cnt) {
     double alpha = static_cast<double>(cnt + 1) / 5.0;
 
-    ControlSetPoint interp(curr_data.q.size());
-    interp.mode = curr_data.mode;
-    for (size_t i = 0; i < curr_data.q.size(); ++i) {
-        interp.q[i]    = prev_data.q[i] + alpha * (curr_data.q[i] - prev_data.q[i]);
+    ControlSetPoint interp(curr_point.q.size());
+    interp.mode = curr_point.mode;
+    for (size_t i = 0; i < curr_point.q.size(); ++i) {
+        interp.q[i]    = prev_point.q[i] + alpha * (curr_point.q[i] - prev_point.q[i]);
     }
  
     maxon_motor_send_task(interp);
@@ -114,9 +114,9 @@ void Controller::send_task_1ms(int cnt) {
 }
 
 void Controller::send_task_5ms() {
-    tmotor_send_task(curr_data);
-    maxon_motor_send_task(curr_data);
-    dynamicxel_send_task(curr_data);
+    tmotor_send_task(curr_point);
+    maxon_motor_send_task(curr_point);
+    dynamicxel_send_task(curr_point);
  
     // Sync 프레임: 소켓당 1회
     struct can_frame sync_frame;
@@ -126,19 +126,19 @@ void Controller::send_task_5ms() {
     }
 }
 
-void Controller::tmotor_send_task(const ControlSetPoint &data) {
+void Controller::tmotor_send_task(const ControlSetPoint &point) {
     struct can_frame frame;
  
     for (auto &[id, motor] : robot.motors) {
         auto tmotor = std::dynamic_pointer_cast<TMotor>(motor);
         if (!tmotor) continue;
 
-        ControlMode mode = data.mode[id];
-        double motor_position  = tmotor->joint_angle_to_motor_position(data.q[id]);
-        double motor_velocity = tmotor->direction_sign * data.qd[id];    // rad/s
+        ControlMode mode = point.mode[id];
+        double motor_position  = tmotor->joint_angle_to_motor_position(point.q[id]);
+        double motor_velocity = tmotor->direction_sign * point.qd[id];    // rad/s
  
         // 목표값 안전 체크 (전송 전)
-        double desired_joint = data.q[id];
+        double desired_joint = point.q[id];
         double diff = desired_joint - tmotor->current_joint_angle;
         if (std::abs(diff) > POS_DIFF_LIMIT) {
             std::cerr << "[Controller] TMotor 급변 차단 (" << tmotor->name << ")"
@@ -189,15 +189,15 @@ void Controller::tmotor_send_task(const ControlSetPoint &data) {
     }
 }
 
-void Controller::maxon_motor_send_task(const ControlSetPoint &data) {
+void Controller::maxon_motor_send_task(const ControlSetPoint &point) {
     struct can_frame frame;
  
     for (auto &[id, motor] : robot.motors) {
         auto maxon = std::dynamic_pointer_cast<MaxonMotor>(motor);
         if (!maxon) continue;
  
-        ControlMode mode = data.mode[id];
-        double motor_position  = maxon->joint_angle_to_motor_position(data.q[id]);
+        ControlMode mode = point.mode[id];
+        double motor_position  = maxon->joint_angle_to_motor_position(point.q[id]);
  
         if (mode == ControlMode::CSP) {
             m_codec.setPosition(maxon->tx_pdo_ids[1], &frame, motor_position);
@@ -271,12 +271,12 @@ double Controller::cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_
     return torque_mNm;
 }
 
-void Controller::dynamicxel_send_task(const ControlSetPoint &data) {
+void Controller::dynamicxel_send_task(const ControlSetPoint &point) {
     for (auto &[id, motor] : robot.motors) {
         auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
         if (!dxl) continue;
  
-        double motor_position  = dxl->joint_angle_to_motor_position(data.q[id]);
+        double motor_position  = dxl->joint_angle_to_motor_position(point.q[id]);
  
         std::vector<double> dxl_command = {0.0, 0.0, motor_position};   // 속도, 가속도가 0인 경우 계단 입력
         dxl->write_command(dxl_command);
@@ -364,7 +364,17 @@ bool Controller::safety_check_recv_tmotor(std::shared_ptr<TMotor> &motor) {
                   << "  joint=" << angle * 180.0 / M_PI << "deg\n";
         return false;
     }
-    // TODO: 과전류 체크 (motor->current_current > motor->current_limit)
+
+    if (motor->current_current > motor->current_limit) {
+        if (motor->cnt++ > 5) {
+            std::cerr << "[Controller] TMotor 전류 초과 (" << motor->name << ")"
+                    << "  current=" << motor->current_current << "A\n";
+            return false;
+        }
+    } else {
+        motor->cnt = 0;
+    }
+
     return true;
 }
 

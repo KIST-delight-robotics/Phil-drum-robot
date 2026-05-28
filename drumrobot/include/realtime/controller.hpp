@@ -30,16 +30,16 @@ private:
     TMotorServoCodec t_codec;
     MaxonMotorCodec m_codec;
  
-    ControlSetPoint curr_data;  // 현재 송신 중인 데이터 (5ms 주기)
-    ControlSetPoint prev_data;  // 맥슨 모터 보간 목표
+    ControlSetPoint curr_point; // 현재 송신 중인 데이터 (5ms 주기)
+    ControlSetPoint prev_point; // 맥슨 모터 보간 목표
  
     // ===== SEND =====
     void send_task_1ms(int cnt);
     void send_task_5ms();
 
-    void tmotor_send_task(const ControlSetPoint &data);
-    void maxon_motor_send_task(const ControlSetPoint &data);
-    void dynamicxel_send_task(const ControlSetPoint &data);
+    void tmotor_send_task(const ControlSetPoint &point);
+    void maxon_motor_send_task(const ControlSetPoint &point);
+    void dynamicxel_send_task(const ControlSetPoint &point);
 
     double cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_position);
 

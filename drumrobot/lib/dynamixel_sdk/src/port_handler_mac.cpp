@@ -83,7 +83,6 @@ char *PortHandlerMac::getPortName()
   return port_name_;
 }
 
-// TODO: baud number ??
 bool PortHandlerMac::setBaudRate(const int baudrate)
 {
   int baud = getCFlagBaud(baudrate);

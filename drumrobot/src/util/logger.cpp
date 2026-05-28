@@ -40,17 +40,31 @@ void Logger::record(const std::vector<double>& values) {
     file << "\n";
 }
 
+void Logger::record(const std::vector<std::string>& values) {
+
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration<double>(now - start);
+
+    file << std::fixed << std::setprecision(4) << elapsed.count() << ",";
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        file << values[i];
+        if (i + 1 < values.size()) file << ",";
+    }
+    file << "\n";
+}
+
 std::string Logger::make_filename(const std::string& name) {
     std::time_t now = std::time(nullptr);
     std::tm *t = std::localtime(&now);
 
     std::ostringstream oss;
-    oss << base_path << name << "_"
+    oss << base_path << "log_"
         << std::setfill('0')
         << std::setw(2) << t->tm_mon + 1
         << std::setw(2) << t->tm_mday << "_"
         << std::setw(2) << t->tm_hour
         << std::setw(2) << t->tm_min
-        << ".csv";
+        << "_" << name << ".csv";
     return oss.str();
 }
