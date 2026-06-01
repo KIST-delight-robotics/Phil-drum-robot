@@ -10,6 +10,7 @@
  
 #include "common/app_context.hpp"
 #include "common/control_queue.hpp"
+#include "common/robot_config.hpp"
 #include "hardware/motor_codec.hpp"
 #include "hardware/robot.hpp"
 #include "util/logger.hpp"

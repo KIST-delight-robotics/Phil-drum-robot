@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common/motion_queue.hpp"
+#include "common/robot_config.hpp"
 #include "kinematics/kinematics_solver.hpp"
 #include "trajectory/base_motion_generator.hpp"
 #include "trajectory/head_motion_generator.hpp"
@@ -27,7 +28,7 @@ private:
     PedalMotionGenerator pedal_motion_generator;
     StateMotionGenerator state_motion_generator;
 
-    const int NUM_JOINT = 13;
+    int get_num_point(double t0, double t1);
 
-    int get_num_point();
+    int round_sum = 0.0;    // 소수점 오차 보정
 };

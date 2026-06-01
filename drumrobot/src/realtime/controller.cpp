@@ -3,12 +3,11 @@
 Controller::Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot &robotRef)
     : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef), motor_log("motor")
 {
-    int n = robot.NUM_JOINT;
-    curr_point = ControlSetPoint(n);
-    prev_point = ControlSetPoint(n);
+    curr_point = ControlSetPoint(ROBOT::NUM_JOINT);
+    prev_point = ControlSetPoint(ROBOT::NUM_JOINT);
 
     for (auto &[id, motor] : robot.motors) {
-        if (id < n) {            
+        if (id < ROBOT::NUM_JOINT) {            
             curr_point.q[id] = motor->initial_joint_angle;
             prev_point.q[id] = motor->initial_joint_angle;
         }

@@ -13,9 +13,12 @@ void PlayMotionGenerator::initialize() {
 }
 
 std::queue<std::vector<double>> PlayMotionGenerator::generate_motion(std::vector<DrumEvent> rds) {
+    // rds[0]: 시작 자세
+    // rds[1]: 목표 자세
+    
     std::queue<std::vector<double>> q_queue;
 
-    int n = get_num_point();
+    int n = get_num_point(rds[1].t, rds[0].t);
 
     std::queue<BaseMotionPoint> base_motion = base_motion_generator.generate_motion(rds, n);
     std::queue<HeadMotionPoint> head_motion = head_motion_generator.generate_motion(rds, n);
@@ -23,7 +26,7 @@ std::queue<std::vector<double>> PlayMotionGenerator::generate_motion(std::vector
     std::queue<StateMotionPoint> state_motion = state_motion_generator.generate_motion(rds, n);
 
     for (int i = 0; i < n; i++) {
-        std::vector<double> q(NUM_JOINT);
+        std::vector<double> q(ROBOT::NUM_JOINT);
 
         BaseMotionPoint b = base_motion.front();
         base_motion.pop();
@@ -46,7 +49,7 @@ std::queue<std::vector<double>> PlayMotionGenerator::generate_motion(std::vector
 
         if (!result.success) {
             std::cerr << "[PlayMotionGenerator] Failed to solve inverse kinematics\n";
-            return q_queue;
+            return q_queue; // TODO: 진행중인 동작을 멈춰야 함. 이렇게 중간에 끊고 다음거 이어서 만들면 계단 입력 나옴
         }
 
         for (int i = 0; i < 9; i++) {
@@ -71,6 +74,18 @@ std::queue<std::vector<double>> PlayMotionGenerator::generate_motion(std::vector
     return q_queue;
 }
 
-int PlayMotionGenerator::get_num_point() {
-    // 이전 코드의 getNumCommands 함수
+int PlayMotionGenerator::get_num_point(double t0, double t1) {
+    double n;
+
+    // 한 라인의 데이터 개수 (5ms 단위)
+    n = (t1 - t0) / ROBOT::DT_SECOND;
+    round_sum += (int)(n * 10000) % 10000;
+    if (round_sum >= 10000)
+    {
+        round_sum -= 10000;
+        n++;
+    }
+    n = floor(n);
+
+    return (int)n;
 }

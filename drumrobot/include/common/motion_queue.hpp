@@ -10,13 +10,14 @@ enum class TrajectoryProfile { TRAPEZOIDAL, CUBIC, QUINTIC, COSINE };
 
 struct DrumEvent {
     unsigned int bar = 1;           // 마디 번호
-    double t = 0.6;
+    double beat = 0.6;              // 박자 (0.6 -> 한 박)
     int note_num_R = 0;             // 오른팔 타격 악기 번호
     int note_num_L = 0;             // 왼팔 타격 악기 번호
     int velocity_R = 0;             // 오른팔 타격 강도
     int velocity_L = 0;             // 왼팔 타격 강도
     bool is_kick = false;           // bass drum
     bool is_closed_hihat = false;   // closed hi-hat
+    double t = 0.0;                 // 누적 시간
 };
 
 struct MotionPrimitive {

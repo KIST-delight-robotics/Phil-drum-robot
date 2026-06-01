@@ -20,9 +20,9 @@ namespace JointID {
 BehaviorPlanner::BehaviorPlanner(AppContext &ctxRef, Robot &robotRef)
     : ctx(ctxRef), robot(robotRef) {
     // 초기 자세를 last_q_target으로 설정 (모터의 initial_joint_angle 사용)
-    last_q_target.resize(robot.NUM_JOINT, 0.0);
+    last_q_target.resize(ROBOT::NUM_JOINT, 0.0);
     for (const auto &[id, motor] : robot.motors) {
-        if (id < robot.NUM_JOINT) {
+        if (id < ROBOT::NUM_JOINT) {
             last_q_target[id] = motor->initial_joint_angle;
         }
     }
@@ -389,13 +389,14 @@ DrumEvent BehaviorPlanner::make_drum_event(const std::vector<std::string>& items
     DrumEvent event;
 
     event.bar             = stoi(items[0]);
-    event.t               = stod(items[1]);
-    event.note_num_R      = stod(items[2]);
-    event.note_num_L      = stod(items[3]);
-    event.velocity_R      = stod(items[4]);
-    event.velocity_L      = stod(items[5]);
-    event.is_kick         = stod(items[6]);
-    event.is_closed_hihat = stod(items[7]);
+    event.beat            = stod(items[1]);
+    event.note_num_R      = stoi(items[2]);
+    event.note_num_L      = stoi(items[3]);
+    event.velocity_R      = stoi(items[4]);
+    event.velocity_L      = stoi(items[5]);
+    event.is_kick         = (stoi(items[6]) == 1);
+    event.is_closed_hihat = (stoi(items[7]) == 1);
+    event.t               = event.beat;     // TODO: bpm 곱해서 누적하기
 
     return event;
 }

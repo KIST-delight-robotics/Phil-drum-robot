@@ -10,6 +10,7 @@
 #include "dynamixel_sdk/include/dynamixel_sdk.h"
 #include "nlohmann/json.hpp"
 
+#include "common/robot_config.hpp"
 #include "hardware/can_interface.hpp"
 #include "hardware/motor_codec.hpp"
 #include "hardware/motor.hpp"
@@ -22,8 +23,6 @@ public:
     ~Robot();
 
     void initialize();
-
-    const int NUM_JOINT = 13;   // 로봇의 관절 개수
 
     CanInterface can;
     std::map<int, std::shared_ptr<Motor>> motors;
