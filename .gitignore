@@ -1,4 +1,8 @@
-bin/
-obj/
-log/
+# 오디오 파일 (용량 큼)
 data/audio/
+*.wav
+
+# 런타임 생성물
+drumrobot/log/
+drumrobot/obj/
+drumrobot/bin/*.out
