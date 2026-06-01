@@ -17,6 +17,7 @@ TrajectoryGenerator::~TrajectoryGenerator() {
 
 void TrajectoryGenerator::initialize(const std::vector<double>& init_pose) {
     solver.initialize();
+    play_motion_generator.initialize();
 
     update_last_q(init_pose);
 }
@@ -46,16 +47,15 @@ void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
 
 void TrajectoryGenerator::generate_joint_space_trajectory(const MotionPrimitive& motion) {
     std::vector<ControlMode> modes = get_modes();
-    int num_point = static_cast<int>(motion.t_total / dt);
+    int num_point = static_cast<int>(motion.t_total / DT);
 
     std::vector<double> q0 = last_q;
     std::vector<double> q1 = motion.q_target;
-    int num_joint = q0.size();
 
     for (int k = 1; k <= num_point; k++) {
         auto [q, qd] = sample(q0, q1, num_point, k, motion.profile);
 
-        ControlSetPoint set_point(num_joint);
+        ControlSetPoint set_point(NUM_JOINT);
         set_point.q = q;
         set_point.qd = qd;
         set_point.mode = modes;
@@ -69,11 +69,10 @@ void TrajectoryGenerator::generate_joint_space_trajectory(const MotionPrimitive&
 
 void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& motion) {
     std::vector<ControlMode> modes = get_modes();
-    int num_point = static_cast<int>(motion.t_total / dt);
+    int num_point = static_cast<int>(motion.t_total / DT);
 
     std::vector<double> q0 = last_q;
     std::vector<double> q1 = motion.q_target;
-    int num_joint = q0.size();
 
     std::vector<double> p0 = {
         last_p_R[0], last_p_R[1], last_p_R[2],
@@ -105,12 +104,12 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
         }
 
         // 13차원 set_point 구성: IK 결과(0~8) + 관절 보간값(9~12)
-        ControlSetPoint set_point(num_joint);
+        ControlSetPoint set_point(NUM_JOINT);
         for (int i = 0; i < 9; i++) {
             set_point.q[i] = result.q[i];   // 관절 0~8 (팔)
-            set_point.qd[i] = (result.q[i] - prev_q[i]) / dt;
+            set_point.qd[i] = (result.q[i] - prev_q[i]) / DT;
         }
-        for (int i = 9; i < num_joint; i++) {
+        for (int i = 9; i < NUM_JOINT; i++) {
             set_point.q[i] = q[i];          // 관절 9~12 (페달, 머리)
             set_point.qd[i] = qd[i]; 
         }
@@ -126,22 +125,44 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
 }
 
 void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion) {
+    std::vector<ControlMode> modes = get_modes();
 
+    std::queue<std::vector<double>> play_motion = play_motion_generator.generate_motion();
+
+    // 속도 계산을 위한 이전 관절각
+    std::vector<double> prev_q = last_q;
+
+    while (!play_motion.empty()) {
+        std::vector<double> q = play_motion.front();
+        play_motion.pop();
+
+        ControlSetPoint set_point(NUM_JOINT);
+        for (int i = 0; i < NUM_JOINT; i++) {
+            set_point.q[i] = q[i];
+            set_point.qd[i] = (q[i] - prev_q[i]) / DT;
+        }
+        
+        set_point.mode = modes;
+        control_queue.push(set_point);
+
+        prev_q = q;
+
+        trajectory_log.record(set_point.q);
+    }
 }
 
 void TrajectoryGenerator::generate_idle_trajectory() {
     std::vector<ControlMode> modes = get_modes();
     double t_total = 1.0;
-    int num_point = static_cast<int>(t_total / dt);
+    int num_point = static_cast<int>(t_total / DT);
 
     std::vector<double> q0 = last_q;
     std::vector<double> q1 = last_q;    // TODO: 미세한 움직임 구현
-    int num_joint = q0.size();
 
     for (int k = 1; k <= num_point; k++) {
         auto [q, qd] = sample_cosine(q0, q1, num_point, k);
 
-        ControlSetPoint set_point(num_joint);
+        ControlSetPoint set_point(NUM_JOINT);
         set_point.q = q;
         set_point.qd = qd;
         set_point.mode = modes;
@@ -215,7 +236,7 @@ std::pair<std::vector<double>, std::vector<double>> TrajectoryGenerator::sample_
     std::vector<double> qd(dim, 0.0);
  
     double s = static_cast<double>(k) / static_cast<double>(n);   // 정규화 시간 [0, 1)
-    double t_total = n * dt;                                      // 실제 전체 시간 [s]
+    double t_total = n * DT;                                      // 실제 전체 시간 [s]
  
     double s_pos;   // 정규화 위치 [0, 1]
     double s_vel;   // 정규화 속도 ds/d(s_time)
@@ -263,7 +284,7 @@ std::pair<std::vector<double>, std::vector<double>> TrajectoryGenerator::sample_
     std::vector<double> qd(dim, 0.0);
  
     double s = static_cast<double>(k) / static_cast<double>(n);
-    double t_total = n * dt;
+    double t_total = n * DT;
  
     double s_pos = 3.0 * s * s - 2.0 * s * s * s;
     double s_vel = 6.0 * s * (1.0 - s);
@@ -292,7 +313,7 @@ std::pair<std::vector<double>, std::vector<double>> TrajectoryGenerator::sample_
     std::vector<double> qd(dim, 0.0);
  
     double s = static_cast<double>(k) / static_cast<double>(n);
-    double t_total = n * dt;
+    double t_total = n * DT;
  
     double s2 = s * s;
     double s3 = s2 * s;
@@ -327,7 +348,7 @@ std::pair<std::vector<double>, std::vector<double>> TrajectoryGenerator::sample_
     std::vector<double> qd(dim, 0.0);
  
     double s = static_cast<double>(k) / static_cast<double>(n);
-    double t_total = n * dt;
+    double t_total = n * DT;
  
     double s_pos = 0.5 * (1.0 - std::cos(M_PI * s));
     double s_vel = 0.5 * M_PI * std::sin(M_PI * s);
@@ -370,14 +391,13 @@ void TrajectoryGenerator::update_last_q(const std::vector<double>& p, const std:
     }
 
     // 13차원 last_q 구성: IK 결과(0~8) + 관절 보간값(9~12)
-    int num_joint = q.size();
     for (int i = 0; i < 9; i++) {
         last_q[i] = result.q[i];
     }
-    for (int i = 9; i < num_joint; i++) {
+    for (int i = 9; i < NUM_JOINT; i++) {
         last_q[i] = q[i];
     }
-    last_qd = std::vector<double>(num_joint, 0.0);
+    last_qd = std::vector<double>(NUM_JOINT, 0.0);
 
     last_p_R.assign(pR.begin(), pR.end());
     last_p_L.assign(pL.begin(), pL.end());

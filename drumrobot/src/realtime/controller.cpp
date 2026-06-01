@@ -3,7 +3,7 @@
 Controller::Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot &robotRef)
     : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef), motor_log("motor")
 {
-    int n = robot.num_joint;
+    int n = robot.NUM_JOINT;
     curr_point = ControlSetPoint(n);
     prev_point = ControlSetPoint(n);
 

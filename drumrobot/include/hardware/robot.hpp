@@ -23,7 +23,7 @@ public:
 
     void initialize();
 
-    const int num_joint = 13;   // 로봇의 관절 개수
+    const int NUM_JOINT = 13;   // 로봇의 관절 개수
 
     CanInterface can;
     std::map<int, std::shared_ptr<Motor>> motors;

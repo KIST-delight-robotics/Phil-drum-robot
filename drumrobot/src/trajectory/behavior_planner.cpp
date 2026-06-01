@@ -20,9 +20,9 @@ namespace JointID {
 BehaviorPlanner::BehaviorPlanner(AppContext &ctxRef, Robot &robotRef)
     : ctx(ctxRef), robot(robotRef) {
     // 초기 자세를 last_q_target으로 설정 (모터의 initial_joint_angle 사용)
-    last_q_target.resize(robot.num_joint, 0.0);
+    last_q_target.resize(robot.NUM_JOINT, 0.0);
     for (const auto &[id, motor] : robot.motors) {
-        if (id < robot.num_joint) {
+        if (id < robot.NUM_JOINT) {
             last_q_target[id] = motor->initial_joint_angle;
         }
     }

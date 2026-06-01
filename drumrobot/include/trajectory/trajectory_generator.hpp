@@ -6,10 +6,12 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
+#include <queue>
 
 #include "common/motion_queue.hpp"  // MotionPrimitive
 #include "common/control_queue.hpp"
 #include "kinematics/kinematics_solver.hpp"
+#include "trajectory/play_motion_generator.hpp"
 #include "util/logger.hpp"
 
 class TrajectoryGenerator {
@@ -24,8 +26,10 @@ private:
     ControlQueue &control_queue;
 
     KinematicsSolver solver;
+    PlayMotionGenerator play_motion_generator;
 
-    const double dt = 0.005;        // 데이터 시간 간격 5ms
+    const double DT = 0.005;        // 데이터 시간 간격 5ms
+    const int NUM_JOINT = 13;
 
     std::vector<double> last_q;     // 마지막 위치
     std::vector<double> last_qd;    // 마지막 속도
