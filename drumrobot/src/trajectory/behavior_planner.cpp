@@ -64,6 +64,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
         case Opcode::MOVE:    return handle_move(parsed.args);
         case Opcode::POSE:    return handle_pose(parsed.args);
         case Opcode::HIT:     return handle_hit(parsed.args);
+        case Opcode::PLAY:    return handle_play(parsed.args);
         case Opcode::START:
             std::cerr << "[BehaviorPlanner] 이미 시작된 상태\n";
             return sequence;
@@ -264,12 +265,43 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_pose(const std::vector<std:
     return sequence;
 }
 
-// HIT target : 드럼 타격 (TODO: 본격 구현은 추후)
+// HIT target : 드럼 타격
 std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
     const std::string& target = args[0];
 
-    std::cout << "[BehaviorPlanner] HIT not yet implemented (target=" << target << ")\n";
+    if (target == "snare") {
+        sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 1, false, false));
+    } else if (target == "floor") {
+        sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 2, false, false));
+    } else if (target == "mid") {
+        sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 3, false, false));
+    } else if (target == "top") {
+        sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 4, false, false));
+    } else if (target == "closed") {    // closed hi-hat
+        sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 5, false, true));
+    } else if (target == "open") {      // open hi-hat
+        sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 5, false, false));
+    } else if (target == "ride") {
+        sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 6, false, false));
+    } else if (target == "right") {     // right crash
+        sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 7, false, false));
+    } else if (target == "left") {      // left crash
+        sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 8, false, false));
+    } else if (target == "bass") {
+        sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 0, true, false));
+    } else {
+        std::cerr << "[BehaviorPlanner] Unknown target instrument: " << target << "\n";
+        return sequence;
+    }
+
+    return sequence;
+}
+
+// PLAY score_name : 드럼 연주
+std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std::string>& args) {
+    std::vector<MotionPrimitive> sequence;
+    const std::string& score_name = args[0];
 
     return sequence;
 }
@@ -287,6 +319,28 @@ MotionPrimitive BehaviorPlanner::make_translate(const std::vector<double>& q_tar
     motion.profile  = profile;
     motion.q_target = q_target;
     motion.t_total  = t_total;
+    return motion;
+}
+
+MotionPrimitive BehaviorPlanner::make_drum_hit(double t, int note_num, bool is_kick, bool is_closed_hihat) {
+    MotionPrimitive motion;
+    motion.type     = MotionType::DRUM;
+
+    DrumEvent event;
+    event.bar = 1;
+    event.t = t;
+    if (note_num == 1 || note_num == 4 || note_num == 5 || note_num == 8) {
+        event.note_num_L = note_num;
+        event.velocity_L = 5;
+    } else {
+        event.note_num_R = note_num;
+        event.velocity_R = 5;
+    }
+    event.is_kick = is_kick;
+    event.is_closed_hihat = is_closed_hihat;
+
+    motion.robotic_drum_score.push_back(event);
+
     return motion;
 }
 

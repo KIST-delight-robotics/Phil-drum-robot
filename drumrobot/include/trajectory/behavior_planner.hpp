@@ -36,6 +36,7 @@ private:
     const double DEFAULT_MOVE_TIME = 3.0;
     const double LOOK_MOVE_TIME    = 1.0;
     const double GESTURE_MOVE_TIME = 1.0;
+    const double DEFAULT_HIT_TIME  = 1.0;
 
     // Opcode별 핸들러
     std::vector<MotionPrimitive> handle_look(const std::vector<std::string>& args);
@@ -43,12 +44,14 @@ private:
     std::vector<MotionPrimitive> handle_move(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_pose(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_hit(const std::vector<std::string>& args);
+    std::vector<MotionPrimitive> handle_play(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_start();
 
     // 헬퍼
     MotionPrimitive make_translate(const std::vector<double>& q_target,
                                    double t_total,
                                    TrajectoryProfile profile = TrajectoryProfile::COSINE);
+    MotionPrimitive make_drum_hit(double t, int note_num, bool is_kick, bool is_closed_hihat);
     int find_motor_id(const std::string& motor_name) const;
     double deg_to_rad(double deg) const { return deg * M_PI / 180.0; }
 };

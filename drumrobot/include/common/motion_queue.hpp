@@ -4,13 +4,24 @@
 #include <mutex>
 #include <optional>
 
-enum class MotionType { TRANSLATE, IDLE };
+enum class MotionType { TRANSLATE, DRUM, IDLE };
 enum class TrajectorySpace { JOINT, TASK };
 enum class TrajectoryProfile { TRAPEZOIDAL, CUBIC, QUINTIC, COSINE };
 
+struct DrumEvent {
+    unsigned int bar = 1;           // 마디 번호
+    double t = 0.6;                 // 박자 (0.6이 한 박)
+    int note_num_R = 0;             // 오른팔 타격 악기 번호
+    int note_num_L = 0;             // 왼팔 타격 악기 번호
+    int velocity_R = 0;             // 오른팔 타격 강도
+    int velocity_L = 0;             // 왼팔 타격 강도
+    bool is_kick = false;           // bass drum
+    bool is_closed_hihat = false;   // closed hi-hat
+};
+
 struct MotionPrimitive {
     MotionType type = MotionType::TRANSLATE;
-    
+
     // TRANSLATE용
     TrajectorySpace space = TrajectorySpace::JOINT;
     TrajectoryProfile profile = TrajectoryProfile::COSINE;
@@ -18,8 +29,11 @@ struct MotionPrimitive {
     std::vector<double> p_target_R;     // task space일 때
     std::vector<double> p_target_L;
     double t_total = 4.0;
-    
-    // 연주용
+
+    // DRUM용
+    std::vector<DrumEvent> robotic_drum_score;
+
+    // IDLE용
     // ... 별도 필드
 };
 

@@ -5,10 +5,6 @@
 #include <string>
 #include <optional>
 
-struct Command {
-    std::string s;
-};
-
 class CommandQueue {
 public:
     CommandQueue();
