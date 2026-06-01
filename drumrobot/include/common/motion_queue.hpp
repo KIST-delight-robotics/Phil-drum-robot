@@ -10,7 +10,7 @@ enum class TrajectoryProfile { TRAPEZOIDAL, CUBIC, QUINTIC, COSINE };
 
 struct DrumEvent {
     unsigned int bar = 1;           // 마디 번호
-    double t = 0.6;                 // 박자 (0.6이 한 박)
+    double t = 0.6;
     int note_num_R = 0;             // 오른팔 타격 악기 번호
     int note_num_L = 0;             // 왼팔 타격 악기 번호
     int velocity_R = 0;             // 오른팔 타격 강도

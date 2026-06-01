@@ -303,6 +303,38 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     std::vector<MotionPrimitive> sequence;
     const std::string& score_name = args[0];
 
+    std::ifstream inputFile;
+    inputFile.open(score_name); // 파일 열기
+
+    if (!inputFile.is_open()) {
+        return sequence;
+    }
+
+    string row;
+    while (getline(inputFile, row)) {
+        istringstream iss(row);
+        string item;
+        vector<string> items;
+        
+        while (getline(iss, item, '\t')) {
+            item = trim_whitespace(item);
+            items.push_back(item);
+        }
+
+        if (items[0] == "bpm") {
+
+        } else if (items[0] == "end") {
+
+        } else {
+            MotionPrimitive motion;
+            motion.type = MotionType::DRUM;
+            motion.robotic_drum_score.push_back(make_drum_event(items));
+
+            sequence.push_back(motion);
+        }
+    }
+    inputFile.close();
+
     return sequence;
 }
 
@@ -342,6 +374,30 @@ MotionPrimitive BehaviorPlanner::make_drum_hit(double t, int note_num, bool is_k
     motion.robotic_drum_score.push_back(event);
 
     return motion;
+}
+
+std::string BehaviorPlanner::trim_whitespace(const std::string &str) {
+    size_t first = str.find_first_not_of(" \t");
+    if (std::string::npos == first) {
+        return str;
+    }
+    size_t last = str.find_last_not_of(" \t");
+    return str.substr(first, (last - first + 1));
+}
+
+DrumEvent BehaviorPlanner::make_drum_event(const std::vector<std::string>& items) {
+    DrumEvent event;
+
+    event.bar             = stoi(items[0]);
+    event.t               = stod(items[1]);
+    event.note_num_R      = stod(items[2]);
+    event.note_num_L      = stod(items[3]);
+    event.velocity_R      = stod(items[4]);
+    event.velocity_L      = stod(items[5]);
+    event.is_kick         = stod(items[6]);
+    event.is_closed_hihat = stod(items[7]);
+
+    return event;
 }
 
 int BehaviorPlanner::find_motor_id(const std::string& motor_name) const {
