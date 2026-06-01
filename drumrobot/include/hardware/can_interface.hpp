@@ -6,6 +6,9 @@
 #include <sstream>
 #include <map>
 #include <cstring>
+#include <fstream>
+#include <cstdlib>
+#include <limits.h>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -19,11 +22,14 @@
 #include <linux/can.h>
 #include <linux/can/raw.h>
 
+#include "nlohmann/json.hpp"
+
 class CanInterface {
 public:
     CanInterface();
     ~CanInterface();
 
+    void resetCanPorts();                                           // USB 허브 포트 전원을 껐다 켜 CAN(PCAN-USB) 하드웨어 리셋
     void initialize();                                              // CAN 포트 초기화 : 사용가능 포트 확인 및 소켓 할당
 
     bool sendFrame(const std::string &ifname, const can_frame &frame);
@@ -56,4 +62,6 @@ private:
 
     int setSocketTimeout(int socket, int sec, int usec);
     void clearCanBuffer(int canSocket);
+
+    std::string getHostname();                                      // 현재 머신의 호스트네임 조회 (can_ports.json 키)
 };

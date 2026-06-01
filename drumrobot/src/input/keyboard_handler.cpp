@@ -21,7 +21,7 @@ void KeyboardHandler::run() {
 
         // 명령을 CommandQueue 에 push
         if (!input.empty()) {
-            command_queue.push(input);  // TODO: 패킷 구분자 포함해서 형식 맞춰서 보내기
+            command_queue.push(input);  // TODO: 키보드 입력을 받아서 패킷 구분자 포함해서 형식 만들어서 보내기
         }
 
         // quit 비교는 대문자로 정규화해서

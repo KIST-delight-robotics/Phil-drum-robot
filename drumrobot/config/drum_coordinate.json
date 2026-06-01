@@ -1,0 +1,14 @@
+{
+  "instruments": [
+    { "id": 1, "name": "S",   "right": {"position": [0.40, -0.10, -0.20], "wrist_angle_deg": 10.0}, "left": {"position": [0.40, 0.10, -0.20], "wrist_angle_deg": 10.0} },
+    { "id": 2, "name": "FT",  "right": {"position": [0.45, -0.25, -0.18], "wrist_angle_deg": 10.0}, "left": {"position": [0.45, 0.25, -0.18], "wrist_angle_deg": 10.0} },
+    { "id": 3, "name": "MT",  "right": {"position": [0.42, -0.05, -0.10], "wrist_angle_deg": 5.0},  "left": {"position": [0.42, 0.05, -0.10], "wrist_angle_deg": 5.0} },
+    { "id": 4, "name": "HT",  "right": {"position": [0.42, 0.05, -0.10],  "wrist_angle_deg": 5.0},  "left": {"position": [0.42, 0.10, -0.10], "wrist_angle_deg": 5.0} },
+    { "id": 5, "name": "HH",  "right": {"position": [0.38, 0.20, -0.18],  "wrist_angle_deg": 10.0}, "left": {"position": [0.38, 0.22, -0.18], "wrist_angle_deg": 10.0} },
+    { "id": 6, "name": "R",   "right": {"position": [0.50, -0.20, -0.05], "wrist_angle_deg": 15.0}, "left": {"position": [0.50, 0.20, -0.05], "wrist_angle_deg": 15.0} },
+    { "id": 7, "name": "RC",  "right": {"position": [0.48, 0.15, 0.00],   "wrist_angle_deg": 10.0}, "left": {"position": [0.48, 0.18, 0.00], "wrist_angle_deg": 10.0} },
+    { "id": 8, "name": "LC",  "right": {"position": [0.46, -0.30, 0.00],  "wrist_angle_deg": 10.0}, "left": {"position": [0.46, 0.30, 0.00], "wrist_angle_deg": 10.0} },
+    { "id": 9, "name": "OHH", "right": {"position": [0.38, 0.20, -0.16],  "wrist_angle_deg": 10.0}, "left": {"position": [0.38, 0.22, -0.16], "wrist_angle_deg": 10.0} },
+    { "id": 10,"name": "RB",  "right": {"position": [0.44, 0.00, -0.22],  "wrist_angle_deg": 10.0}, "left": {"position": [0.44, 0.00, -0.22], "wrist_angle_deg": 10.0} }
+  ]
+}

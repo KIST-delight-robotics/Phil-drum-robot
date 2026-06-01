@@ -8,6 +8,85 @@ CanInterface::~CanInterface() {
 
 }
 
+void CanInterface::resetCanPorts() {
+    using json = nlohmann::json;
+ 
+    std::string hostname = getHostname();
+    if (hostname.empty()) {
+        std::cerr << "[CanInterface] Failed to get hostname, skip CAN reset\n";
+        return;
+    }
+ 
+    std::ifstream f("drumrobot/config/can_ports.json");
+    if (!f.is_open()) {
+        std::cerr << "[CanInterface] Failed to open config/can_ports.json, skip CAN reset\n";
+        return;
+    }
+ 
+    json config = json::parse(f, nullptr, false);
+    if (config.is_discarded() || !config.contains("machines")) {
+        std::cerr << "[CanInterface] Invalid can_ports.json, skip CAN reset\n";
+        return;
+    }
+ 
+    const auto& machines = config["machines"];
+    if (!machines.contains(hostname)) {
+        std::cerr << "[CanInterface] Unrecognized hostname: " << hostname
+                  << " (not in can_ports.json), skip CAN reset\n";
+        return;
+    }
+ 
+    const auto& machine = machines[hostname];
+    std::string hub = machine.value("hub", std::string{});
+    std::vector<int> ports;
+    if (machine.contains("ports")) {
+        for (const auto& p : machine["ports"]) {
+            ports.push_back(p.get<int>());
+        }
+    }
+ 
+    if (hub.empty() || ports.empty()) {
+        std::cout << "[CanInterface] No CAN reset needed for " << hostname << "\n";
+        return;
+    }
+ 
+    std::cout << "[CanInterface] Resetting CAN ports on " << hostname
+              << " (hub " << hub << ")\n";
+ 
+    auto run_uhubctl = [&](int port, const char* action) -> bool {
+        std::string cmd = "sudo uhubctl -l " + hub
+                        + " -p " + std::to_string(port)
+                        + " -a " + action;
+        int ret = std::system(cmd.c_str());
+        std::cout << std::endl;
+        if (ret != 0) {
+            std::cerr << "[CanInterface] Command failed (" << ret << "): " << cmd << "\n";
+            return false;
+        }
+        return true;
+    };
+ 
+    bool ok = true;
+ 
+    // 전원 OFF
+    for (int port : ports) {
+        ok &= run_uhubctl(port, "off");
+    }
+ 
+    sleep(2);
+ 
+    // 전원 ON
+    for (int port : ports) {
+        ok &= run_uhubctl(port, "on");
+    }
+ 
+    if (!ok) {
+        std::cerr << "[CanInterface] Failed to reset one or more CAN ports\n";
+    }
+ 
+    sleep(2);   // 포트가 다시 올라올 때까지 대기
+}
+
 void CanInterface::initialize() {
     std::vector<std::string> ifnames = listAndActivateAvailableCANPorts();  // 사용 가능한 CAN 포트 이름 목록
     for (const auto &ifname : ifnames) {
@@ -301,4 +380,14 @@ void CanInterface::clearCanBuffer(int canSocket) {
             break;
         }
     }
+}
+
+std::string CanInterface::getHostname() {
+    char hostname[HOST_NAME_MAX + 1];
+    if (gethostname(hostname, sizeof(hostname)) != 0) {
+        perror("[CanInterface] gethostname");
+        return std::string{};
+    }
+    hostname[HOST_NAME_MAX] = '\0';
+    return std::string(hostname);
 }
