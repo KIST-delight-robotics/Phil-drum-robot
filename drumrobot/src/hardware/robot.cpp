@@ -13,7 +13,7 @@ Robot::~Robot() {
 }
 
 void Robot::initialize() {
-    // TODO: CAN 초기화 하기 전 리셋 (USB 전원 껏다 켜기) 먼저 해야 함
+    can.resetCanPorts();
     can.initialize();
     init_motor_from_json();
     set_motors_socket();
