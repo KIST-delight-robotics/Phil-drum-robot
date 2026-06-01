@@ -32,6 +32,9 @@ void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
             std::cerr << "[TrajectoryGenerator] Unknown motion trajectory space\n";
         }
         break;
+    case MotionType::DRUM:
+        generate_play_trajectory(motion);
+        break;
     case MotionType::IDLE:
         generate_idle_trajectory();
         break;
@@ -120,6 +123,10 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
     }
 
     update_last_q(p1, q1);
+}
+
+void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion) {
+
 }
 
 void TrajectoryGenerator::generate_idle_trajectory() {

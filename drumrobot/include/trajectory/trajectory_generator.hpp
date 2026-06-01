@@ -39,6 +39,7 @@ private:
     
     void generate_joint_space_trajectory(const MotionPrimitive& motion);
     void generate_task_space_trajectory(const MotionPrimitive& motion);
+    void generate_play_trajectory(const MotionPrimitive& motion);
     void generate_idle_trajectory();
 
     std::vector<ControlMode> get_modes();
