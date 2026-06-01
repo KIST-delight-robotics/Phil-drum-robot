@@ -8,6 +8,6 @@ HeadMotionGenerator::~HeadMotionGenerator() {
 
 }
 
-std::queue<HeadMotionPoint> HeadMotionGenerator::generate_motion() {
+std::queue<HeadMotionPoint> HeadMotionGenerator::generate_motion(std::vector<DrumEvent> rds, int num_point) {
 
 }

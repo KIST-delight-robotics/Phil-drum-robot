@@ -12,15 +12,15 @@ void PlayMotionGenerator::initialize() {
     solver.initialize();
 }
 
-std::queue<std::vector<double>> PlayMotionGenerator::generate_motion() {
+std::queue<std::vector<double>> PlayMotionGenerator::generate_motion(std::vector<DrumEvent> rds) {
     std::queue<std::vector<double>> q_queue;
 
     int n = get_num_point();
 
-    std::queue<BaseMotionPoint> base_motion = base_motion_generator.generate_motion();
-    std::queue<HeadMotionPoint> head_motion = head_motion_generator.generate_motion();
-    std::queue<PedalMotionPoint> pedal_motion = pedal_motion_generator.generate_motion();
-    std::queue<StateMotionPoint> state_motion = state_motion_generator.generate_motion();
+    std::queue<BaseMotionPoint> base_motion = base_motion_generator.generate_motion(rds, n);
+    std::queue<HeadMotionPoint> head_motion = head_motion_generator.generate_motion(rds, n);
+    std::queue<PedalMotionPoint> pedal_motion = pedal_motion_generator.generate_motion(rds, n);
+    std::queue<StateMotionPoint> state_motion = state_motion_generator.generate_motion(rds, n);
 
     for (int i = 0; i < n; i++) {
         std::vector<double> q(NUM_JOINT);
@@ -72,5 +72,5 @@ std::queue<std::vector<double>> PlayMotionGenerator::generate_motion() {
 }
 
 int PlayMotionGenerator::get_num_point() {
-    return 100;
+    // 이전 코드의 getNumCommands 함수
 }

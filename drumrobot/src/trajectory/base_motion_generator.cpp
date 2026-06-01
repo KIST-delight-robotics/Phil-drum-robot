@@ -8,6 +8,6 @@ BaseMotionGenerator::~BaseMotionGenerator() {
 
 }
 
-std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion() {
+std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(std::vector<DrumEvent> rds, int num_point) {
 
 }

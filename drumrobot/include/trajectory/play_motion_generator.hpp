@@ -17,7 +17,7 @@ public:
 
     void initialize();
 
-    std::queue<std::vector<double>> generate_motion();
+    std::queue<std::vector<double>> generate_motion(std::vector<DrumEvent> rds);
 
 private:
     KinematicsSolver solver;

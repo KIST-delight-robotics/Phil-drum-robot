@@ -127,7 +127,7 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
 void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion) {
     std::vector<ControlMode> modes = get_modes();
 
-    std::queue<std::vector<double>> play_motion = play_motion_generator.generate_motion();
+    std::queue<std::vector<double>> play_motion = play_motion_generator.generate_motion(motion.robotic_drum_score);
 
     // 속도 계산을 위한 이전 관절각
     std::vector<double> prev_q = last_q;

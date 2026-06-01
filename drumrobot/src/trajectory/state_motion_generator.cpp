@@ -8,6 +8,6 @@ StateMotionGenerator::~StateMotionGenerator() {
 
 }
 
-std::queue<StateMotionPoint> StateMotionGenerator::generate_motion() {
+std::queue<StateMotionPoint> StateMotionGenerator::generate_motion(std::vector<DrumEvent> rds, int num_point) {
 
 }

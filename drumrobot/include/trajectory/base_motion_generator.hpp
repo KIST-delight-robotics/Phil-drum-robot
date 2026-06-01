@@ -23,6 +23,6 @@ public:
     BaseMotionGenerator();
     ~BaseMotionGenerator();
 
-    std::queue<BaseMotionPoint> generate_motion();
+    std::queue<BaseMotionPoint> generate_motion(std::vector<DrumEvent> rds, int num_point);
 private:
 };
