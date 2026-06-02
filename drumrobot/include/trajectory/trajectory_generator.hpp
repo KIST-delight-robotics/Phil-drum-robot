@@ -36,7 +36,7 @@ private:
     std::vector<double> last_p_L;   // 마지막 위치
 
     ControlMode tmotor_control_mode = ControlMode::VEL;
-    ControlMode wrist_control_mode = ControlMode::CST;
+    ControlMode wrist_control_mode = ControlMode::CSP;
     ControlMode pedal_control_mode = ControlMode::CSP;
     
     void generate_joint_space_trajectory(const MotionPrimitive& motion);
