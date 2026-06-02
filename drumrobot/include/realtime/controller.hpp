@@ -38,7 +38,7 @@ private:
     void send_task_1ms(int cnt);
     void send_task_5ms();
 
-    bool all_motors_received();
+    bool all_tmotors_received();
 
     void tmotor_send_task(const ControlSetPoint &point);
     void maxon_motor_send_task(const ControlSetPoint &point);

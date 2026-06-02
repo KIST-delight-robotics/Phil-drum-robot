@@ -29,7 +29,7 @@ void Controller::send_loop() {
             continue;
         }
 
-        if (!all_motors_received()) {
+        if (!all_tmotors_received()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10)); // 모든 모터가 값을 수신할 때까지 대기
             continue;
         }
@@ -100,9 +100,12 @@ void Controller::recv_loop() {
 }
 
 // ===== SEND =====
-bool Controller::all_motors_received() {
+bool Controller::all_tmotors_received() {
     for (auto &[id, motor] : robot.motors) {
-        if (!motor->first_recv_done) return false;
+        auto tmotor = std::dynamic_pointer_cast<TMotor>(motor);
+        if (!tmotor) continue;
+
+        if (!tmotor->first_recv_done) return false;
     }
     return true;
 }
@@ -383,7 +386,7 @@ void Controller::distribute_frames() {
                         is_safe = false;
                     }
 
-                    tmotor->first_recv_done = true;
+                    tmotor->first_recv_done = true; // 수신 확인 완료되면 send loop 켜기
                 }
             }
         } else if (auto maxon = std::dynamic_pointer_cast<MaxonMotor>(motor_ptr)) {
@@ -398,8 +401,6 @@ void Controller::distribute_frames() {
                     if (!safety_check_recv_maxon(maxon)) {
                         is_safe = false;
                     }
-
-                    maxon->first_recv_done = true;
                 }
             }
         }

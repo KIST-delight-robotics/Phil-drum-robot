@@ -28,8 +28,6 @@ public:
 
     double current_joint_angle = 0.0;
 
-    bool first_recv_done = false;   // 수신이 한 번이라도 되었는지 확인
-
     double joint_angle_to_motor_position(double joint_angle);
     double motor_position_to_joint_angle(double motor_position);
 private:
@@ -56,6 +54,9 @@ public:
 
     // 과전류 체크 카운터
     int cnt = 0;
+
+    // 수신이 한 번이라도 되었는지 확인
+    bool first_recv_done = false;
 private:
 };
 

@@ -87,7 +87,6 @@ void Robot::init_motor_from_json() {
             motor->min_angle = m["min_angle"].get<double>() * M_PI / 180.0;
             motor->max_angle = m["max_angle"].get<double>() * M_PI / 180.0;
             motor->dxl_id = m["dxl_id"];
-            motor->first_recv_done = true;  // 다이나믹셀은 리시브 쓰레드에서 수신 안함
             motors[id] = motor;
 
             // std::cout << "[Robot] motor setting: " << motor->name << "\n";
