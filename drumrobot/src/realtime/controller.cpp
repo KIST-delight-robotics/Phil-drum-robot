@@ -76,6 +76,8 @@ void Controller::recv_loop() {
             continue;
         }
 
+        robot.can.clearReadBuffers();
+
         auto next = std::chrono::steady_clock::now();
 
         while (ctx.running.load() && ctx.recv_active.load()) {
