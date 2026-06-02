@@ -273,6 +273,8 @@ void Controller::set_maxon_mode(std::shared_ptr<MaxonMotor> &maxon, ControlMode 
     robot.can.sendFrame(maxon->socket, frame);
     m_codec.getEnable(maxon->tx_pdo_ids[0], &frame);
     robot.can.sendFrame(maxon->socket, frame);
+
+    maxon->mode = target_mode;
 }
 
 double Controller::cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_position) {

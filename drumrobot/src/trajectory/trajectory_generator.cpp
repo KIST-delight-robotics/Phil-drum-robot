@@ -46,7 +46,7 @@ void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
 }
 
 void TrajectoryGenerator::generate_joint_space_trajectory(const MotionPrimitive& motion) {
-    std::vector<ControlMode> modes = get_modes(motion.profile == TrajectoryProfile::TRAPEZOIDAL);
+    std::vector<ControlMode> modes = get_modes(motion.profile == TrajectoryProfile::TRAPEZOIDAL);   // TODO: mode test 코드 지우기
     int num_point = static_cast<int>(motion.t_total / ROBOT::DT_SECOND);
 
     std::vector<double> q0 = last_q;

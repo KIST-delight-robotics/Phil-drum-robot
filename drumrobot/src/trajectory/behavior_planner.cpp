@@ -129,7 +129,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_start() {
 void BehaviorPlanner::handle_state(const std::vector<std::string>& args) {
     const std::string& state = args[0];
 
-    if (state == "idle") {
+    if (state == "idle" && ctx.robot_state.load() == RobotState::Init) {
         ctx.robot_state = RobotState::Idle;
     } else {
         std::cerr << "[BehaviorPlanner] Unknown state argument: " << state << "\n";
