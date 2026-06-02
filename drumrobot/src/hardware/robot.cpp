@@ -268,8 +268,6 @@ void Robot::set_zero_tmotor() {
         t_codec.setOrigin(tmotor->node_id, &frame, 0);
         can.sendFrame(tmotor->socket, frame);
 
-        std::cout << "[Robot] TMotor " << tmotor->name << " Set Zero\n";
-
         usleep(100000);    // 100ms
     }
 
