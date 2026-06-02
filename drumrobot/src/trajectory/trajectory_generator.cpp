@@ -46,7 +46,7 @@ void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
 }
 
 void TrajectoryGenerator::generate_joint_space_trajectory(const MotionPrimitive& motion) {
-    std::vector<ControlMode> modes = get_modes();
+    std::vector<ControlMode> modes = get_modes(motion.profile == TrajectoryProfile::TRAPEZOIDAL);
     int num_point = static_cast<int>(motion.t_total / ROBOT::DT_SECOND);
 
     std::vector<double> q0 = last_q;
@@ -68,7 +68,7 @@ void TrajectoryGenerator::generate_joint_space_trajectory(const MotionPrimitive&
 }
 
 void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& motion) {
-    std::vector<ControlMode> modes = get_modes();
+    std::vector<ControlMode> modes = get_modes(false);
     int num_point = static_cast<int>(motion.t_total / ROBOT::DT_SECOND);
 
     std::vector<double> q0 = last_q;
@@ -125,7 +125,7 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
 }
 
 void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion) {
-    std::vector<ControlMode> modes = get_modes();
+    std::vector<ControlMode> modes = get_modes(false);
 
     std::queue<std::vector<double>> play_motion = play_motion_generator.generate_motion(motion.robotic_drum_score);
 
@@ -152,7 +152,7 @@ void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion
 }
 
 void TrajectoryGenerator::generate_idle_trajectory() {
-    std::vector<ControlMode> modes = get_modes();
+    std::vector<ControlMode> modes = get_modes(false);
     double t_total = 1.0;
     int num_point = static_cast<int>(t_total / ROBOT::DT_SECOND);
 
@@ -174,7 +174,13 @@ void TrajectoryGenerator::generate_idle_trajectory() {
     update_last_q(q1);
 }
 
-std::vector<ControlMode> TrajectoryGenerator::get_modes() {
+std::vector<ControlMode> TrajectoryGenerator::get_modes(bool test) {
+    if (test) {
+        wrist_control_mode = ControlMode::CST;
+    } else {
+        wrist_control_mode = ControlMode::CSP;
+    } 
+    
     std::vector<ControlMode> modes = {
         tmotor_control_mode,
         tmotor_control_mode,

@@ -44,7 +44,7 @@ private:
     void generate_play_trajectory(const MotionPrimitive& motion);
     void generate_idle_trajectory();
 
-    std::vector<ControlMode> get_modes();
+    std::vector<ControlMode> get_modes(bool test);
     std::pair<std::vector<double>, std::vector<double>> sample(
         const std::vector<double>& q0,
         const std::vector<double>& q1,

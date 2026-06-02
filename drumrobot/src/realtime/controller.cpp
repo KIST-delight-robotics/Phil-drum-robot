@@ -306,7 +306,7 @@ double Controller::cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_
     gravity_angle += maxon->current_joint_angle;
 
     double gravity_torque_Nm = STICK_MASS_KG * 9.81 * STICK_LEN_M * std::sin(gravity_angle) / maxon->gear_ratio;
-    torque_mNm -= gravity_torque_Nm * 1000.0;  // N·m -> mN·m
+    // torque_mNm -= gravity_torque_Nm * 1000.0;  // N·m -> mN·m
 
     return torque_mNm;
 }

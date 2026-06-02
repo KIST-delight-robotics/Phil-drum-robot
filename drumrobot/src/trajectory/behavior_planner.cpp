@@ -287,7 +287,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_pose(const std::vector<std:
         return sequence;
     }
 
-    sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME));
+    sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME, TrajectoryProfile::TRAPEZOIDAL));
     last_q_target = it->second;
 
     // shutdown 포즈로 이동하는 경우 종료 플래그 세팅
