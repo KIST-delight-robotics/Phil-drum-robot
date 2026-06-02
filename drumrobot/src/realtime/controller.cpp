@@ -24,13 +24,13 @@ void Controller::send_loop() {
 
     while (ctx.running.load()) {
         if (!ctx.send_active.load()) {
-            if (ctx.shutdown_requested.load()) break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(10)); // send_active 전까지 대기
+            if (ctx.robot_state.load() == RobotState::ShuttingDown) break;  // send_active 전 종료 상태가 되면 바로 탈출
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));     // send_active 전까지 대기
             continue;
         }
 
         if (!all_tmotors_received()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10)); // 모든 모터가 값을 수신할 때까지 대기
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));     // 모든 모터가 값을 수신할 때까지 대기
             continue;
         }
 
@@ -60,8 +60,8 @@ void Controller::send_loop() {
             }
             cnt++;
 
-            // 종료 요청 + 큐 소진 -> 루프 탈출
-            if (ctx.shutdown_requested.load() && control_queue.empty()) {
+            // 종료 상태 + 큐 소진 -> 루프 탈출
+            if ((ctx.robot_state.load() == RobotState::ShuttingDown) && control_queue.empty()) {
                 ctx.running = false;
                 break;
             }
@@ -218,6 +218,8 @@ void Controller::maxon_motor_send_task(const ControlSetPoint &point) {
         double motor_position  = maxon->joint_angle_to_motor_position(point.q[id]);
  
         if (mode == ControlMode::CSP) {
+            if (mode != maxon->mode) set_maxon_mode(maxon, ControlMode::CSP);   // 모터가 현재 설정된 모드와 다르면 변경
+
             m_codec.setPosition(maxon->tx_pdo_ids[1], &frame, motor_position);
 
             std::vector<double> values = {(double)maxon->id,
@@ -229,6 +231,8 @@ void Controller::maxon_motor_send_task(const ControlSetPoint &point) {
             };
             motor_log.record(values);
         } else if (mode == ControlMode::CST) {
+            if (mode != maxon->mode) set_maxon_mode(maxon, ControlMode::CST);   // 모터가 현재 설정된 모드와 다르면 변경
+
             double torque_mNm = cal_torque(maxon, motor_position);
             m_codec.setTorque(maxon->tx_pdo_ids[3], &frame, static_cast<int>(torque_mNm));
 
@@ -251,6 +255,24 @@ void Controller::maxon_motor_send_task(const ControlSetPoint &point) {
  
         robot.can.sendFrame(maxon->socket, frame);
     }
+}
+
+void Controller::set_maxon_mode(std::shared_ptr<MaxonMotor> &maxon, ControlMode target_mode) {
+    struct can_frame frame;
+
+    if (target_mode == ControlMode::CST) {
+        m_codec.getCSTMode(maxon->can_send_id, &frame);
+        robot.can.sendFrame(maxon->socket, frame);
+    } else if (target_mode == ControlMode::CSP) {
+        m_codec.getCSPMode(maxon->can_send_id, &frame);
+        robot.can.sendFrame(maxon->socket, frame);
+    }
+
+    // 모드 바꾸고 shutdown -> enable 해주기
+    m_codec.getShutdown(maxon->tx_pdo_ids[0], &frame);
+    robot.can.sendFrame(maxon->socket, frame);
+    m_codec.getEnable(maxon->tx_pdo_ids[0], &frame);
+    robot.can.sendFrame(maxon->socket, frame);
 }
 
 double Controller::cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_position) {

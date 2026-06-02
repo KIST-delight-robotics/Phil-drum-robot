@@ -1,7 +1,5 @@
 #pragma once
 
-#include "dynamixel_sdk/include/dynamixel_sdk.h"
-
 #include <iostream>
 #include <string>
 #include <vector>
@@ -10,6 +8,10 @@
 #include <memory>
 #include <cstring>
 #include <utility>
+
+#include "dynamixel_sdk/include/dynamixel_sdk.h"
+
+#include "common/control_queue.hpp"
 
 class Motor{
 public:
@@ -80,6 +82,8 @@ public:
     double control_kd;          // CST 모드용 D 게인
     double prev_err = 0.0;       // CST 모드용 이전 오차
     double prev_err_dot = 0.0;   // CST 모드용 이전 오차 미분
+
+    ControlMode mode = ControlMode::CSP;
 
     double current_position = 0.0;
     double current_torque   = 0.0;

@@ -19,8 +19,10 @@
 // =============================================================
 
 enum class Opcode {
+    STATE,      // 상태 변경       args: state
+
     LOOK,       // 시선 제어       args: pan(deg), tilt(deg)
-    GESTURE,    // 제스처         args: type (nod / shake / wave / hi / hurray / happy)
+    GESTURE,    // 행동           args: type (nod / shake / wave / hi / hurray / happy)
     MOVE,       // 개별 관절 이동   args: motorName, angleDeg, [moveTime=2.0]
     POSE,       // 사전 정의 포즈   args: poseName (home / ready / shutdown)
     HIT,        // 드럼 타격       args: target (snare / hihat / kick / ...)

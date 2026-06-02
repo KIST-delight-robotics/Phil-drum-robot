@@ -48,7 +48,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
         if (opcode == Opcode::START) {
             return handle_start();
         } else if (opcode == Opcode::QUIT) {
-            ctx.shutdown_requested = true;
+            ctx.robot_state = RobotState::ShuttingDown;
             return sequence;
         } else {
             std::cerr << "[BehaviorPlanner] 수행할 수 없는 명령 (send_active=false): opcode="
@@ -59,6 +59,10 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
 
     // ===== send_active 후 =====
     switch (opcode) {
+        case Opcode::STATE: {
+            handle_state(parsed.args);
+            return sequence;
+        }
         case Opcode::LOOK:    return handle_look(parsed.args);
         case Opcode::GESTURE: return handle_gesture(parsed.args);
         case Opcode::MOVE:    return handle_move(parsed.args);
@@ -75,7 +79,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
                 sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME));
                 last_q_target = it->second;
             }
-            ctx.shutdown_requested = true;
+            ctx.robot_state = RobotState::ShuttingDown;
             return sequence;
         }
         default:
@@ -121,9 +125,24 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_start() {
     return sequence;
 }
 
+// STATE: state 변경
+void BehaviorPlanner::handle_state(const std::vector<std::string>& args) {
+    const std::string& state = args[0];
+
+    if (state == "idle") {
+        ctx.robot_state = RobotState::Idle;
+    } else {
+        std::cerr << "[BehaviorPlanner] Unknown state argument: " << state << "\n";
+    }
+}
+
 // LOOK pan tilt : 머리 yaw, pitch 제어
 std::vector<MotionPrimitive> BehaviorPlanner::handle_look(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
+    if (ctx.robot_state.load() != RobotState::Idle) {
+        std::cerr << "[BehaviorPlanner] LOOK rejected: only allowed in Idle\n";
+        return sequence;
+    }
 
     try {
         double pan_deg  = std::stod(args[0]);
@@ -146,6 +165,11 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_look(const std::vector<std:
 // GESTURE type : 미리 정의된 제스처 시퀀스
 std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
+    if (ctx.robot_state.load() != RobotState::Idle) {
+        std::cerr << "[BehaviorPlanner] GESTURE rejected: only allowed in Idle\n";
+        return sequence;
+    }
+
     const std::string& type = args[0];
 
     if (type == "nod") {
@@ -219,6 +243,10 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
 // MOVE motor_name angle_deg [move_time]
 std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std::string>& args) {   // TODO: 여러개의 관절 동시에 움직이기
     std::vector<MotionPrimitive> sequence;
+    if (ctx.robot_state.load() != RobotState::Idle) {
+        std::cerr << "[BehaviorPlanner] MOVE rejected: only allowed in Idle\n";
+        return sequence;
+    }
 
     const std::string& motor_name = args[0];
     int motor_id = find_motor_id(motor_name);
@@ -246,6 +274,11 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std:
 // POSE pose_name : 사전 정의 포즈로 이동
 std::vector<MotionPrimitive> BehaviorPlanner::handle_pose(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
+    if (ctx.robot_state.load() != RobotState::Idle) {
+        std::cerr << "[BehaviorPlanner] POSE rejected: only allowed in Idle\n";
+        return sequence;
+    }
+
     const std::string& pose_name = args[0];
 
     auto it = poses.find(pose_name);
@@ -259,7 +292,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_pose(const std::vector<std:
 
     // shutdown 포즈로 이동하는 경우 종료 플래그 세팅
     if (pose_name == "shutdown") {
-        ctx.shutdown_requested = true;
+        ctx.robot_state = RobotState::ShuttingDown;
     }
 
     return sequence;
@@ -268,6 +301,11 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_pose(const std::vector<std:
 // HIT target : 드럼 타격
 std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
+    if (ctx.robot_state.load() != RobotState::Idle) {
+        std::cerr << "[BehaviorPlanner] HIT rejected: only allowed in Idle\n";
+        return sequence;
+    }
+
     const std::string& target = args[0];
 
     if (target == "snare") {
@@ -301,6 +339,12 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::
 // PLAY score_name : 드럼 연주
 std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
+    if (ctx.robot_state.load() != RobotState::Idle) {
+        std::cerr << "[BehaviorPlanner] PLAY rejected: only allowed in Idle\n";
+        return sequence;
+    }
+
+    ctx.robot_state = RobotState::Playing;
     const std::string& score_name = args[0];
 
     std::ifstream inputFile;
@@ -358,6 +402,11 @@ MotionPrimitive BehaviorPlanner::make_drum_hit(double t, int note_num, bool is_k
     MotionPrimitive motion;
     motion.type     = MotionType::DRUM;
 
+    // TODO: 궤적 만들 때 시작하는 위치 고려하기
+    DrumEvent start_event;
+    start_event.flag = EventFlag::START;
+    motion.robotic_drum_score.push_back(start_event);
+
     DrumEvent event;
     event.bar = 1;
     event.t = t;
@@ -372,6 +421,10 @@ MotionPrimitive BehaviorPlanner::make_drum_hit(double t, int note_num, bool is_k
     event.is_closed_hihat = is_closed_hihat;
 
     motion.robotic_drum_score.push_back(event);
+
+    DrumEvent end_event;
+    end_event.flag = EventFlag::END;
+    motion.robotic_drum_score.push_back(end_event);
 
     return motion;
 }

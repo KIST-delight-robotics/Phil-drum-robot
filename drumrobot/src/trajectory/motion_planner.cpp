@@ -56,7 +56,7 @@ void MotionPlanner::initialize() {
 }
 
 void MotionPlanner::parse_command(const std::string& cmd) {
-    if (ctx.shutdown_requested.load()) return;
+    if (ctx.robot_state.load() == RobotState::ShuttingDown) return; // 종료 상태가 되면 추가 명령 안받음
 
     ParsedCommand parsed = command_parser.parse(cmd);
 
@@ -71,7 +71,7 @@ void MotionPlanner::parse_command(const std::string& cmd) {
 }
 
 void MotionPlanner::schedule_idle_motion() {
-    if (ctx.shutdown_requested.load()) return;
+    if (ctx.robot_state.load() == RobotState::ShuttingDown) return; // 종료 상태가 되면 추가 명령 안받음
 
     MotionPrimitive idle_motion;
 

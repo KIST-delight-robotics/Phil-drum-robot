@@ -44,6 +44,7 @@ private:
     void maxon_motor_send_task(const ControlSetPoint &point);
     void dynamicxel_send_task(const ControlSetPoint &point);
 
+    void set_maxon_mode(std::shared_ptr<MaxonMotor> &maxon, ControlMode target_mode);
     double cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_position);
 
     const double STICK_LEN_M   = 0.121;

@@ -39,13 +39,14 @@ private:
     const double DEFAULT_HIT_TIME  = 1.0;
 
     // Opcode별 핸들러
+    std::vector<MotionPrimitive> handle_start();
+    void handle_state(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_look(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_gesture(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_move(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_pose(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_hit(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_play(const std::vector<std::string>& args);
-    std::vector<MotionPrimitive> handle_start();
 
     // 헬퍼
     MotionPrimitive make_translate(const std::vector<double>& q_target,
