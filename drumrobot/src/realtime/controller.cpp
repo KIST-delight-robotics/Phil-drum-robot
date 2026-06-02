@@ -29,6 +29,11 @@ void Controller::send_loop() {
             continue;
         }
 
+        if (!all_motors_received()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10)); // 모든 모터가 값을 수신할 때까지 대기
+            continue;
+        }
+
         auto next = std::chrono::steady_clock::now();
 
         while (ctx.running.load() && ctx.send_active.load()) {
@@ -95,6 +100,13 @@ void Controller::recv_loop() {
 }
 
 // ===== SEND =====
+bool Controller::all_motors_received() {
+    for (auto &[id, motor] : robot.motors) {
+        if (!motor->first_recv_done) return false;
+    }
+    return true;
+}
+
 void Controller::send_task_1ms(int cnt) {
     double alpha = static_cast<double>(cnt + 1) / 5.0;
 
@@ -143,6 +155,8 @@ void Controller::tmotor_send_task(const ControlSetPoint &point) {
         double diff = desired_joint - tmotor->current_joint_angle;
         if (std::abs(diff) > POS_DIFF_LIMIT) {
             std::cerr << "[Controller] TMotor 급변 차단 (" << tmotor->name << ")"
+                      << "  desired=" << desired_joint * 180.0 / M_PI << "deg"
+                      << "  actual=" << tmotor->current_joint_angle * 180.0 / M_PI << "deg"
                       << "  diff=" << diff * 180.0 / M_PI << "deg\n";
             continue;
         }
@@ -368,6 +382,8 @@ void Controller::distribute_frames() {
                     if (!safety_check_recv_tmotor(tmotor)) {
                         is_safe = false;
                     }
+
+                    tmotor->first_recv_done = true;
                 }
             }
         } else if (auto maxon = std::dynamic_pointer_cast<MaxonMotor>(motor_ptr)) {
@@ -382,6 +398,8 @@ void Controller::distribute_frames() {
                     if (!safety_check_recv_maxon(maxon)) {
                         is_safe = false;
                     }
+
+                    maxon->first_recv_done = true;
                 }
             }
         }

@@ -28,6 +28,8 @@ public:
 
     double current_joint_angle = 0.0;
 
+    bool first_recv_done = false;   // 수신이 한 번이라도 되었는지 확인
+
     double joint_angle_to_motor_position(double joint_angle);
     double motor_position_to_joint_angle(double motor_position);
 private:
