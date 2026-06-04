@@ -175,9 +175,9 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
     if (type == "nod") {
         // 끄덕임: 아래 → 위 → 정면
         std::vector<double> q;
-        q = last_q_target; q[JointID::HEAD_PITCH] = deg_to_rad(-20.0);
+        q = last_q_target; q[JointID::HEAD_PITCH] = deg_to_rad(20.0);
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
-        q[JointID::HEAD_PITCH] = deg_to_rad(20.0);
+        q[JointID::HEAD_PITCH] = deg_to_rad(-20.0);
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
         q[JointID::HEAD_PITCH] = 0.0;
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
@@ -186,9 +186,9 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
     else if (type == "shake") {
         // 도리도리: 좌 → 우 → 정면
         std::vector<double> q;
-        q = last_q_target; q[JointID::HEAD_YAW] = deg_to_rad(-30.0);
+        q = last_q_target; q[JointID::HEAD_YAW] = deg_to_rad(30.0);
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
-        q[JointID::HEAD_YAW] = deg_to_rad(30.0);
+        q[JointID::HEAD_YAW] = deg_to_rad(-30.0);
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
         q[JointID::HEAD_YAW] = 0.0;
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
@@ -202,8 +202,8 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
         q[JointID::R_SHOULDER_2] = deg_to_rad(45.0);
         q[JointID::R_ELBOW]      = deg_to_rad(90.0);
         q[JointID::R_WRIST]      = 0.0;
-        q[JointID::HEAD_YAW]     = deg_to_rad(20.0);
-        q[JointID::HEAD_PITCH]   = deg_to_rad(5.0);
+        q[JointID::HEAD_YAW]     = deg_to_rad(-20.0);
+        q[JointID::HEAD_PITCH]   = deg_to_rad(-5.0);
         sequence.push_back(make_translate(q, DEFAULT_MOVE_TIME));
 
         // 2) 손목 좌우 흔들기 3회
@@ -229,7 +229,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
         q[JointID::L_ELBOW]      = deg_to_rad(95.0);
         q[JointID::R_WRIST]      = 0.0;
         q[JointID::L_WRIST]      = 0.0;
-        q[JointID::HEAD_PITCH]   = deg_to_rad(15.0);
+        q[JointID::HEAD_PITCH]   = deg_to_rad(-15.0);
         sequence.push_back(make_translate(q, DEFAULT_MOVE_TIME));
         last_q_target = q;
     }

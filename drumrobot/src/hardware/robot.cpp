@@ -478,4 +478,7 @@ void Robot::init_dynamicxel() {
     }
     dxl_port = port;
     dxl_pkt  = pkt;
+
+    // TODO: 초기 위치로 천천히 보내기
+    // 다이나믹셀은 추기 위치가 고정되어 있지 않음
 }
