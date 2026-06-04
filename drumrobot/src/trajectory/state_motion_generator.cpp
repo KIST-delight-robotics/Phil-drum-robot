@@ -16,7 +16,10 @@ std::queue<StateMotionPoint> StateMotionGenerator::generate_motion(const std::ve
     }
 
     for (int i = 0; i < num_point; i++) {
+        StateMotionPoint point;
 
+
+        out.push(point);
     }
 
     return out;
