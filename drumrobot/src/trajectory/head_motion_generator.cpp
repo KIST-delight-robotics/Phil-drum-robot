@@ -38,6 +38,8 @@ std::queue<HeadMotionPoint> HeadMotionGenerator::generate_motion(const std::vect
         double tau = (double)i / (num_point - 1.0);
         point.yaw = cur_angle + (next_angle - cur_angle) * (3.0 * std::pow(tau, 2.0) - 2.0 * std::pow(tau, 3.0)) - 90.0*M_PI/180.0;
         point.pitch = get_nod_angle(rds[1].beat, nod_intensity, i, num_point);
+
+        out.push(point);
     }
 
     return out;
