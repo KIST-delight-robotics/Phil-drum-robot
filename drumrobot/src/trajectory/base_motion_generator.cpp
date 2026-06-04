@@ -64,7 +64,7 @@ void BaseMotionGenerator::initialize() {
               << " drum coordinates from " << config_path << "\n";
 }
 
-std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(std::vector<DrumEvent>& rds, int num_point) {
+std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds, int num_point) {
     std::queue<BaseMotionPoint> out;
  
     if (rds.size() < 2 || num_point <= 0) {
@@ -139,43 +139,46 @@ BaseMotionGenerator::MotionSegment BaseMotionGenerator::get_motion_segment(const
     // ===== 악기 & 시간 =====
     // R
     MotionContext next_context_R;
-
+ 
     if (rds[0].note_num_R == 0) {
         if (right_context.state == State::REST_TO_HIT || right_context.state == State::HIT_TO_HIT) {
             // 기존의 이동하던 궤적을 이어서 이동
             next_context_R.state = right_context.state;
             next_context_R.last_t = right_context.last_t;
             next_context_R.last_instrument = right_context.last_instrument;
-
-            seg.right.start_position = right_context.last_instrument;
-            seg.right.end_position = note_hit_R;
-
+ 
+            note_to_target(right_context.last_instrument, Arm::RIGHT,
+                           seg.right.start_position, seg.right.start_wrist_angle);
+            note_to_target(note_hit_R, Arm::RIGHT,
+                           seg.right.end_position, seg.right.end_wrist_angle);
+ 
             seg.right.start_time = right_context.last_t;
             seg.right.end_time = t_hit_R;
-
-            seg.right.start_wrist_angle = right_context.last_instrument;
-            seg.right.end_wrist_angle = note_hit_R;
         } else {
             if (is_hit_R) {
                 // 휴식 중 다음 타격 찾음
                 next_context_R.state = State::REST_TO_HIT;
                 next_context_R.last_t = rds[0].t;
                 next_context_R.last_instrument = right_context.last_instrument;
-
-                seg.right.start_position = right_context.last_instrument;
-                seg.right.end_position = note_hit_R;
-
+ 
+                note_to_target(right_context.last_instrument, Arm::RIGHT,
+                               seg.right.start_position, seg.right.start_wrist_angle);
+                note_to_target(note_hit_R, Arm::RIGHT,
+                               seg.right.end_position, seg.right.end_wrist_angle);
+ 
                 seg.right.start_time = rds[0].t;
                 seg.right.end_time = t_hit_R;
             } else {
-                // 휴식 중 다음 타격 없음
+                // 휴식 중 다음 타격 없음 (현재 위치 유지)
                 next_context_R.state = State::REST_TO_REST;
                 next_context_R.last_t = rds[0].t;
                 next_context_R.last_instrument = right_context.last_instrument;
-
-                seg.right.start_position = right_context.last_instrument;
-                seg.right.end_position = right_context.last_instrument;
-
+ 
+                note_to_target(right_context.last_instrument, Arm::RIGHT,
+                               seg.right.start_position, seg.right.start_wrist_angle);
+                seg.right.end_position    = seg.right.start_position;
+                seg.right.end_wrist_angle = seg.right.start_wrist_angle;
+ 
                 seg.right.start_time = rds[0].t;
                 seg.right.end_time = rds[1].t;
             }
@@ -186,27 +189,125 @@ BaseMotionGenerator::MotionSegment BaseMotionGenerator::get_motion_segment(const
             next_context_R.state = State::HIT_TO_HIT;
             next_context_R.last_t = rds[0].t;
             next_context_R.last_instrument = rds[0].note_num_R;
-
-            seg.right.start_position = rds[0].note_num_R;
-            seg.right.end_position = note_hit_R;
-
+ 
+            note_to_target(rds[0].note_num_R, Arm::RIGHT,
+                           seg.right.start_position, seg.right.start_wrist_angle);
+            note_to_target(note_hit_R, Arm::RIGHT,
+                           seg.right.end_position, seg.right.end_wrist_angle);
+ 
             seg.right.start_time = rds[0].t;
             seg.right.end_time = t_hit_R;
         } else {
-            // 타격 후 다음 타격 없음
+            // 타격 후 다음 타격 없음 (현재 위치 유지)
             next_context_R.state = State::HIT_TO_REST;
             next_context_R.last_t = rds[0].t;
             next_context_R.last_instrument = rds[0].note_num_R;
-
-            seg.right.start_position = rds[0].note_num_R;
-            seg.right.end_position = rds[0].note_num_R;
-
+ 
+            note_to_target(rds[0].note_num_R, Arm::RIGHT,
+                           seg.right.start_position, seg.right.start_wrist_angle);
+            seg.right.end_position    = seg.right.start_position;
+            seg.right.end_wrist_angle = seg.right.start_wrist_angle;
+ 
             seg.right.start_time = rds[0].t;
             seg.right.end_time = rds[1].t;
         }
     }
-
+ 
     seg.right.next_context = next_context_R;
+ 
+    // L
+    MotionContext next_context_L;
+ 
+    if (rds[0].note_num_L == 0) {
+        if (left_context.state == State::REST_TO_HIT || left_context.state == State::HIT_TO_HIT) {
+            // 기존의 이동하던 궤적을 이어서 이동
+            next_context_L.state = left_context.state;
+            next_context_L.last_t = left_context.last_t;
+            next_context_L.last_instrument = left_context.last_instrument;
+ 
+            note_to_target(left_context.last_instrument, Arm::LEFT,
+                           seg.left.start_position, seg.left.start_wrist_angle);
+            note_to_target(note_hit_L, Arm::LEFT,
+                           seg.left.end_position, seg.left.end_wrist_angle);
+ 
+            seg.left.start_time = left_context.last_t;
+            seg.left.end_time = t_hit_L;
+        } else {
+            if (is_hit_L) {
+                // 휴식 중 다음 타격 찾음
+                next_context_L.state = State::REST_TO_HIT;
+                next_context_L.last_t = rds[0].t;
+                next_context_L.last_instrument = left_context.last_instrument;
+ 
+                note_to_target(left_context.last_instrument, Arm::LEFT,
+                               seg.left.start_position, seg.left.start_wrist_angle);
+                note_to_target(note_hit_L, Arm::LEFT,
+                               seg.left.end_position, seg.left.end_wrist_angle);
+ 
+                seg.left.start_time = rds[0].t;
+                seg.left.end_time = t_hit_L;
+            } else {
+                // 휴식 중 다음 타격 없음 (현재 위치 유지)
+                next_context_L.state = State::REST_TO_REST;
+                next_context_L.last_t = rds[0].t;
+                next_context_L.last_instrument = left_context.last_instrument;
+ 
+                note_to_target(left_context.last_instrument, Arm::LEFT,
+                               seg.left.start_position, seg.left.start_wrist_angle);
+                seg.left.end_position    = seg.left.start_position;
+                seg.left.end_wrist_angle = seg.left.start_wrist_angle;
+ 
+                seg.left.start_time = rds[0].t;
+                seg.left.end_time = rds[1].t;
+            }
+        }
+    } else {
+        if (is_hit_L) {
+            // 타격 후 다음 타격 찾음
+            next_context_L.state = State::HIT_TO_HIT;
+            next_context_L.last_t = rds[0].t;
+            next_context_L.last_instrument = rds[0].note_num_L;
+ 
+            note_to_target(rds[0].note_num_L, Arm::LEFT,
+                           seg.left.start_position, seg.left.start_wrist_angle);
+            note_to_target(note_hit_L, Arm::LEFT,
+                           seg.left.end_position, seg.left.end_wrist_angle);
+ 
+            seg.left.start_time = rds[0].t;
+            seg.left.end_time = t_hit_L;
+        } else {
+            // 타격 후 다음 타격 없음 (현재 위치 유지)
+            next_context_L.state = State::HIT_TO_REST;
+            next_context_L.last_t = rds[0].t;
+            next_context_L.last_instrument = rds[0].note_num_L;
+ 
+            note_to_target(rds[0].note_num_L, Arm::LEFT,
+                           seg.left.start_position, seg.left.start_wrist_angle);
+            seg.left.end_position    = seg.left.start_position;
+            seg.left.end_wrist_angle = seg.left.start_wrist_angle;
+ 
+            seg.left.start_time = rds[0].t;
+            seg.left.end_time = rds[1].t;
+        }
+    }
+ 
+    seg.left.next_context = next_context_L;
+ 
+    return seg;
+}
+
+void BaseMotionGenerator::note_to_target(int note_num, Arm arm, std::array<double, 3>& out_position, double& out_wrist_angle_deg) {
+    auto it = drum_coordinates.find(note_num);
+    if (it == drum_coordinates.end()) {
+        std::cerr << "[BaseMotionGenerator] note_to_target: invalid note number "
+                  << note_num << "\n";
+        out_position        = {0.0, 0.0, 0.0};
+        out_wrist_angle_deg = 0.0;
+        return;
+    }
+    const InstrumentCoordinate& coord = it->second;
+    if (arm == Arm::RIGHT) { out_position = coord.right_position; out_wrist_angle_deg = coord.right_wrist_angle_deg; }
+    else                   { out_position = coord.left_position;  out_wrist_angle_deg = coord.left_wrist_angle_deg; }
 }
 
 double BaseMotionGenerator::time_scaling(double ti, double tf, double t) {

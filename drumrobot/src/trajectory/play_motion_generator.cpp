@@ -14,7 +14,7 @@ void PlayMotionGenerator::initialize() {
     base_motion_generator.initialize();
 }
 
-std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_motion(std::vector<DrumEvent>& rds) {
+std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds) {
     // rds[0]: 시작 자세
     // rds[1]: 목표 자세
     

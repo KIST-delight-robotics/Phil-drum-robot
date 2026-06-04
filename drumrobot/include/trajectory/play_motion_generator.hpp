@@ -19,7 +19,7 @@ public:
 
     void initialize();
 
-    std::queue<std::array<double, ROBOT::NUM_JOINT>> generate_motion(std::vector<DrumEvent>& rds);
+    std::queue<std::array<double, ROBOT::NUM_JOINT>> generate_motion(const std::vector<DrumEvent>& rds);
 
 private:
     KinematicsSolver solver;
