@@ -10,6 +10,8 @@ PlayMotionGenerator::~PlayMotionGenerator() {
 
 void PlayMotionGenerator::initialize() {
     solver.initialize();
+
+    base_motion_generator.initialize();
 }
 
 std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_motion(std::vector<DrumEvent> rds) {

@@ -308,6 +308,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::
 
     const std::string& target = args[0];
 
+    // TODO: 악기 이름과 번호를 어디선가 정의되어 공유하면 좋을 듯
     if (target == "snare") {
         sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 1, false, false));
     } else if (target == "floor") {
