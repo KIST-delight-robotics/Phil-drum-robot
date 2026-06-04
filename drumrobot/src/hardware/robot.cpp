@@ -366,7 +366,6 @@ void Robot::set_maxon_motor_mode(const std::string& targetMode) {
 }
 
 void Robot::init_dynamicxel() {
-    // TODO: USB 속도 설정인가? 그런거 해야 함
     dynamixel::PortHandler *port;
     dynamixel::PacketHandler *pkt;
 
@@ -377,6 +376,7 @@ void Robot::init_dynamicxel() {
     if (port->openPort())
     {
         printf("[Robot] -------------- Open Dynamixel Port");
+        set_dxl_latency(DXL_PORT, 1);
     }
     else
     {
@@ -479,6 +479,68 @@ void Robot::init_dynamicxel() {
     dxl_port = port;
     dxl_pkt  = pkt;
 
-    // TODO: 초기 위치로 천천히 보내기
-    // 다이나믹셀은 추기 위치가 고정되어 있지 않음
+    // 초기 위치로 보내기
+    set_dxl_init_angle();
+}
+
+void Robot::set_dxl_latency(const std::string &dev_path, int latency_ms) {
+    // latency_timer 값 바꿔주기
+    auto pos = dev_path.find_last_of('/');
+    std::string dev = (pos == std::string::npos) ? dev_path : dev_path.substr(pos + 1);
+
+    std::string sysfs =
+        "/sys/bus/usb-serial/devices/" + dev + "/latency_timer";
+
+    std::ofstream ofs(sysfs);
+    if (!ofs) {
+        std::cerr << "[Robot] latency_timer open 실패: "
+                  << sysfs << "\n";
+        return;
+    }
+    ofs << latency_ms;
+    if (!ofs) {
+        std::cerr << "[Robot] latency_timer 쓰기 실패: " << sysfs << "\n";
+    } else {
+        std::cout << "[Robot] " << dev << " latency_timer = "
+                  << latency_ms << "ms 설정 완료\n";
+    }
+}
+
+void Robot::set_dxl_init_angle() {
+    // 다이나믹셀은 초기 위치가 고정되어 있지 않음
+    const int32_t total_time = 2000;  // 이동 시간 [ms]
+
+    dxl_sw->clearParam();
+    for (auto &[id, motor] : motors) {
+        auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
+        if (!dxl) continue;
+
+        double motor_position = dxl->joint_angle_to_motor_position(0.0);    // 초기 위치 0
+
+        int32_t values[3];
+        uint8_t param[12];
+        // Profile Acceleration, Profile Velocity, Goal Position
+        values[0] = total_time;
+        values[1] = total_time / 2;
+        values[2] = dxl->angle_to_tick(motor_position);
+        memcpy(param, values, sizeof(values));
+
+        if (!dxl_sw->addParam(dxl->dxl_id, param)) {
+            std::cerr << "[Robot] init pose: dxl_sw addParam failed for ID:"
+                      << (int)dxl->dxl_id << "\n";
+            continue;
+        }
+
+        dxl->current_position = motor_position;
+        dxl->current_joint_angle = 0.0;
+    }
+
+    if (dxl_sw->txPacket() != COMM_SUCCESS) {
+        std::cerr << "[Robot] init pose: SyncWrite failed\n";
+    } else {
+        printf("[Robot] -------------- Dynamixel moving to initial pose\n");
+    }
+
+    // 모터가 초기 위치에 도착할 때까지 대기
+    usleep((total_time + 200) * 1000);
 }

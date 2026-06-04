@@ -42,6 +42,9 @@ void MotionPlanner::initialize() {
     // init 포즈 vs 모터 initial_joint_angle 비교
     const auto &init_pose = behavior_planner.poses["init"];
     for (auto &[id, motor] : robot.motors) {
+        auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
+        if (dxl) continue;  // 다이나믹셀은 초기 위치 비교 안함
+
         double diff = std::abs(init_pose[id] - motor->initial_joint_angle);
 
         if (diff > 1e-4) {

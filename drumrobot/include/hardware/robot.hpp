@@ -45,4 +45,6 @@ private:
     void maxon_motor_enable();
     void set_maxon_motor_mode(const std::string& targetMode);
     void init_dynamicxel();
+    void set_dxl_latency(const std::string &dev_path, int latency_ms);
+    void set_dxl_init_angle();
 };
