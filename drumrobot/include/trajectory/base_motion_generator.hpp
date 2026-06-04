@@ -16,13 +16,8 @@
 #include "kinematics/kinematics_solver.hpp"
 
 struct BaseMotionPoint {
-    double right_x;
-    double right_y;
-    double right_z;
-
-    double left_x;
-    double left_y;
-    double left_z;
+    std::array<double, 3> right_position;
+    std::array<double, 3> left_position;
 
     double waist;
     double right_wrist;
@@ -36,7 +31,7 @@ public:
  
     void initialize();
  
-    std::queue<BaseMotionPoint> generate_motion(std::vector<DrumEvent> rds, int num_point);
+    std::queue<BaseMotionPoint> generate_motion(std::vector<DrumEvent>& rds, int num_point);
  
 private:
     KinematicsSolver solver;
@@ -51,4 +46,38 @@ private:
     };
 
     std::map<int, InstrumentCoordinate> drum_coordinates;
+
+    const double HIT_DETECTION_THRESHOLD = 1.2;
+
+    enum class State {
+        REST_TO_REST,    // 이전 없음 -> 다음 없음 (계속 대기)
+        REST_TO_HIT,     // 이전 없음 -> 다음 있음 (대기 -> 타격 진입)
+        HIT_TO_REST,     // 이전 있음 -> 다음 없음 (타격 -> 대기 복귀)
+        HIT_TO_HIT       // 이전 있음 -> 다음 있음 (연속 타격)
+    };
+    struct MotionContext {
+        double last_t;          // 이전 시간
+        int last_instrument;    // 이전 악기
+        State state;            // 상태
+    };
+
+    struct ArmSegment {
+        double start_time, end_time;                  // 전체 궤적 기준 출발/도착 시간
+        std::array<double, 3> start_position, end_position;
+        double start_wrist_angle, end_wrist_angle;
+        MotionContext next_context;                   // 이전 시간, 이전 악기, 상태
+    };
+
+    struct MotionSegment {
+        double t0, t1;          // 궤적 생성 구간
+        ArmSegment right, left;
+    };
+
+    MotionContext right_context;    // TODO: 연주 시작할 때마다 초기화해야 함
+    MotionContext left_context;
+
+    BaseMotionGenerator::MotionSegment get_motion_segment(const std::vector<DrumEvent>& rds);
+    void parse_rds(const std::vector<DrumEvent>& rds);
+    double time_scaling(double ti, double tf, double t);
+    std::array<double, 3> make_path(const std::array<double, 3>& pi, const std::array<double, 3>& pf, double s);
 };

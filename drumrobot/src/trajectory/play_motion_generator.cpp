@@ -14,7 +14,7 @@ void PlayMotionGenerator::initialize() {
     base_motion_generator.initialize();
 }
 
-std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_motion(std::vector<DrumEvent> rds) {
+std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_motion(std::vector<DrumEvent>& rds) {
     // rds[0]: 시작 자세
     // rds[1]: 목표 자세
     
@@ -42,8 +42,8 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
         StateMotionPoint s = state_motion.front();
         state_motion.pop();
 
-        std::array<double, 3> pR = {b.right_x, b.right_y, b.right_z};
-        std::array<double, 3> pL = {b.left_x, b.left_y, b.left_z};
+        std::array<double, 3> pR = b.right_position;
+        std::array<double, 3> pL = b.left_position;
         double theta0 = b.waist;
         double theta7 = b.right_wrist;
         double theta8 = b.left_wrist;
