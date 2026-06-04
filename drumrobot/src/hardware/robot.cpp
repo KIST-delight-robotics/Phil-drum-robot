@@ -480,11 +480,11 @@ void Robot::init_dynamicxel() {
     dxl_pkt  = pkt;
 
     // 초기 위치로 보내기
-    set_dxl_init_angle();
+    set_dxl_initial_pose();
 }
 
 void Robot::set_dxl_latency(const std::string &dev_path, int latency_ms) {
-    // latency_timer 값 바꿔주기
+    // latency_timer 값 바꿔주기    // TODO: 잘 바뀌는지 확인 필요
     auto pos = dev_path.find_last_of('/');
     std::string dev = (pos == std::string::npos) ? dev_path : dev_path.substr(pos + 1);
 
@@ -506,7 +506,7 @@ void Robot::set_dxl_latency(const std::string &dev_path, int latency_ms) {
     }
 }
 
-void Robot::set_dxl_init_angle() {
+void Robot::set_dxl_initial_pose() {
     // 다이나믹셀은 초기 위치가 고정되어 있지 않음
     const int32_t total_time = 2000;  // 이동 시간 [ms]
 
