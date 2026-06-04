@@ -27,7 +27,6 @@ void Logger::set_header(const std::vector<std::string> &columns) {
 }
 
 void Logger::record(const std::vector<double>& values) {
-
     auto now = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration<double>(now - start);
 
@@ -41,13 +40,25 @@ void Logger::record(const std::vector<double>& values) {
 }
 
 void Logger::record(const std::vector<std::string>& values) {
-
     auto now = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration<double>(now - start);
 
     file << std::fixed << std::setprecision(4) << elapsed.count() << ",";
 
     for (size_t i = 0; i < values.size(); ++i) {
+        file << values[i];
+        if (i + 1 < values.size()) file << ",";
+    }
+    file << "\n";
+}
+
+void Logger::record(const std::array<double, 13>& values) {
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration<double>(now - start);
+
+    file << std::fixed << std::setprecision(4) << elapsed.count() << ",";
+
+    for (size_t i = 0; i < 13; ++i) {
         file << values[i];
         if (i + 1 < values.size()) file << ",";
     }

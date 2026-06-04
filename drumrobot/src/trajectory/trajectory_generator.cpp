@@ -46,18 +46,18 @@ void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
 }
 
 void TrajectoryGenerator::generate_joint_space_trajectory(const MotionPrimitive& motion) {
-    std::vector<ControlMode> modes = get_modes(motion.profile == TrajectoryProfile::TRAPEZOIDAL);   // TODO: mode test 코드 지우기
+    std::array<ControlMode, ROBOT::NUM_JOINT> modes = get_modes();
     int num_point = static_cast<int>(motion.t_total / ROBOT::DT_SECOND);
 
-    std::vector<double> q0 = last_q;
+    std::vector<double> q0(last_q.begin(), last_q.end());
     std::vector<double> q1 = motion.q_target;
 
     for (int k = 1; k <= num_point; k++) {
         auto [q, qd] = sample(q0, q1, num_point, k, motion.profile);
 
-        ControlSetPoint set_point(ROBOT::NUM_JOINT);
-        set_point.q = q;
-        set_point.qd = qd;
+        ControlSetPoint set_point;
+        std::copy(q.begin(),  q.end(),  set_point.q.begin());
+        std::copy(qd.begin(), qd.end(), set_point.qd.begin());
         set_point.mode = modes;
         control_queue.push(set_point);
 
@@ -68,10 +68,10 @@ void TrajectoryGenerator::generate_joint_space_trajectory(const MotionPrimitive&
 }
 
 void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& motion) {
-    std::vector<ControlMode> modes = get_modes(false);
+    std::array<ControlMode, ROBOT::NUM_JOINT> modes = get_modes();
     int num_point = static_cast<int>(motion.t_total / ROBOT::DT_SECOND);
 
-    std::vector<double> q0 = last_q;
+    std::vector<double> q0(last_q.begin(), last_q.end());
     std::vector<double> q1 = motion.q_target;
 
     std::vector<double> p0 = {
@@ -85,7 +85,8 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
     };
 
     // 속도 계산을 위한 이전 관절각
-    std::vector<double> prev_q = q0;
+    std::array<double, 9> prev_q;
+    std::copy(last_q.begin(), last_q.begin() + 9, prev_q.begin());
 
     for (int k = 1; k <= num_point; k++) {
         auto [q, qd] = sample(q0, q1, num_point, k, motion.profile);
@@ -104,7 +105,7 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
         }
 
         // 13차원 set_point 구성: IK 결과(0~8) + 관절 보간값(9~12)
-        ControlSetPoint set_point(ROBOT::NUM_JOINT);
+        ControlSetPoint set_point;
         for (int i = 0; i < 9; i++) {
             set_point.q[i] = result.q[i];   // 관절 0~8 (팔)
             set_point.qd[i] = (result.q[i] - prev_q[i]) / ROBOT::DT_SECOND;
@@ -125,18 +126,18 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
 }
 
 void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion) {
-    std::vector<ControlMode> modes = get_modes(false);
+    std::array<ControlMode, ROBOT::NUM_JOINT> modes = get_modes(true);
 
-    std::queue<std::vector<double>> play_motion = play_motion_generator.generate_motion(motion.robotic_drum_score);
+    std::queue<std::array<double, ROBOT::NUM_JOINT>> play_motion = play_motion_generator.generate_motion(motion.robotic_drum_score);
 
     // 속도 계산을 위한 이전 관절각
-    std::vector<double> prev_q = last_q;
+    std::array<double, ROBOT::NUM_JOINT> prev_q = last_q;
 
     while (!play_motion.empty()) {
-        std::vector<double> q = play_motion.front();
+        std::array<double, ROBOT::NUM_JOINT> q = play_motion.front();
         play_motion.pop();
 
-        ControlSetPoint set_point(ROBOT::NUM_JOINT);
+        ControlSetPoint set_point;
         for (int i = 0; i < ROBOT::NUM_JOINT; i++) {
             set_point.q[i] = q[i];
             set_point.qd[i] = (q[i] - prev_q[i]) / ROBOT::DT_SECOND;
@@ -149,22 +150,24 @@ void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion
 
         trajectory_log.record(set_point.q);
     }
+
+    // TODO: update_last_q 해야 함
 }
 
 void TrajectoryGenerator::generate_idle_trajectory() {
-    std::vector<ControlMode> modes = get_modes(false);
+    std::array<ControlMode, ROBOT::NUM_JOINT> modes = get_modes();
     double t_total = 1.0;
     int num_point = static_cast<int>(t_total / ROBOT::DT_SECOND);
 
-    std::vector<double> q0 = last_q;
-    std::vector<double> q1 = last_q;    // TODO: 미세한 움직임 구현
+    std::vector<double> q0(last_q.begin(), last_q.end());
+    std::vector<double> q1(last_q.begin(), last_q.end());    // TODO: 미세한 움직임 구현
 
     for (int k = 1; k <= num_point; k++) {
         auto [q, qd] = sample_cosine(q0, q1, num_point, k);
 
-        ControlSetPoint set_point(ROBOT::NUM_JOINT);
-        set_point.q = q;
-        set_point.qd = qd;
+        ControlSetPoint set_point;
+        std::copy(q.begin(),  q.end(),  set_point.q.begin());
+        std::copy(qd.begin(), qd.end(), set_point.qd.begin());
         set_point.mode = modes;
         control_queue.push(set_point);
 
@@ -174,14 +177,14 @@ void TrajectoryGenerator::generate_idle_trajectory() {
     update_last_q(q1);
 }
 
-std::vector<ControlMode> TrajectoryGenerator::get_modes(bool test) {
-    if (test) {
+std::array<ControlMode, ROBOT::NUM_JOINT> TrajectoryGenerator::get_modes(bool is_play) {
+    if (is_play) {
         wrist_control_mode = ControlMode::CST;
     } else {
         wrist_control_mode = ControlMode::CSP;
-    } 
-    
-    std::vector<ControlMode> modes = {
+    }
+
+    std::array<ControlMode, ROBOT::NUM_JOINT> modes = {
         tmotor_control_mode,
         tmotor_control_mode,
         tmotor_control_mode,
@@ -369,18 +372,20 @@ std::pair<std::vector<double>, std::vector<double>> TrajectoryGenerator::sample_
 }
 
 void TrajectoryGenerator::update_last_q(const std::vector<double>& q) {
-    last_q  = q;
-    last_qd = std::vector<double>(q.size(), 0.0);
+    std::copy(q.begin(), q.end(), last_q.begin());
+    last_qd.fill(0.0);
 
-    KinematicsSolver::FKResult result = solver.fk_solve(last_q);
+    std::array<double, 9> q_in;
+    std::copy(last_q.begin(), last_q.begin() + 9, q_in.begin());
+    KinematicsSolver::FKResult result = solver.fk_solve(q_in);
 
     if (!result.success) {
         std::cerr << "[TrajectoryGenerator] Failed to solve forward kinematics\n";
         return;
     }
     
-    last_p_R.assign(result.pR.begin(), result.pR.end());
-    last_p_L.assign(result.pL.begin(), result.pL.end());
+    last_p_R = result.pR;
+    last_p_L = result.pL;
 }
 
 void TrajectoryGenerator::update_last_q(const std::vector<double>& p, const std::vector<double>& q) {
@@ -403,8 +408,8 @@ void TrajectoryGenerator::update_last_q(const std::vector<double>& p, const std:
     for (int i = 9; i < ROBOT::NUM_JOINT; i++) {
         last_q[i] = q[i];
     }
-    last_qd = std::vector<double>(ROBOT::NUM_JOINT, 0.0);
+    last_qd.fill(0.0);
 
-    last_p_R.assign(pR.begin(), pR.end());
-    last_p_L.assign(pL.begin(), pL.end());
+    last_p_R = pR;
+    last_p_L = pL;
 }

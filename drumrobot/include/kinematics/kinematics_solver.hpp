@@ -19,7 +19,7 @@ public:
     void initialize();
 
     struct IKResult {
-        std::vector<double> q;  // [θ0~θ8], rad
+        std::array<double, 9> q;  // [θ0~θ8], rad
         bool success = false;   // 성공 여부
     };
 
@@ -31,7 +31,7 @@ public:
         double theta8
     ) const;
 
-    bool check_joint_limits(const std::vector<double>& q) const;    // q 벡터가 모든 관절 한계 내에 있는지 확인
+    bool check_joint_limits(const std::array<double, 9>& q) const;    // q 벡터가 모든 관절 한계 내에 있는지 확인
 
     struct FKResult {
         std::array<double, 3> pR;   // 오른손 끝 좌표 (드럼 스틱 끝)
@@ -39,7 +39,7 @@ public:
         bool success = false;
     };
     
-    FKResult fk_solve(const std::vector<double>& q);
+    FKResult fk_solve(const std::array<double, 9>& q);
 
 private:
     struct JointLimit {

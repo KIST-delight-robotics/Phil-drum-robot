@@ -3,7 +3,10 @@
 #include <queue>
 #include <mutex>
 #include <vector>
+#include <array>
 #include <optional>
+
+#include "common/robot_config.hpp"
 
 enum class ControlMode {
     // T motor
@@ -20,13 +23,9 @@ enum class ControlMode {
 };
 
 struct ControlSetPoint {
-    std::vector<double> q;
-    std::vector<double> qd;
-    std::vector<ControlMode> mode;
-
-    ControlSetPoint() = default;
-    explicit ControlSetPoint(int n) 
-        : q(n, 0.0), qd(n, 0.0), mode(n, ControlMode::None) {}
+    std::array<double, ROBOT::NUM_JOINT> q{};
+    std::array<double, ROBOT::NUM_JOINT> qd{};
+    std::array<ControlMode, ROBOT::NUM_JOINT> mode{};
 };
 
 class ControlQueue {

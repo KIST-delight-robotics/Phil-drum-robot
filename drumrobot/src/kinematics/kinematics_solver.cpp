@@ -26,11 +26,11 @@ void KinematicsSolver::initialize() {
     link_length.forearm   = config["link_length"]["forearm"];
     link_length.stick     = config["link_length"]["stick"];
 
-    std::cout << "[KinematicsSolver] Initialized."
-              << " waist="     << link_length.waist
-              << " upper_arm=" << link_length.upper_arm
-              << " forearm="   << link_length.forearm
-              << " stick="     << link_length.stick << "\n";
+    // std::cout << "[KinematicsSolver] Initialized."
+    //           << " waist="     << link_length.waist
+    //           << " upper_arm=" << link_length.upper_arm
+    //           << " forearm="   << link_length.forearm
+    //           << " stick="     << link_length.stick << "\n";
 
     // 기구학 함수 검증
     // verify_fk_ik();
@@ -44,7 +44,7 @@ KinematicsSolver::IKResult KinematicsSolver::ik_solve(
     double theta8
 ) const {
     IKResult result;
-    result.q.resize(9, 0.0);
+    result.q.fill(0.0);
 
     const double L1   = link_length.upper_arm;
     const double S    = link_length.waist;
@@ -127,7 +127,7 @@ KinematicsSolver::IKResult KinematicsSolver::ik_solve(
     return result;
 }
 
-KinematicsSolver::FKResult KinematicsSolver::fk_solve(const std::vector<double>& q) {
+KinematicsSolver::FKResult KinematicsSolver::fk_solve(const std::array<double, 9>& q) {
     FKResult result;
  
     if (q.size() < 9) {
@@ -279,15 +279,15 @@ void KinematicsSolver::verify_fk_ik(int num_tests, double tolerance_deg) {
  
     // 최악 사례 추적
     double max_endpoint_err = 0.0;
-    std::vector<double> worst_q_in(9, 0.0);
-    std::vector<double> worst_q_out(9, 0.0);
+    std::array<double, 9> worst_q_in{};
+    std::array<double, 9> worst_q_out{};
     std::array<double, 3> worst_pR_target{};
     std::array<double, 3> worst_pR_actual{};
     std::array<double, 3> worst_pL_target{};
     std::array<double, 3> worst_pL_actual{};
  
     for (int t = 0; t < num_tests; ++t) {
-        std::vector<double> q_in(9, 0.0);
+        std::array<double, 9> q_in{};
         for (int i = 0; i < 9; ++i) {
             q_in[i] = dists[i](rng);
         }
@@ -409,7 +409,7 @@ void KinematicsSolver::verify_fk_ik(int num_tests, double tolerance_deg) {
     std::cout << "===================================================\n\n";
 }
 
-bool KinematicsSolver::check_joint_limits(const std::vector<double>& q) const {
+bool KinematicsSolver::check_joint_limits(const std::array<double, 9>& q) const {
     for (int i = 0; i < static_cast<int>(q.size()); ++i) {
         auto it = joint_limits.find(i);
         if (it == joint_limits.end()) continue;

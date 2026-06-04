@@ -2,6 +2,7 @@
 
 #include <queue>
 #include <vector>
+#include <array>
 
 #include "common/motion_queue.hpp"
 #include "common/robot_config.hpp"
@@ -18,7 +19,7 @@ public:
 
     void initialize();
 
-    std::queue<std::vector<double>> generate_motion(std::vector<DrumEvent> rds);
+    std::queue<std::array<double, ROBOT::NUM_JOINT>> generate_motion(std::vector<DrumEvent> rds);
 
 private:
     KinematicsSolver solver;

@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <array>
 #include <ctime>
 #include <iostream>
 #include <iomanip>
@@ -17,6 +18,7 @@ public:
     void set_header(const std::vector<std::string>& columns);
     void record(const std::vector<double>& values);
     void record(const std::vector<std::string>& values);
+    void record(const std::array<double, 13>& values);
 
 private:
     std::ofstream file;

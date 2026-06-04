@@ -12,11 +12,11 @@ void PlayMotionGenerator::initialize() {
     solver.initialize();
 }
 
-std::queue<std::vector<double>> PlayMotionGenerator::generate_motion(std::vector<DrumEvent> rds) {
+std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_motion(std::vector<DrumEvent> rds) {
     // rds[0]: 시작 자세
     // rds[1]: 목표 자세
     
-    std::queue<std::vector<double>> q_queue;
+    std::queue<std::array<double, ROBOT::NUM_JOINT>> q_queue;
 
     int n = get_num_point(rds[1].t, rds[0].t);
 
@@ -26,7 +26,7 @@ std::queue<std::vector<double>> PlayMotionGenerator::generate_motion(std::vector
     std::queue<StateMotionPoint> state_motion = state_motion_generator.generate_motion(rds, n);
 
     for (int i = 0; i < n; i++) {
-        std::vector<double> q(ROBOT::NUM_JOINT);
+        std::array<double, ROBOT::NUM_JOINT> q;
 
         BaseMotionPoint b = base_motion.front();
         base_motion.pop();

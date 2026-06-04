@@ -375,7 +375,7 @@ void Robot::init_dynamicxel() {
     // Open port
     if (port->openPort())
     {
-        printf("[Robot] -------------- Open Dynamixel Port");
+        printf("[Robot] -------------- Open Dynamixel Port\n");
         set_dxl_latency(DXL_PORT, 1);
     }
     else

@@ -3,9 +3,6 @@
 Controller::Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot &robotRef)
     : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef), motor_log("motor")
 {
-    curr_point = ControlSetPoint(ROBOT::NUM_JOINT);
-    prev_point = ControlSetPoint(ROBOT::NUM_JOINT);
-
     for (auto &[id, motor] : robot.motors) {
         if (id < ROBOT::NUM_JOINT) {            
             curr_point.q[id] = motor->initial_joint_angle;
@@ -113,10 +110,10 @@ bool Controller::all_tmotors_received() {
 void Controller::send_task_1ms(int cnt) {
     double alpha = static_cast<double>(cnt + 1) / 5.0;
 
-    ControlSetPoint interp(curr_point.q.size());
+    ControlSetPoint interp;
     interp.mode = curr_point.mode;
     for (size_t i = 0; i < curr_point.q.size(); ++i) {
-        interp.q[i]    = prev_point.q[i] + alpha * (curr_point.q[i] - prev_point.q[i]);
+        interp.q[i] = prev_point.q[i] + alpha * (curr_point.q[i] - prev_point.q[i]);
     }
  
     maxon_motor_send_task(interp);

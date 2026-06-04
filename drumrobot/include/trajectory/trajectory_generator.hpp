@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <utility>
 #include <queue>
+#include <array>
 
 #include "common/control_queue.hpp"
 #include "common/motion_queue.hpp"  // MotionPrimitive
@@ -29,11 +30,11 @@ private:
     KinematicsSolver solver;
     PlayMotionGenerator play_motion_generator;
 
-    std::vector<double> last_q;     // 마지막 위치
-    std::vector<double> last_qd;    // 마지막 속도
+    std::array<double, ROBOT::NUM_JOINT> last_q;     // 마지막 위치
+    std::array<double, ROBOT::NUM_JOINT> last_qd;    // 마지막 속도
 
-    std::vector<double> last_p_R;   // 마지막 위치
-    std::vector<double> last_p_L;   // 마지막 위치
+    std::array<double, 3> last_p_R;   // 마지막 위치
+    std::array<double, 3> last_p_L;   // 마지막 위치
 
     ControlMode tmotor_control_mode = ControlMode::VEL;
     ControlMode wrist_control_mode = ControlMode::CSP;
@@ -44,7 +45,7 @@ private:
     void generate_play_trajectory(const MotionPrimitive& motion);
     void generate_idle_trajectory();
 
-    std::vector<ControlMode> get_modes(bool test);
+    std::array<ControlMode, ROBOT::NUM_JOINT> get_modes(bool is_play = false);
     std::pair<std::vector<double>, std::vector<double>> sample(
         const std::vector<double>& q0,
         const std::vector<double>& q1,
