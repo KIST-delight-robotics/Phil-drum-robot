@@ -29,21 +29,12 @@ public:
     BaseMotionGenerator();
     ~BaseMotionGenerator();
  
-    void initialize();
+    void initialize(const std::map<int, InstrumentCoordinate>& coordinates);
  
     std::queue<BaseMotionPoint> generate_motion(const std::vector<DrumEvent>& rds, int num_point);
  
 private:
     KinematicsSolver solver;
-
-    struct InstrumentCoordinate {
-        // 드럼 위치
-        // 드럼을 치는 순간 손목 각도
-        std::array<double, 3> right_position;
-        double                right_wrist_angle_deg;
-        std::array<double, 3> left_position;
-        double                left_wrist_angle_deg;
-    };
 
     std::map<int, InstrumentCoordinate> drum_coordinates;
 

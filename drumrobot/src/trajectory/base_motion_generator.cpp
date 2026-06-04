@@ -8,60 +8,10 @@ BaseMotionGenerator::~BaseMotionGenerator() {
 
 }
 
-void BaseMotionGenerator::initialize() {
-    using json = nlohmann::json;
+void BaseMotionGenerator::initialize(const std::map<int, InstrumentCoordinate>& coordinates) {
  
     solver.initialize();
-
-    const std::string config_path = "drumrobot/config/drum_coordinate.json";
-    std::ifstream ifs(config_path);
-    if (!ifs.is_open()) {
-        std::cerr << "[BaseMotionGenerator] Failed to open config file: "
-                  << config_path << "\n";
-        return;
-    }
-
-    json root;
-    try {
-        ifs >> root;
-    } catch (const json::parse_error& e) {
-        std::cerr << "[BaseMotionGenerator] JSON parse error in "
-                  << config_path << ": " << e.what() << "\n";
-        return;
-    }
-
-    drum_coordinates.clear();
-
-    for (const auto& inst : root.at("instruments")) {
-        InstrumentCoordinate coord;
-
-        int id = inst.at("id").get<int>();
-
-        const auto& right = inst.at("right");
-        const auto& left  = inst.at("left");
-
-        auto right_pos = right.at("position");
-        auto left_pos  = left.at("position");
-
-        coord.right_position = {
-            right_pos.at(0).get<double>(),
-            right_pos.at(1).get<double>(),
-            right_pos.at(2).get<double>()
-        };
-        coord.right_wrist_angle_deg = right.at("wrist_angle_deg").get<double>();
-
-        coord.left_position = {
-            left_pos.at(0).get<double>(),
-            left_pos.at(1).get<double>(),
-            left_pos.at(2).get<double>()
-        };
-        coord.left_wrist_angle_deg = left.at("wrist_angle_deg").get<double>();
-
-        drum_coordinates[id] = coord;   // TODO: 저장은 (번호, 위치)로 하되 읽을 때, 악기 이름과 번호를 매칭할 수 있는 공유 자원 있으면 좋을 듯
-    }
-
-    std::cout << "[BaseMotionGenerator] Loaded " << drum_coordinates.size()
-              << " drum coordinates from " << config_path << "\n";
+    drum_coordinates = coordinates;
 }
 
 std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds, int num_point) {
@@ -90,9 +40,11 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
 
         point.right_wrist = s_R * (seg.right.end_wrist_angle - seg.right.start_wrist_angle) + seg.right.start_wrist_angle;
         point.left_wrist = s_L * (seg.left.end_wrist_angle - seg.left.start_wrist_angle) + seg.left.start_wrist_angle;
-    }
 
-    // TODO: 허리각 결정해줘야 함
+        // TODO: 허리각 결정해줘야 함
+
+        out.push(point);
+    }
 
     return out;
 }
@@ -105,13 +57,14 @@ BaseMotionGenerator::MotionSegment BaseMotionGenerator::get_motion_segment(const
 
     // ===== 타격 감지 =====
     const double e = 0.00001; 
+    int rds_size = rds.size();
     
     bool is_hit_R = false, is_hit_L = false;
     double t_hit_R = 0.0, t_hit_L = 0.0;
     int note_hit_R = 0, note_hit_L = 0;
 
     // R
-    for (int i = 1; i < rds.size(); i++) {
+    for (int i = 1; i < rds_size; i++) {
         if (round(10000 * (HIT_DETECTION_THRESHOLD + e)) < round(10000 * (rds[i].t - rds[0].t))) {
             break;
         }
@@ -124,7 +77,7 @@ BaseMotionGenerator::MotionSegment BaseMotionGenerator::get_motion_segment(const
     }
 
     // L
-    for (int i = 1; i < rds.size(); i++) {
+    for (int i = 1; i < rds_size; i++) {
         if (round(10000 * (HIT_DETECTION_THRESHOLD + e)) < round(10000 * (rds[i].t - rds[0].t))) {
             break;
         }

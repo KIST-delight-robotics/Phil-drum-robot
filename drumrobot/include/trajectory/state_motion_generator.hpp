@@ -17,6 +17,6 @@ public:
     StateMotionGenerator();
     ~StateMotionGenerator();
 
-    std::queue<StateMotionPoint> generate_motion(std::vector<DrumEvent> rds, int num_point);
+    std::queue<StateMotionPoint> generate_motion(const std::vector<DrumEvent> rds, int num_point);
 private:
 };

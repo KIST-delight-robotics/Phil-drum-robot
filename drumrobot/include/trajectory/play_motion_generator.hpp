@@ -3,6 +3,7 @@
 #include <queue>
 #include <vector>
 #include <array>
+#include <map>
 
 #include "common/motion_queue.hpp"
 #include "common/robot_config.hpp"
@@ -23,6 +24,8 @@ public:
 
 private:
     KinematicsSolver solver;
+
+    std::map<int, InstrumentCoordinate> drum_coordinates;
 
     BaseMotionGenerator base_motion_generator;
     HeadMotionGenerator head_motion_generator;

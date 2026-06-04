@@ -14,6 +14,6 @@ public:
     PedalMotionGenerator();
     ~PedalMotionGenerator();
 
-    std::queue<PedalMotionPoint> generate_motion(std::vector<DrumEvent> rds, int num_point);
+    std::queue<PedalMotionPoint> generate_motion(const std::vector<DrumEvent> rds, int num_point);
 private:
 };
