@@ -21,7 +21,7 @@ public:
     TrajectoryGenerator(ControlQueue &controlQueueRef);
     ~TrajectoryGenerator();
 
-    void initialize(const std::vector<double>& init_pose);
+    void initialize(const std::map<std::string, std::vector<double>>& pose);
     void generate_trajectory(const MotionPrimitive& motion);
  
 private:
@@ -42,8 +42,12 @@ private:
     
     void generate_joint_space_trajectory(const MotionPrimitive& motion);
     void generate_task_space_trajectory(const MotionPrimitive& motion);
+    void generate_play_start_trajectory();
+    void generate_play_end_trajectory();
     void generate_play_trajectory(const MotionPrimitive& motion);
     void generate_idle_trajectory();
+
+    std::vector<double> home_pose;   // play 후 돌아오는 위치
 
     std::array<ControlMode, ROBOT::NUM_JOINT> get_modes(bool is_play = false);
     std::pair<std::vector<double>, std::vector<double>> sample(

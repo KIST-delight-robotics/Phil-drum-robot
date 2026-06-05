@@ -305,30 +305,58 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::
         std::cerr << "[BehaviorPlanner] HIT rejected: only allowed in Idle\n";
         return sequence;
     }
+    
+    MotionPrimitive start;
+    start.type = MotionType::DRUM;
+    start.flag = PlayFlag::START;
+
+    MotionPrimitive end;
+    end.type = MotionType::DRUM;
+    end.flag = PlayFlag::END;
 
     const std::string& target = args[0];
 
     // TODO: 악기 이름과 번호를 어디선가 정의되어 공유하면 좋을 듯
     if (target == "snare") {
+        sequence.push_back(start);
         sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 1, false, false));
+        sequence.push_back(end);
     } else if (target == "floor") {
+        sequence.push_back(start);
         sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 2, false, false));
+        sequence.push_back(end);
     } else if (target == "mid") {
+        sequence.push_back(start);
         sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 3, false, false));
+        sequence.push_back(end);
     } else if (target == "top") {
+        sequence.push_back(start);
         sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 4, false, false));
+        sequence.push_back(end);
     } else if (target == "closed") {    // closed hi-hat
+        sequence.push_back(start);
         sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 5, false, true));
+        sequence.push_back(end);
     } else if (target == "open") {      // open hi-hat
+        sequence.push_back(start);
         sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 5, false, false));
+        sequence.push_back(end);
     } else if (target == "ride") {
+        sequence.push_back(start);
         sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 6, false, false));
+        sequence.push_back(end);
     } else if (target == "right") {     // right crash
+        sequence.push_back(start);
         sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 7, false, false));
+        sequence.push_back(end);
     } else if (target == "left") {      // left crash
+        sequence.push_back(start);
         sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 8, false, false));
+        sequence.push_back(end);
     } else if (target == "bass") {
+        sequence.push_back(start);
         sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, 0, true, false));
+        sequence.push_back(end);
     } else {
         std::cerr << "[BehaviorPlanner] Unknown target instrument: " << target << "\n";
         return sequence;
@@ -403,10 +431,8 @@ MotionPrimitive BehaviorPlanner::make_drum_hit(double t, int note_num, bool is_k
     MotionPrimitive motion;
     motion.type     = MotionType::DRUM;
 
-    // TODO: 궤적 만들 때 시작하는 위치 고려하기
-    DrumEvent start_event;
-    start_event.flag = EventFlag::START;
-    motion.robotic_drum_score.push_back(start_event);
+    DrumEvent Dummy;
+    motion.robotic_drum_score.push_back(Dummy);
 
     DrumEvent event;
     event.bar = 1;
@@ -422,10 +448,6 @@ MotionPrimitive BehaviorPlanner::make_drum_hit(double t, int note_num, bool is_k
     event.is_closed_hihat = is_closed_hihat;
 
     motion.robotic_drum_score.push_back(event);
-
-    DrumEvent end_event;
-    end_event.flag = EventFlag::END;
-    motion.robotic_drum_score.push_back(end_event);
 
     return motion;
 }

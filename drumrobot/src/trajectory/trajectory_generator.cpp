@@ -15,11 +15,12 @@ TrajectoryGenerator::~TrajectoryGenerator() {
 
 }
 
-void TrajectoryGenerator::initialize(const std::vector<double>& init_pose) {
+void TrajectoryGenerator::initialize(const std::map<std::string, std::vector<double>>& pose) {
     solver.initialize();
     play_motion_generator.initialize();
 
-    update_last_q(init_pose);
+    update_last_q(pose.at("init"));
+    home_pose = pose.at("home");
 }
 
 void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
@@ -34,7 +35,13 @@ void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
         }
         break;
     case MotionType::DRUM:
-        generate_play_trajectory(motion);
+        if (motion.flag == PlayFlag::START) {
+            generate_play_start_trajectory();
+        } else if (motion.flag == PlayFlag::END) {
+            generate_play_end_trajectory();
+        } else {
+            generate_play_trajectory(motion);
+        }
         break;
     case MotionType::IDLE:
         generate_idle_trajectory();
@@ -123,6 +130,55 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
     }
 
     update_last_q(p1, q1);
+}
+
+void TrajectoryGenerator::generate_play_start_trajectory() {
+    // TODO: 초기 악기로 보내는 것도 좋을 듯
+    // 스네어 위치로 이동
+    std::array<ControlMode, ROBOT::NUM_JOINT> modes = get_modes();
+    double t_total = 4.0;
+    int num_point = static_cast<int>(t_total / ROBOT::DT_SECOND);
+
+    std::vector<double> q0(last_q.begin(), last_q.end());
+    std::vector<double> q1 = play_motion_generator.reset();
+
+    for (int k = 1; k <= num_point; k++) {
+        auto [q, qd] = sample(q0, q1, num_point, k, TrajectoryProfile::COSINE);
+
+        ControlSetPoint set_point;
+        std::copy(q.begin(),  q.end(),  set_point.q.begin());
+        std::copy(qd.begin(), qd.end(), set_point.qd.begin());
+        set_point.mode = modes;
+        control_queue.push(set_point);
+
+        trajectory_log.record(set_point.q);
+    }
+
+    update_last_q(q1);
+}
+
+void TrajectoryGenerator::generate_play_end_trajectory() {
+    // 홈 위치로 이동
+    std::array<ControlMode, ROBOT::NUM_JOINT> modes = get_modes();
+    double t_total = 4.0;
+    int num_point = static_cast<int>(t_total / ROBOT::DT_SECOND);
+
+    std::vector<double> q0(last_q.begin(), last_q.end());
+    std::vector<double> q1 = home_pose;
+
+    for (int k = 1; k <= num_point; k++) {
+        auto [q, qd] = sample(q0, q1, num_point, k, TrajectoryProfile::COSINE);
+
+        ControlSetPoint set_point;
+        std::copy(q.begin(),  q.end(),  set_point.q.begin());
+        std::copy(qd.begin(), qd.end(), set_point.qd.begin());
+        set_point.mode = modes;
+        control_queue.push(set_point);
+
+        trajectory_log.record(set_point.q);
+    }
+
+    update_last_q(q1);
 }
 
 void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion) {

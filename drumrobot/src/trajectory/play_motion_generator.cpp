@@ -64,6 +64,14 @@ void PlayMotionGenerator::initialize() {
               << " drum coordinates from " << config_path << "\n";
 
     base_motion_generator.initialize(drum_coordinates);
+    head_motion_generator.initialize(drum_coordinates);
+}
+
+std::vector<double> PlayMotionGenerator::reset() {
+    base_motion_generator.reset();
+    state_motion_generator.reset();
+
+    // TODO: 초기 위치 (스네어) 자세 반환하기
 }
 
 std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds) {

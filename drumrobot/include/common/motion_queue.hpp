@@ -8,10 +8,8 @@ enum class MotionType { TRANSLATE, DRUM, IDLE };
 enum class TrajectorySpace { JOINT, TASK };
 enum class TrajectoryProfile { TRAPEZOIDAL, CUBIC, QUINTIC, COSINE };
 
-enum class EventFlag { START, PLAYING, END };
+enum class PlayFlag { START, PLAYING, END };
 struct DrumEvent {
-    EventFlag flag = EventFlag::PLAYING;
-
     unsigned int bar = 1;           // 마디 번호
     double beat = 0.6;              // 박자 (0.6 -> 한 박)
     int note_num_R = 0;             // 오른팔 타격 악기 번호
@@ -36,6 +34,7 @@ struct MotionPrimitive {
 
     // DRUM용
     std::vector<DrumEvent> robotic_drum_score;
+    PlayFlag flag = PlayFlag::PLAYING;
 
     // IDLE용
     // ... 별도 필드

@@ -55,7 +55,7 @@ void MotionPlanner::initialize() {
         }
     }
 
-    trajectory_generator.initialize(behavior_planner.poses["init"]);
+    trajectory_generator.initialize(behavior_planner.poses);
 }
 
 void MotionPlanner::parse_command(const std::string& cmd) {
