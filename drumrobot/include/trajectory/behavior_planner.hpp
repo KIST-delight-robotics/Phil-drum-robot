@@ -40,7 +40,7 @@ private:
 
     // Opcode별 핸들러
     std::vector<MotionPrimitive> handle_start();
-    void handle_state(const std::vector<std::string>& args);
+    void handle_ready();
     std::vector<MotionPrimitive> handle_look(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_gesture(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_move(const std::vector<std::string>& args);

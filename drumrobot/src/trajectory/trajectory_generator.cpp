@@ -197,7 +197,7 @@ void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion
         ControlSetPoint set_point;
         for (int i = 0; i < ROBOT::NUM_JOINT; i++) {
             set_point.q[i] = q[i];
-            set_point.qd[i] = (q[i] - prev_q[i]) / ROBOT::DT_SECOND;
+            set_point.qd[i] = (q[i] - prev_q[i]) / ROBOT::DT_SECOND;    // TODO: 수치 미분 스파이크 무서우면 필터 넣기
         }
         
         set_point.mode = modes;

@@ -59,8 +59,8 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
 
     // ===== send_active 후 =====
     switch (opcode) {
-        case Opcode::STATE: {
-            handle_state(parsed.args);
+        case Opcode::READY: {
+            handle_ready();
             return sequence;
         }
         case Opcode::LOOK:    return handle_look(parsed.args);
@@ -122,17 +122,20 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_start() {
     sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME));
     last_q_target = it->second;
 
+    std::cout   << "\n========================================\n"
+                << " 모터 토크 ON\n"
+                << " 1. 고정 키를 모두 제거하세요.\n"
+                << " 2. 제거 후 'READY' 명령을 입력하세요.\n"
+                << "========================================\n\n";
+    ctx.robot_state = RobotState::Init;
+
     return sequence;
 }
 
-// STATE: state 변경
-void BehaviorPlanner::handle_state(const std::vector<std::string>& args) {
-    const std::string& state = args[0];
-
-    if (state == "idle" && ctx.robot_state.load() == RobotState::Init) {
+// READY: idle state로 변경
+void BehaviorPlanner::handle_ready() {
+    if (ctx.robot_state.load() == RobotState::Init) {
         ctx.robot_state = RobotState::Idle;
-    } else {
-        std::cerr << "[BehaviorPlanner] Unknown state argument: " << state << "\n";
     }
 }
 
