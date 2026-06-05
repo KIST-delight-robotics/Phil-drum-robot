@@ -25,7 +25,7 @@ public:
 private:
     std::map<int, InstrumentCoordinate> drum_coordinates;
 
-    double get_nod_ntensity(const std::vector<DrumEvent> rds);
+    double get_nod_intensity(const std::vector<DrumEvent> rds);
     float get_nod_angle(double beat_of_line, double nod_intensity, int i, int n);
 
     int next_note = 0;

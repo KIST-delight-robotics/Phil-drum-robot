@@ -35,7 +35,7 @@ std::queue<HeadMotionPoint> HeadMotionGenerator::generate_motion(const std::vect
     double next_angle = (next_note == 0) ? 0.0 : 
         std::atan2(drum_coordinates[next_note].right_position[1], drum_coordinates[next_note].right_position[0]);
 
-    double nod_intensity = get_nod_ntensity(rds);
+    double nod_intensity = get_nod_intensity(rds);
 
     for (int i = 0; i < num_point; i++) {
         HeadMotionPoint point;
@@ -50,7 +50,7 @@ std::queue<HeadMotionPoint> HeadMotionGenerator::generate_motion(const std::vect
     return out;
 }
 
-double HeadMotionGenerator::get_nod_ntensity(const std::vector<DrumEvent> rds) {
+double HeadMotionGenerator::get_nod_intensity(const std::vector<DrumEvent> rds) {
     int rds_size = (int)rds.size();
 
     double beat_sum = 0.0;
@@ -63,6 +63,7 @@ double HeadMotionGenerator::get_nod_ntensity(const std::vector<DrumEvent> rds) {
         intensity_sum += line_intensity;
         line++;
 
+        beat_sum += rds[i].beat;        
         if (beat_sum >= 0.6) {  // 한 박
             break;
         }
