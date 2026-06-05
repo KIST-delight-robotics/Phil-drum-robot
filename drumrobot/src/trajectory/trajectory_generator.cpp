@@ -140,7 +140,8 @@ void TrajectoryGenerator::generate_play_start_trajectory() {
     int num_point = static_cast<int>(t_total / ROBOT::DT_SECOND);
 
     std::vector<double> q0(last_q.begin(), last_q.end());
-    std::vector<double> q1 = play_motion_generator.reset();
+    std::array<double, ROBOT::NUM_JOINT> q_target = play_motion_generator.reset();
+    std::vector<double> q1(q_target.begin(), q_target.end());
 
     for (int k = 1; k <= num_point; k++) {
         auto [q, qd] = sample(q0, q1, num_point, k, TrajectoryProfile::COSINE);

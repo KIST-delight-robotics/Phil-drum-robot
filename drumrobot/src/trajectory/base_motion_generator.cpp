@@ -14,9 +14,17 @@ void BaseMotionGenerator::initialize(const std::map<int, InstrumentCoordinate>& 
     drum_coordinates = coordinates;
 }
 
-void BaseMotionGenerator::reset() {
+BaseMotionPoint BaseMotionGenerator::reset() {
     right_context = MotionContext{};
     left_context = MotionContext{};
+
+    BaseMotionPoint point;
+    note_to_target(1, Arm::RIGHT, point.right_position, point.right_wrist); // 스네어
+    note_to_target(1, Arm::LEFT, point.left_position, point.left_wrist);
+
+    point.waist = 0.0;  // TODO: 임시 허리각
+
+    return point;
 }
 
 std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds, int num_point) {
@@ -47,7 +55,7 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
         point.right_wrist = s_R * (seg_R.end_wrist_angle - seg_R.start_wrist_angle) + seg_R.start_wrist_angle;
         point.left_wrist = s_L * (seg_L.end_wrist_angle - seg_L.start_wrist_angle) + seg_L.start_wrist_angle;
 
-        // TODO: 허리각 결정해줘야 함
+        point.waist = 0.0;  // TODO: 임시 허리각
 
         out.push(point);
     }

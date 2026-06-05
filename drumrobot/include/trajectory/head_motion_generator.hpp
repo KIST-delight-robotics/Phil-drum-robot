@@ -17,13 +17,13 @@ public:
     HeadMotionGenerator();
     ~HeadMotionGenerator();
 
-    void reset();
-
+    HeadMotionPoint reset();
     void initialize(const std::map<int, InstrumentCoordinate>& coordinates);
 
     std::queue<HeadMotionPoint> generate_motion(const std::vector<DrumEvent> rds, int num_point);
 private:
     std::map<int, InstrumentCoordinate> drum_coordinates;
+    const double ready_angle = 20*M_PI/180.0;   // robot_poses.json 에서 확인
 
     double get_nod_intensity(const std::vector<DrumEvent> rds);
     float get_nod_angle(double beat_of_line, double nod_intensity, int i, int n);

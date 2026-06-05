@@ -16,6 +16,7 @@ public:
     PedalMotionGenerator();
     ~PedalMotionGenerator();
 
+    PedalMotionPoint reset();
     std::queue<PedalMotionPoint> generate_motion(const std::vector<DrumEvent> rds, int num_point);
 private:
     enum class State {
@@ -37,6 +38,12 @@ private:
         double t_hit;
         double t_splash;
     };
+
+    const double ready_angle = 0*M_PI/180.0;            // 준비 각도
+    const double press_angle = -20*M_PI/180.0;          // 최저점 각도
+
+    const double open_hihat_angle = -3*M_PI/180.0;      // Open Hihat : -3도
+    const double closed_hihat_angle = -13*M_PI/180.0;   // Closed Hihat : -13도 
 
     PedalMotionGenerator::State get_state(bool cur, bool next);
     PedalMotionGenerator::BassParam get_bass_param(double t0, double t1);

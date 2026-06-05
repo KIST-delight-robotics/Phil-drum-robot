@@ -67,12 +67,43 @@ void PlayMotionGenerator::initialize() {
     head_motion_generator.initialize(drum_coordinates);
 }
 
-std::vector<double> PlayMotionGenerator::reset() {
-    base_motion_generator.reset();
-    head_motion_generator.reset();
-    state_motion_generator.reset();
+std::array<double, ROBOT::NUM_JOINT> PlayMotionGenerator::reset() {
+    BaseMotionPoint b = base_motion_generator.reset();
+    HeadMotionPoint h = head_motion_generator.reset();
+    PedalMotionPoint p = pedal_motion_generator.reset();
+    StateMotionPoint s = state_motion_generator.reset();
 
-    // TODO: 초기 위치 (스네어) 자세 반환하기
+    std::array<double, 3> pR = b.right_position;
+    std::array<double, 3> pL = b.left_position;
+    double theta0 = b.waist;
+    double theta7 = b.right_wrist;
+    double theta8 = b.left_wrist;
+    KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8);
+
+    if (!result.success) {
+        std::cerr << "[PlayMotionGenerator] Failed to solve inverse kinematics\n";
+        // TODO: 에러 처리 필요
+    }
+
+    std::array<double, ROBOT::NUM_JOINT> q;
+
+    for (int i = 0; i < 9; i++) {
+        q[i] = result.q[i];   // 관절 0~8 (팔)
+    }
+
+    q[4] += s.right_elbow;
+    q[6] += s.left_elbow;
+
+    q[7] += s.right_wrist;
+    q[8] += s.left_wrist;
+
+    q[9] = p.right;
+    q[10] = p.left;
+
+    q[11] = h.yaw - q[0];
+    q[12] = h.pitch;
+
+    return q;
 }
 
 std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds) {

@@ -20,9 +20,7 @@ public:
     StateMotionGenerator();
     ~StateMotionGenerator();
 
-    // TODO: 연주 시작할 때마다 초기화 호출 필요
-    void reset();
-
+    StateMotionPoint reset();
     std::queue<StateMotionPoint> generate_motion(const std::vector<DrumEvent> rds, int num_point);
 
 private:

@@ -8,6 +8,14 @@ PedalMotionGenerator::~PedalMotionGenerator() {
 
 }
 
+PedalMotionPoint PedalMotionGenerator::reset() {
+    PedalMotionPoint point;
+    point.right = ready_angle;
+    point.left = open_hihat_angle;
+
+    return point;
+}
+
 std::queue<PedalMotionPoint> PedalMotionGenerator::generate_motion(const std::vector<DrumEvent> rds, int num_point) {
     std::queue<PedalMotionPoint> out;
  
@@ -65,10 +73,7 @@ PedalMotionGenerator::HihatParam PedalMotionGenerator::get_hihat_param(double t0
 
 double PedalMotionGenerator::get_bass_angle(double t, BassParam bp, State bs) {
     // Xl : lift 궤적 , Xh : hit 궤적
-    double X0 = 0.0, Xp = 0.0, Xl = 0.0, Xh = 0.0;
-
-    X0 = 0*M_PI/180.0;          // 준비 각도
-    Xp = -20*M_PI/180.0;        // 최저점 각도
+    double Xl = 0.0, Xh = 0.0;
 
     // 타격 시간이 0.2초 이하일 때
     if (bp.t_hit <= 0.2) {
@@ -76,22 +81,22 @@ double PedalMotionGenerator::get_bass_angle(double t, BassParam bp, State bs) {
             // 짧은 시간에 연속으로 타격하는 경우 덜 들도록, 올라오는 궤적과 내려가는 궤적을 합쳐서 사용 (- 영역이라 가능)
             // 조정수 박사님 자료 BassAngle 부분 참고
             double temp_liftTime = bp.t_hit / 2;
-            Xl = -0.5 * (Xp - X0) * (cos(M_PI * (t / bp.t_hit + 1)) - 1);
+            Xl = -0.5 * (press_angle - ready_angle) * (cos(M_PI * (t / bp.t_hit + 1)) - 1);
 
             if (t < temp_liftTime) {
                 Xh = 0;
             } else {
-                Xh = -0.5 * (Xp - X0) * (cos(M_PI * (t - temp_liftTime) / (bp.t_hit - temp_liftTime)) - 1);
+                Xh = -0.5 * (press_angle - ready_angle) * (cos(M_PI * (t - temp_liftTime) / (bp.t_hit - temp_liftTime)) - 1);
             }
         } else if (bs == State::HIT_TO_REST) {
             // 시간이 짧을 땐 전체 시간을 다 써서 궤적 생성
             // 복귀하는 궤적
-            Xl = -0.5 * (Xp - X0) * (cos(M_PI * (t / bp.t_hit + 1)) - 1);
+            Xl = -0.5 * (press_angle - ready_angle) * (cos(M_PI * (t / bp.t_hit + 1)) - 1);
             Xh = 0;
         } else if (bs == State::REST_TO_HIT) {
             // 타격하는 궤적
             Xl = 0;
-            Xh = -0.5 * (Xp - X0) * (cos(M_PI * t / bp.t_hit) - 1);
+            Xh = -0.5 * (press_angle - ready_angle) * (cos(M_PI * t / bp.t_hit) - 1);
         } else {
             Xl = 0;
             Xh = 0;
@@ -101,7 +106,7 @@ double PedalMotionGenerator::get_bass_angle(double t, BassParam bp, State bs) {
         // StayTime 이전 -> 타격 후 들어올림   
         if(bs == State::HIT_TO_REST || bs == State::HIT_TO_HIT) {
             // 복귀하는 궤적
-            Xl = -0.5 * (Xp - X0) * (cos(M_PI * (t / bp.t_stay + 1)) - 1);
+            Xl = -0.5 * (press_angle - ready_angle) * (cos(M_PI * (t / bp.t_stay + 1)) - 1);
             Xh = 0;
         } else {
             Xl = 0;
@@ -112,14 +117,14 @@ double PedalMotionGenerator::get_bass_angle(double t, BassParam bp, State bs) {
         if (bs == State::REST_TO_HIT || bs == State::HIT_TO_HIT) {
             // 타격하는 궤적
             Xl = 0;
-            Xh = -0.5 * (Xp - X0) * (cos(M_PI * (t - bp.t_lift) / (bp.t_hit - bp.t_lift)) - 1);
+            Xh = -0.5 * (press_angle - ready_angle) * (cos(M_PI * (t - bp.t_lift) / (bp.t_hit - bp.t_lift)) - 1);
         } else {
             Xl = 0;
             Xh = 0;
         }
     }
     
-    return X0 + Xl + Xh;        // 준비 각도 + 하강 각도 + 상승 각도
+    return ready_angle + Xl + Xh;        // 준비 각도 + 하강 각도 + 상승 각도
 }
 
 double PedalMotionGenerator::get_hihat_angle(double t, HihatParam hp, State hs, bool is_splash) {
@@ -127,39 +132,35 @@ double PedalMotionGenerator::get_hihat_angle(double t, HihatParam hp, State hs, 
     // o/c 상태에 따라 악기 소리가 다름. 소리나는 도중에 상태가 변해도 소리가 변함. 
     // 정확한 소리를 내기 위해 타격 이전(settlingTime)에 상태를 바꾸고 타격 이후(liftTime)에도 그 상태를 유지함.
     // splash는 페달을 밟았다가 떼며 두 심벌이 부딪힘으로 소리내는 방식임. -> 현재 사용 안함
-
-    double X0 = -3*M_PI/180.0;      // Open Hihat : -3도
-    double Xp = -13*M_PI/180.0;     // Closed Hihat : -13도 
-
-    double Xl = 0.0;
+    double hihat_angle = 0.0;
 
     if(hs == State::REST_TO_REST) {
-        Xl = X0;
+        hihat_angle = open_hihat_angle;
     } else if(hp.t_hit <= 0.2) {
         // 한 박의 시간이 0.2초 이하인 경우
         if(hs == State::HIT_TO_REST) {
-            Xl = cosine_profile(Xp, X0, 0, hp.t_hit, t);       // 전체 시간동안 궤적 생성
+            hihat_angle = cosine_profile(closed_hihat_angle, open_hihat_angle, 0, hp.t_hit, t);       // 전체 시간동안 궤적 생성
         } else if(is_splash) {
             // Hihat splash 궤적
             if(t < hp.t_splash) {
                 if(hs == State::REST_TO_HIT) {
-                    Xl = cosine_profile(X0, Xp, 0, hp.t_hit, t);
+                    hihat_angle = cosine_profile(open_hihat_angle, closed_hihat_angle, 0, hp.t_hit, t);
                 } else if(hs == State::HIT_TO_HIT) {
-                    Xl = cosine_profile(Xp, Xp - (Xp - X0) * hp.t_hit / 0.2, 0, hp.t_splash, t);     // 20도/0.1초 의 속도를 유지하기 위해서 시간에 따라 이동량 감소시킴.
+                    hihat_angle = cosine_profile(closed_hihat_angle, closed_hihat_angle - (closed_hihat_angle - open_hihat_angle) * hp.t_hit / 0.2, 0, hp.t_splash, t);     // 20도/0.1초 의 속도를 유지하기 위해서 시간에 따라 이동량 감소시킴.
                 }
             } else {
                 if(hs == State::REST_TO_HIT) {
-                    Xl = cosine_profile(X0, Xp, 0, hp.t_hit, t);
+                    hihat_angle = cosine_profile(open_hihat_angle, closed_hihat_angle, 0, hp.t_hit, t);
                 } else if(hs == State::HIT_TO_HIT) {
-                    Xl = cosine_profile(Xp - (Xp - X0) * hp.t_hit / 0.2, Xp, hp.t_splash, hp.t_hit, t);
+                    hihat_angle = cosine_profile(closed_hihat_angle - (closed_hihat_angle - open_hihat_angle) * hp.t_hit / 0.2, closed_hihat_angle, hp.t_splash, hp.t_hit, t);
                 }
             }
         } else {
             // open/closed Hihat 궤적
             if(hs == State::REST_TO_HIT) {
-                Xl = cosine_profile(X0, Xp, 0, hp.t_hit, t);
+                hihat_angle = cosine_profile(open_hihat_angle, closed_hihat_angle, 0, hp.t_hit, t);
             } else if(hs == State::HIT_TO_HIT) {                
-                Xl = Xp;
+                hihat_angle = closed_hihat_angle;
             }
         }
     } else if(is_splash) {
@@ -167,47 +168,47 @@ double PedalMotionGenerator::get_hihat_angle(double t, HihatParam hp, State hs, 
         // Hi-Hat splash 궤적
         if(t < hp.t_splash) {
             if(hs == State::REST_TO_HIT) {
-                Xl = X0;
+                hihat_angle = open_hihat_angle;
             } else if(hs == State::HIT_TO_HIT) {
-                Xl = cosine_profile(Xp, X0, 0, hp.t_splash, t);
+                hihat_angle = cosine_profile(closed_hihat_angle, open_hihat_angle, 0, hp.t_splash, t);
             }
         } else if(t >= hp.t_splash) {
             if(hs == State::REST_TO_HIT) {
-                Xl = cosine_profile(X0, Xp, hp.t_splash, hp.t_hit, t);
+                hihat_angle = cosine_profile(open_hihat_angle, closed_hihat_angle, hp.t_splash, hp.t_hit, t);
             } else if(hs == State::HIT_TO_HIT) {
-                Xl = cosine_profile(X0, Xp, hp.t_splash, hp.t_hit, t);
+                hihat_angle = cosine_profile(open_hihat_angle, closed_hihat_angle, hp.t_splash, hp.t_hit, t);
             }
         }
     } else {
         // open/closed Hi-Hat 궤적
         if(t < hp.t_lift) {
             if(hs == State::HIT_TO_REST) {
-                Xl = Xp;
+                hihat_angle = closed_hihat_angle;
             } else if(hs == State::REST_TO_HIT) {
-                Xl = X0;
+                hihat_angle = open_hihat_angle;
             } else if(hs == State::HIT_TO_HIT) {                
-                Xl = Xp;
+                hihat_angle = closed_hihat_angle;
             }
         } else if(t >= hp.t_lift && t < hp.t_settling) {
             if(hs == State::HIT_TO_REST) {
-                Xl = cosine_profile(Xp, X0, hp.t_lift, hp.t_settling, t);
+                hihat_angle = cosine_profile(closed_hihat_angle, open_hihat_angle, hp.t_lift, hp.t_settling, t);
             } else if(hs == State::REST_TO_HIT) {      
-                Xl = cosine_profile(X0, Xp, hp.t_lift, hp.t_settling, t);
+                hihat_angle = cosine_profile(open_hihat_angle, closed_hihat_angle, hp.t_lift, hp.t_settling, t);
             } else if(hs == State::HIT_TO_HIT) {
-                Xl = Xp;
+                hihat_angle = closed_hihat_angle;
             }
         } else if(t >= hp.t_settling) {
             if(hs == State::HIT_TO_REST) {
-                Xl = X0;
+                hihat_angle = open_hihat_angle;
             } else if(hs == State::REST_TO_HIT) {
-                Xl = Xp;
+                hihat_angle = closed_hihat_angle;
             } else if(hs == State::HIT_TO_HIT) {
-                Xl = Xp;
+                hihat_angle = closed_hihat_angle;
             }
         }
     }
 
-    return Xl;
+    return hihat_angle;
 }
 
 double PedalMotionGenerator::cosine_profile(double qi, double qf, double ti, double tf, double t) {

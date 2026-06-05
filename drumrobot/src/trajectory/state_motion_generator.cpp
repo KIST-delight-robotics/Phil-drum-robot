@@ -11,9 +11,21 @@ StateMotionGenerator::~StateMotionGenerator() {
 
 }
 
-void StateMotionGenerator::reset() {
+StateMotionPoint StateMotionGenerator::reset() {
     right_context = MotionContext{};
     left_context  = MotionContext{};
+
+    StateMotionPoint point;
+
+    ElbowAngle e;
+    point.right_elbow = e.stay;
+    point.left_elbow = e.stay;
+
+    WristAngle w;
+    point.right_wrist = w.stay;
+    point.left_wrist = w.stay;
+
+    return point;
 }
 
 std::queue<StateMotionPoint> StateMotionGenerator::generate_motion(const std::vector<DrumEvent> rds, int num_point) {
