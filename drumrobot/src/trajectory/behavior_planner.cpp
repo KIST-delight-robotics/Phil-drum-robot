@@ -69,19 +69,10 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
         case Opcode::POSE:    return handle_pose(parsed.args);
         case Opcode::HIT:     return handle_hit(parsed.args);
         case Opcode::PLAY:    return handle_play(parsed.args);
+        case Opcode::QUIT:    return handle_quit();
         case Opcode::START:
             std::cerr << "[BehaviorPlanner] 이미 시작된 상태\n";
             return sequence;
-        case Opcode::QUIT: {
-            // shutdown 포즈로 이동 후 종료 플래그 세팅
-            auto it = poses.find("shutdown");
-            if (it != poses.end()) {
-                sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME));
-                last_q_target = it->second;
-            }
-            ctx.robot_state = RobotState::ShuttingDown;
-            return sequence;
-        }
         default:
             std::cerr << "[BehaviorPlanner] Unknown opcode\n";
             return sequence;
@@ -436,6 +427,23 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     }
     inputFile.close();
 
+    return sequence;
+}
+
+std::vector<MotionPrimitive> BehaviorPlanner::handle_quit() {
+    std::vector<MotionPrimitive> sequence;
+    if (ctx.robot_state.load() != RobotState::Idle) {
+        std::cerr << "[BehaviorPlanner] PLAY rejected: only allowed in Idle\n";
+        return sequence;
+    }
+
+    // shutdown 포즈로 이동 후 종료 플래그 세팅
+    auto it = poses.find("shutdown");
+    if (it != poses.end()) {
+        sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME));
+        last_q_target = it->second;
+    }
+    ctx.robot_state = RobotState::ShuttingDown;
     return sequence;
 }
 

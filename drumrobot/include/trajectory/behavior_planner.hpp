@@ -47,6 +47,7 @@ private:
     std::vector<MotionPrimitive> handle_pose(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_hit(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_play(const std::vector<std::string>& args);
+    std::vector<MotionPrimitive> handle_quit();
 
     // 헬퍼
     MotionPrimitive make_translate(const std::vector<double>& q_target, double t_total, TrajectoryProfile profile = TrajectoryProfile::COSINE);
