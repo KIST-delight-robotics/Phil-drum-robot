@@ -244,6 +244,7 @@ OPCODE|arg1|arg2\n
 | Opcode | 인자 | 설명 | 허용 상태 |
 |---|---|---|---|
 | `START`     | 없음                                            | 모터 토크 ON + home 자세. `Standby → Init` | Standby |
+| `READY`     | 없음                                            | 고정 키 제거 완료 후 동작 허용 상태로 전환. `Init → Idle` | Init |
 | `LOOK`      | `pan_deg`, `tilt_deg`                          | 머리 yaw / pitch 제어 | Idle |
 | `GESTURE`   | `type`                                          | 제스처 (`nod` / `shake` / `wave` / `hi` / `hurray` / `happy`) | Idle |
 | `MOVE`      | `motor_name`, `angle_deg`, `[move_time=3.0]`   | 개별 관절 이동 | Idle |
@@ -292,9 +293,9 @@ QUIT                        # shutdown 포즈 이동 후 종료
 ## 로봇 상태 (RobotState)
 
 ```
-Standby ──START──▶ Init ──STATE|idle──▶ Idle ──PLAY──▶ Playing
-   │                 │                    │
-   └──────────── QUIT / shutdown 포즈 ─────┴──────────▶ ShuttingDown
+Standby ──START──▶ Init ── READY ──▶ Idle ──PLAY──▶ Playing
+   │                 │                 │
+   └──────────── QUIT / shutdown 포즈 ──┴──────────▶ ShuttingDown
 ```
 
 | 상태 | 의미 |
