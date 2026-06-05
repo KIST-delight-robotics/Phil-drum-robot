@@ -46,7 +46,7 @@ std::queue<HeadMotionPoint> HeadMotionGenerator::generate_motion(const std::vect
 }
 
 double HeadMotionGenerator::get_nod_ntensity(const std::vector<DrumEvent> rds) {
-    int rds_size = rds.size();
+    int rds_size = (int)rds.size();
 
     double beat_sum = 0.0;
     int line = 0;

@@ -30,6 +30,9 @@ public:
     ~BaseMotionGenerator();
  
     void initialize(const std::map<int, InstrumentCoordinate>& coordinates);
+
+    // TODO: 연주 시작할 때마다 초기화 호출 필요
+    void reset();
  
     std::queue<BaseMotionPoint> generate_motion(const std::vector<DrumEvent>& rds, int num_point);
  
@@ -48,27 +51,23 @@ private:
         HIT_TO_HIT       // 이전 있음 -> 다음 있음 (연속 타격)
     };
     struct MotionContext {
-        double last_t;          // 이전 시간
-        int last_instrument;    // 이전 악기
-        State state;            // 상태
+        double last_t = 0.0;        // 이전 시간
+        int last_instrument = 1;    // 이전 악기 (초기 위치는 스네어)
+        State state = State::REST_TO_REST;
     };
 
-    struct ArmSegment {
+    struct MotionSegment {
+        double t0, t1;          // 궤적 생성 구간
         double start_time, end_time;                  // 전체 궤적 기준 출발/도착 시간
         std::array<double, 3> start_position, end_position;
         double start_wrist_angle, end_wrist_angle;
         MotionContext next_context;                   // 이전 시간, 이전 악기, 상태
     };
 
-    struct MotionSegment {
-        double t0, t1;          // 궤적 생성 구간
-        ArmSegment right, left;
-    };
-
-    MotionContext right_context;    // TODO: 연주 시작할 때마다 초기화해야 함
+    MotionContext right_context;
     MotionContext left_context;
 
-    BaseMotionGenerator::MotionSegment get_motion_segment(const std::vector<DrumEvent>& rds);
+    BaseMotionGenerator::MotionSegment get_motion_segment(const std::vector<DrumEvent>& rds, Arm arm);
     void note_to_target(int note_num, Arm arm, std::array<double, 3>& out_position, double& out_wrist_angle_deg);
     double time_scaling(double ti, double tf, double t);
     std::array<double, 3> make_path(const std::array<double, 3>& pi, const std::array<double, 3>& pf, double s);

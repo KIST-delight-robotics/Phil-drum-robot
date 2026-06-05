@@ -37,7 +37,7 @@ PedalMotionGenerator::State PedalMotionGenerator::get_state(bool cur, bool next)
     if (!cur && !next)     return State::REST_TO_REST;
     else if (cur && !next) return State::HIT_TO_REST;
     else if (!cur && next) return State::REST_TO_HIT;
-    else if (cur && next)  return State::HIT_TO_HIT;
+    else return State::HIT_TO_HIT;  // cur && next
 }
 
 PedalMotionGenerator::BassParam PedalMotionGenerator::get_bass_param(double t0, double t1) {

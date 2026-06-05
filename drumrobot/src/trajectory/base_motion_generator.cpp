@@ -14,6 +14,11 @@ void BaseMotionGenerator::initialize(const std::map<int, InstrumentCoordinate>& 
     drum_coordinates = coordinates;
 }
 
+void BaseMotionGenerator::reset() {
+    right_context = MotionContext{};
+    left_context = MotionContext{};
+}
+
 std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds, int num_point) {
     std::queue<BaseMotionPoint> out;
  
@@ -21,25 +26,26 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
         return out;
     }
 
-    MotionSegment seg = get_motion_segment(rds);
+    MotionSegment seg_R = get_motion_segment(rds, Arm::RIGHT);
+    MotionSegment seg_L = get_motion_segment(rds, Arm::LEFT);
 
-    right_context = seg.right.next_context; // context update
-    left_context = seg.left.next_context;
+    right_context = seg_R.next_context; // context update
+    left_context = seg_L.next_context;
 
     for (int i = 0; i < num_point; i++) {
         BaseMotionPoint point;
 
-        double t_R = i * ROBOT::DT_SECOND + seg.t0 - seg.right.start_time;
-        double t_L = i * ROBOT::DT_SECOND + seg.t0 - seg.left.start_time;
+        double t_R = i * ROBOT::DT_SECOND + seg_R.t0 - seg_R.start_time;
+        double t_L = i * ROBOT::DT_SECOND + seg_L.t0 - seg_L.start_time;
 
-        double s_R = time_scaling(0.0, seg.right.end_time - seg.right.start_time, t_R);
-        double s_L = time_scaling(0.0, seg.left.end_time - seg.left.start_time, t_L);
+        double s_R = time_scaling(0.0, seg_R.end_time - seg_R.start_time, t_R);
+        double s_L = time_scaling(0.0, seg_L.end_time - seg_L.start_time, t_L);
         
-        point.right_position = make_path(seg.right.start_position, seg.right.end_position, s_R);
-        point.left_position = make_path(seg.left.start_position, seg.left.end_position, s_L);
+        point.right_position = make_path(seg_R.start_position, seg_R.end_position, s_R);
+        point.left_position = make_path(seg_L.start_position, seg_L.end_position, s_L);
 
-        point.right_wrist = s_R * (seg.right.end_wrist_angle - seg.right.start_wrist_angle) + seg.right.start_wrist_angle;
-        point.left_wrist = s_L * (seg.left.end_wrist_angle - seg.left.start_wrist_angle) + seg.left.start_wrist_angle;
+        point.right_wrist = s_R * (seg_R.end_wrist_angle - seg_R.start_wrist_angle) + seg_R.start_wrist_angle;
+        point.left_wrist = s_L * (seg_L.end_wrist_angle - seg_L.start_wrist_angle) + seg_L.start_wrist_angle;
 
         // TODO: 허리각 결정해줘야 함
 
@@ -49,203 +55,115 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
     return out;
 }
 
-BaseMotionGenerator::MotionSegment BaseMotionGenerator::get_motion_segment(const std::vector<DrumEvent>& rds) {
+BaseMotionGenerator::MotionSegment BaseMotionGenerator::get_motion_segment(const std::vector<DrumEvent>& rds, Arm arm) {
     MotionSegment seg;
-    
+
     seg.t0 = rds[0].t;
     seg.t1 = rds[1].t;
 
+    // 팔에 따라 참조할 context / note 선택
+    MotionContext& context = (arm == Arm::RIGHT) ? right_context : left_context;
+    auto note_of = [&](int i) {
+        return (arm == Arm::RIGHT) ? rds[i].note_num_R : rds[i].note_num_L;
+    };
+
     // ===== 타격 감지 =====
-    const double e = 0.00001; 
-    int rds_size = rds.size();
-    
-    bool is_hit_R = false, is_hit_L = false;
-    double t_hit_R = 0.0, t_hit_L = 0.0;
-    int note_hit_R = 0, note_hit_L = 0;
+    const double e = 0.00001;
+    int rds_size = (int)rds.size();
 
-    // R
+    bool   is_hit   = false;
+    double t_hit    = 0.0;
+    int    note_hit = 0;
+
     for (int i = 1; i < rds_size; i++) {
         if (round(10000 * (HIT_DETECTION_THRESHOLD + e)) < round(10000 * (rds[i].t - rds[0].t))) {
             break;
         }
 
-        if (rds[i].note_num_R != 0) {
-            is_hit_R = true;
-            t_hit_R = rds[i].t;
-            note_hit_R = rds[i].note_num_R; // TODO: 오픈 하이햇 처리 해야함
-        }
-    }
-
-    // L
-    for (int i = 1; i < rds_size; i++) {
-        if (round(10000 * (HIT_DETECTION_THRESHOLD + e)) < round(10000 * (rds[i].t - rds[0].t))) {
-            break;
-        }
-
-        if (rds[i].note_num_L != 0) {
-            is_hit_L = true;
-            t_hit_L = rds[i].t;
-            note_hit_L = rds[i].note_num_L; // TODO: 오픈 하이햇 처리 해야함
+        if (note_of(i) != 0) {
+            is_hit   = true;
+            t_hit    = rds[i].t;
+            note_hit = note_of(i);  // TODO: 오픈 하이햇 처리 해야함
         }
     }
 
     // ===== 악기 & 시간 =====
-    // R
-    MotionContext next_context_R;
- 
-    if (rds[0].note_num_R == 0) {
-        if (right_context.state == State::REST_TO_HIT || right_context.state == State::HIT_TO_HIT) {
+    MotionContext next_context;
+
+    if (note_of(0) == 0) {
+        if (context.state == State::REST_TO_HIT || context.state == State::HIT_TO_HIT) {
             // 기존의 이동하던 궤적을 이어서 이동
-            next_context_R.state = right_context.state;
-            next_context_R.last_t = right_context.last_t;
-            next_context_R.last_instrument = right_context.last_instrument;
- 
-            note_to_target(right_context.last_instrument, Arm::RIGHT,
-                           seg.right.start_position, seg.right.start_wrist_angle);
-            note_to_target(note_hit_R, Arm::RIGHT,
-                           seg.right.end_position, seg.right.end_wrist_angle);
- 
-            seg.right.start_time = right_context.last_t;
-            seg.right.end_time = t_hit_R;
+            note_to_target(context.last_instrument, arm,
+                           seg.start_position, seg.start_wrist_angle);
+            note_to_target(note_hit, arm,
+                           seg.end_position, seg.end_wrist_angle);
+
+            seg.start_time = context.last_t;
+            seg.end_time   = t_hit;
+
+            next_context = context;
         } else {
-            if (is_hit_R) {
+            if (is_hit) {
                 // 휴식 중 다음 타격 찾음
-                next_context_R.state = State::REST_TO_HIT;
-                next_context_R.last_t = rds[0].t;
-                next_context_R.last_instrument = right_context.last_instrument;
- 
-                note_to_target(right_context.last_instrument, Arm::RIGHT,
-                               seg.right.start_position, seg.right.start_wrist_angle);
-                note_to_target(note_hit_R, Arm::RIGHT,
-                               seg.right.end_position, seg.right.end_wrist_angle);
- 
-                seg.right.start_time = rds[0].t;
-                seg.right.end_time = t_hit_R;
+                note_to_target(context.last_instrument, arm,
+                               seg.start_position, seg.start_wrist_angle);
+                note_to_target(note_hit, arm,
+                               seg.end_position, seg.end_wrist_angle);
+
+                seg.start_time = rds[0].t;
+                seg.end_time   = t_hit;
+
+                next_context.state          = State::REST_TO_HIT;
+                next_context.last_t         = rds[0].t;
+                next_context.last_instrument = context.last_instrument;
+
             } else {
                 // 휴식 중 다음 타격 없음 (현재 위치 유지)
-                next_context_R.state = State::REST_TO_REST;
-                next_context_R.last_t = rds[0].t;
-                next_context_R.last_instrument = right_context.last_instrument;
- 
-                note_to_target(right_context.last_instrument, Arm::RIGHT,
-                               seg.right.start_position, seg.right.start_wrist_angle);
-                seg.right.end_position    = seg.right.start_position;
-                seg.right.end_wrist_angle = seg.right.start_wrist_angle;
- 
-                seg.right.start_time = rds[0].t;
-                seg.right.end_time = rds[1].t;
+                note_to_target(context.last_instrument, arm,
+                               seg.start_position, seg.start_wrist_angle);
+                seg.end_position    = seg.start_position;
+                seg.end_wrist_angle = seg.start_wrist_angle;
+
+                seg.start_time = rds[0].t;
+                seg.end_time   = rds[1].t;
+
+                next_context.state          = State::REST_TO_REST;
+                next_context.last_t         = rds[0].t;
+                next_context.last_instrument = context.last_instrument;
             }
         }
     } else {
-        if (is_hit_R) {
+        if (is_hit) {
             // 타격 후 다음 타격 찾음
-            next_context_R.state = State::HIT_TO_HIT;
-            next_context_R.last_t = rds[0].t;
-            next_context_R.last_instrument = rds[0].note_num_R;
- 
-            note_to_target(rds[0].note_num_R, Arm::RIGHT,
-                           seg.right.start_position, seg.right.start_wrist_angle);
-            note_to_target(note_hit_R, Arm::RIGHT,
-                           seg.right.end_position, seg.right.end_wrist_angle);
- 
-            seg.right.start_time = rds[0].t;
-            seg.right.end_time = t_hit_R;
+            note_to_target(note_of(0), arm,
+                           seg.start_position, seg.start_wrist_angle);
+            note_to_target(note_hit, arm,
+                           seg.end_position, seg.end_wrist_angle);
+
+            seg.start_time = rds[0].t;
+            seg.end_time   = t_hit;
+
+            next_context.state          = State::HIT_TO_HIT;
+            next_context.last_t         = rds[0].t;
+            next_context.last_instrument = note_of(0);
         } else {
             // 타격 후 다음 타격 없음 (현재 위치 유지)
-            next_context_R.state = State::HIT_TO_REST;
-            next_context_R.last_t = rds[0].t;
-            next_context_R.last_instrument = rds[0].note_num_R;
- 
-            note_to_target(rds[0].note_num_R, Arm::RIGHT,
-                           seg.right.start_position, seg.right.start_wrist_angle);
-            seg.right.end_position    = seg.right.start_position;
-            seg.right.end_wrist_angle = seg.right.start_wrist_angle;
- 
-            seg.right.start_time = rds[0].t;
-            seg.right.end_time = rds[1].t;
+            note_to_target(note_of(0), arm,
+                           seg.start_position, seg.start_wrist_angle);
+            seg.end_position    = seg.start_position;
+            seg.end_wrist_angle = seg.start_wrist_angle;
+
+            seg.start_time = rds[0].t;
+            seg.end_time   = rds[1].t;
+
+            next_context.state          = State::HIT_TO_REST;
+            next_context.last_t         = rds[0].t;
+            next_context.last_instrument = note_of(0);
         }
     }
- 
-    seg.right.next_context = next_context_R;
- 
-    // L
-    MotionContext next_context_L;
- 
-    if (rds[0].note_num_L == 0) {
-        if (left_context.state == State::REST_TO_HIT || left_context.state == State::HIT_TO_HIT) {
-            // 기존의 이동하던 궤적을 이어서 이동
-            next_context_L.state = left_context.state;
-            next_context_L.last_t = left_context.last_t;
-            next_context_L.last_instrument = left_context.last_instrument;
- 
-            note_to_target(left_context.last_instrument, Arm::LEFT,
-                           seg.left.start_position, seg.left.start_wrist_angle);
-            note_to_target(note_hit_L, Arm::LEFT,
-                           seg.left.end_position, seg.left.end_wrist_angle);
- 
-            seg.left.start_time = left_context.last_t;
-            seg.left.end_time = t_hit_L;
-        } else {
-            if (is_hit_L) {
-                // 휴식 중 다음 타격 찾음
-                next_context_L.state = State::REST_TO_HIT;
-                next_context_L.last_t = rds[0].t;
-                next_context_L.last_instrument = left_context.last_instrument;
- 
-                note_to_target(left_context.last_instrument, Arm::LEFT,
-                               seg.left.start_position, seg.left.start_wrist_angle);
-                note_to_target(note_hit_L, Arm::LEFT,
-                               seg.left.end_position, seg.left.end_wrist_angle);
- 
-                seg.left.start_time = rds[0].t;
-                seg.left.end_time = t_hit_L;
-            } else {
-                // 휴식 중 다음 타격 없음 (현재 위치 유지)
-                next_context_L.state = State::REST_TO_REST;
-                next_context_L.last_t = rds[0].t;
-                next_context_L.last_instrument = left_context.last_instrument;
- 
-                note_to_target(left_context.last_instrument, Arm::LEFT,
-                               seg.left.start_position, seg.left.start_wrist_angle);
-                seg.left.end_position    = seg.left.start_position;
-                seg.left.end_wrist_angle = seg.left.start_wrist_angle;
- 
-                seg.left.start_time = rds[0].t;
-                seg.left.end_time = rds[1].t;
-            }
-        }
-    } else {
-        if (is_hit_L) {
-            // 타격 후 다음 타격 찾음
-            next_context_L.state = State::HIT_TO_HIT;
-            next_context_L.last_t = rds[0].t;
-            next_context_L.last_instrument = rds[0].note_num_L;
- 
-            note_to_target(rds[0].note_num_L, Arm::LEFT,
-                           seg.left.start_position, seg.left.start_wrist_angle);
-            note_to_target(note_hit_L, Arm::LEFT,
-                           seg.left.end_position, seg.left.end_wrist_angle);
- 
-            seg.left.start_time = rds[0].t;
-            seg.left.end_time = t_hit_L;
-        } else {
-            // 타격 후 다음 타격 없음 (현재 위치 유지)
-            next_context_L.state = State::HIT_TO_REST;
-            next_context_L.last_t = rds[0].t;
-            next_context_L.last_instrument = rds[0].note_num_L;
- 
-            note_to_target(rds[0].note_num_L, Arm::LEFT,
-                           seg.left.start_position, seg.left.start_wrist_angle);
-            seg.left.end_position    = seg.left.start_position;
-            seg.left.end_wrist_angle = seg.left.start_wrist_angle;
- 
-            seg.left.start_time = rds[0].t;
-            seg.left.end_time = rds[1].t;
-        }
-    }
- 
-    seg.left.next_context = next_context_L;
- 
+
+    seg.next_context = next_context;
+
     return seg;
 }
 
