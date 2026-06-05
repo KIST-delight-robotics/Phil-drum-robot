@@ -1,12 +1,12 @@
 {
   "instruments": [
-    { "id": 1, "name": "snare",  "right": {"position": [-0.061, 0.363, 0.512], "wrist_angle_deg": 10.0}, "left": {"position": [-0.139, 0.358, 0.528], "wrist_angle_deg": 10.0} },
-    { "id": 2, "name": "floor",  "right": {"position": [0.284, 0.358, 0.532], "wrist_angle_deg": 10.0}, "left": {"position": [0.180, 0.359, 0.498], "wrist_angle_deg": 10.0} },
-    { "id": 3, "name": "mid",    "right": {"position": [0.244, 0.585, 0.628], "wrist_angle_deg": 5.0},  "left": {"position": [0.188, 0.608, 0.616], "wrist_angle_deg": 5.0} },
-    { "id": 4, "name": "top",    "right": {"position": [-0.031, 0.614, 0.692], "wrist_angle_deg": 5.0}, "left": {"position": [-0.106, 0.600, 0.667], "wrist_angle_deg": 5.0} },
-    { "id": 5, "name": "hihat",  "right": {"position": [-0.266, 0.514, 0.781], "wrist_angle_deg": 10.0}, "left": {"position": [-0.318, 0.472, 0.772], "wrist_angle_deg": 10.0} },
-    { "id": 6, "name": "ride",   "right": {"position": [0.357, 0.625, 0.849], "wrist_angle_deg": 15.0}, "left": {"position": [0.295, 0.663, 0.860], "wrist_angle_deg": 15.0} },
-    { "id": 7, "name": "crashR", "right": {"position": [0.496, 0.404, 0.747], "wrist_angle_deg": 10.0}, "left": {"position": [0.474, 0.444, 0.755], "wrist_angle_deg": 10.0} },
-    { "id": 8, "name": "crashL", "right": {"position": [-0.162, 0.676, 0.872], "wrist_angle_deg": 10.0}, "left": {"position": [-0.205, 0.661, 0.834], "wrist_angle_deg": 10.0} }
+    { "id": 1, "name": "snare",  "right": {"position": [-0.061, 0.363, -0.443], "wrist_angle_deg": 10.0}, "left": {"position": [-0.139, 0.358, -0.427], "wrist_angle_deg": 10.0} },
+    { "id": 2, "name": "floor",  "right": {"position": [0.284, 0.358, -0.423], "wrist_angle_deg": 10.0}, "left": {"position": [0.180, 0.359, -0.457], "wrist_angle_deg": 10.0} },
+    { "id": 3, "name": "mid",    "right": {"position": [0.244, 0.585, -0.327], "wrist_angle_deg": 5.0},  "left": {"position": [0.188, 0.608, -0.339], "wrist_angle_deg": 5.0} },
+    { "id": 4, "name": "top",    "right": {"position": [-0.031, 0.614, -0.263], "wrist_angle_deg": 5.0}, "left": {"position": [-0.106, 0.600, -0.288], "wrist_angle_deg": 5.0} },
+    { "id": 5, "name": "hihat",  "right": {"position": [-0.266, 0.514, -0.174], "wrist_angle_deg": 10.0}, "left": {"position": [-0.318, 0.472, -0.183], "wrist_angle_deg": 10.0} },
+    { "id": 6, "name": "ride",   "right": {"position": [0.357, 0.625, -0.106], "wrist_angle_deg": 15.0}, "left": {"position": [0.295, 0.663, -0.095], "wrist_angle_deg": 15.0} },
+    { "id": 7, "name": "crashR", "right": {"position": [0.496, 0.404, -0.208], "wrist_angle_deg": 10.0}, "left": {"position": [0.474, 0.444, -0.200], "wrist_angle_deg": 10.0} },
+    { "id": 8, "name": "crashL", "right": {"position": [-0.162, 0.676, -0.083], "wrist_angle_deg": 10.0}, "left": {"position": [-0.205, 0.661, -0.121], "wrist_angle_deg": 10.0} }
   ]
 }

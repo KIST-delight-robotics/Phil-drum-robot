@@ -48,14 +48,14 @@ void PlayMotionGenerator::initialize() {
             right_pos.at(1).get<double>(),
             right_pos.at(2).get<double>()
         };
-        coord.right_wrist_angle_deg = right.at("wrist_angle_deg").get<double>();
+        coord.right_wrist_angle = right.at("wrist_angle_deg").get<double>() * M_PI / 180.0;
 
         coord.left_position = {
             left_pos.at(0).get<double>(),
             left_pos.at(1).get<double>(),
             left_pos.at(2).get<double>()
         };
-        coord.left_wrist_angle_deg = left.at("wrist_angle_deg").get<double>();
+        coord.left_wrist_angle = left.at("wrist_angle_deg").get<double>() * M_PI / 180.0;
 
         drum_coordinates[id] = coord;   // TODO: 저장은 (번호, 위치)로 하되 읽을 때, 악기 이름과 번호를 매칭할 수 있는 공유 자원 있으면 좋을 듯
     }
@@ -81,7 +81,7 @@ std::array<double, ROBOT::NUM_JOINT> PlayMotionGenerator::reset() {
     KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8);
 
     if (!result.success) {
-        std::cerr << "[PlayMotionGenerator] Failed to solve inverse kinematics\n";
+        std::cerr << "[PlayMotionGenerator] reset: Failed to solve inverse kinematics\n";
         // TODO: 에러 처리 필요
     }
 
@@ -142,7 +142,7 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
         KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8);
 
         if (!result.success) {
-            std::cerr << "[PlayMotionGenerator] Failed to solve inverse kinematics\n";
+            std::cerr << "[PlayMotionGenerator] play: Failed to solve inverse kinematics\n";
             return q_queue; // TODO: 진행중인 동작을 멈춰야 함. 이렇게 중간에 끊고 다음거 이어서 만들면 계단 입력 나옴
         }
 

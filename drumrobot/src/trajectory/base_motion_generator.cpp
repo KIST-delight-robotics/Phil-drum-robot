@@ -185,8 +185,8 @@ void BaseMotionGenerator::note_to_target(int note_num, Arm arm, std::array<doubl
         return;
     }
     const InstrumentCoordinate& coord = it->second;
-    if (arm == Arm::RIGHT) { out_position = coord.right_position; out_wrist_angle_deg = coord.right_wrist_angle_deg; }
-    else                   { out_position = coord.left_position;  out_wrist_angle_deg = coord.left_wrist_angle_deg; }
+    if (arm == Arm::RIGHT) { out_position = coord.right_position; out_wrist_angle_deg = coord.right_wrist_angle; }
+    else                   { out_position = coord.left_position;  out_wrist_angle_deg = coord.left_wrist_angle; }
 }
 
 double BaseMotionGenerator::time_scaling(double ti, double tf, double t) {

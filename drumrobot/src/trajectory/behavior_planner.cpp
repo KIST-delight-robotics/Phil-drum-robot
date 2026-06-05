@@ -377,17 +377,30 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     const std::string& score_name = args[0];
 
     std::ifstream inputFile;
-    inputFile.open(score_name); // 파일 열기
+    std::string score_path = "drumrobot/data/scores/" + score_name + ".txt";
+    inputFile.open(score_path); // 파일 열기
 
     if (!inputFile.is_open()) {
+        // TODO: 메세지 출력
         return sequence;
     }
 
-    string row;
+    double bpm = 100.0;
+    double last_t = 0.0;
+
+    std::vector<DrumEvent> rds;
+    int start_idx = 0, end_idx = 0;
+
+    MotionPrimitive start;
+    start.type = MotionType::DRUM;
+    start.flag = PlayFlag::START;
+    sequence.push_back(start);
+
+    std::string row;
     while (getline(inputFile, row)) {
         istringstream iss(row);
-        string item;
-        vector<string> items;
+        std::string item;
+        std::vector<std::string> items;
         
         while (getline(iss, item, '\t')) {
             item = trim_whitespace(item);
@@ -395,15 +408,27 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
         }
 
         if (items[0] == "bpm") {
-
+            bpm = stod(items[1]);
         } else if (items[0] == "end") {
+            while (start_idx < end_idx) {
+                sequence.push_back(make_drum_play(std::vector<DrumEvent>(rds.begin() + start_idx, rds.end())));
+                start_idx++;
+            }
 
+            MotionPrimitive end;
+            end.type = MotionType::DRUM;
+            end.flag = PlayFlag::END;
+            sequence.push_back(end);
         } else {
-            MotionPrimitive motion;
-            motion.type = MotionType::DRUM;
-            motion.robotic_drum_score.push_back(make_drum_event(items));
+            rds.push_back(make_drum_event(items, bpm, last_t));
+            last_t = rds[end_idx].t;
 
-            sequence.push_back(motion);
+            // 2.4s : 100bpm 기준 한 마디 시간
+            if ((rds[end_idx].t - rds[start_idx].t) * bpm / 100.0 >= 2.4) {
+                sequence.push_back(make_drum_play(std::vector<DrumEvent>(rds.begin() + start_idx, rds.begin() + end_idx + 1))); // [start, end)
+                start_idx++;
+            }
+            end_idx++;
         }
     }
     inputFile.close();
@@ -415,9 +440,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
 // 헬퍼
 // =============================================================
 
-MotionPrimitive BehaviorPlanner::make_translate(const std::vector<double>& q_target,
-                                                double t_total,
-                                                TrajectoryProfile profile) {
+MotionPrimitive BehaviorPlanner::make_translate(const std::vector<double>& q_target, double t_total, TrajectoryProfile profile) {
     MotionPrimitive motion;
     motion.type     = MotionType::TRANSLATE;
     motion.space    = TrajectorySpace::JOINT;
@@ -448,7 +471,6 @@ MotionPrimitive BehaviorPlanner::make_drum_hit(double t, int note_num, bool is_k
     event.is_closed_hihat = is_closed_hihat;
 
     motion.robotic_drum_score.push_back(event);     // rds[1]
-
     return motion;
 }
 
@@ -461,9 +483,8 @@ std::string BehaviorPlanner::trim_whitespace(const std::string &str) {
     return str.substr(first, (last - first + 1));
 }
 
-DrumEvent BehaviorPlanner::make_drum_event(const std::vector<std::string>& items) {
+DrumEvent BehaviorPlanner::make_drum_event(const std::vector<std::string>& items, double bpm, double last_t) {
     DrumEvent event;
-
     event.bar             = stoi(items[0]);
     event.beat            = stod(items[1]);
     event.note_num_R      = stoi(items[2]);
@@ -472,9 +493,15 @@ DrumEvent BehaviorPlanner::make_drum_event(const std::vector<std::string>& items
     event.velocity_L      = stoi(items[5]);
     event.is_kick         = (stoi(items[6]) == 1);
     event.is_closed_hihat = (stoi(items[7]) == 1);
-    event.t               = event.beat;     // TODO: bpm 곱해서 누적하기
-
+    event.t               = event.beat * 100.0 / bpm + last_t;
     return event;
+}
+
+MotionPrimitive BehaviorPlanner::make_drum_play(std::vector<DrumEvent> rds) {
+    MotionPrimitive motion;
+    motion.type = MotionType::DRUM;
+    motion.robotic_drum_score = rds;
+    return motion;
 }
 
 int BehaviorPlanner::find_motor_id(const std::string& motor_name) const {
