@@ -42,7 +42,7 @@ private:
 
     void tmotor_send_task(const ControlSetPoint &point);
     void maxon_motor_send_task(const ControlSetPoint &point);
-    void dynamicxel_send_task(const ControlSetPoint &point);
+    void dynamixel_send_task(const ControlSetPoint &point);
 
     void set_maxon_mode(std::shared_ptr<MaxonMotor> &maxon, ControlMode target_mode);
     double cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_position);

@@ -22,8 +22,8 @@ void MotionPlanner::run() {
         if (control_queue.size() < threshold) {
             if (auto motion = motion_queue.try_pop()) {
                 trajectory_generator.generate_trajectory(*motion);
-                if (!ctx.recv_active) ctx.recv_active = true;
-                if (!ctx.send_active) ctx.send_active = true;
+                if (!ctx.recv_active.load()) ctx.recv_active = true;
+                if (!ctx.send_active.load()) ctx.send_active = true;
 
                 record_motion(*motion);
             }

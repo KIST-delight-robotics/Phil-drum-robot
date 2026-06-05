@@ -129,7 +129,7 @@ void Controller::send_task_1ms(int cnt) {
 void Controller::send_task_5ms() {
     tmotor_send_task(curr_point);
     maxon_motor_send_task(curr_point);
-    dynamicxel_send_task(curr_point);
+    dynamixel_send_task(curr_point);
  
     // Sync 프레임: 소켓당 1회
     struct can_frame sync_frame;
@@ -310,7 +310,7 @@ double Controller::cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_
     return torque_mNm;
 }
 
-void Controller::dynamicxel_send_task(const ControlSetPoint &point) {
+void Controller::dynamixel_send_task(const ControlSetPoint &point) {
     if (!robot.dxl_sw || !robot.dxl_sr) return;
 
     // 모든 dxl 모터의 목표값을 dxl_sw에 한 번에 등록
@@ -341,9 +341,7 @@ void Controller::dynamicxel_send_task(const ControlSetPoint &point) {
 
     // 한 번에 수신
     int comm = robot.dxl_sr->txRxPacket();
-    if (comm != COMM_SUCCESS) {
-        // 로그만 남기고 진행
-    } else {
+    if (comm == COMM_SUCCESS) {
         for (auto &[id, motor] : robot.motors) {
             auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
             if (!dxl) continue;

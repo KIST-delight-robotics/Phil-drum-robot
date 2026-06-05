@@ -12,6 +12,11 @@ void HeadMotionGenerator::initialize(const std::map<int, InstrumentCoordinate>& 
     drum_coordinates = coordinates;
 }
 
+void HeadMotionGenerator::reset() {
+    prev_nod_intensity = 0.0;
+    beat_sum = 0.0;
+}
+
 std::queue<HeadMotionPoint> HeadMotionGenerator::generate_motion(const std::vector<DrumEvent> rds, int num_point) {
     std::queue<HeadMotionPoint> out;
  
@@ -54,7 +59,7 @@ double HeadMotionGenerator::get_nod_ntensity(const std::vector<DrumEvent> rds) {
 
     for (int i = 1; i < rds_size; i++) {
         // 계수 조절 가능
-        double line_intensity = 0.1 * rds[i].velocity_R + 0.1 * rds[i].velocity_L + 0.5 * rds[i].is_kick?1:0;
+        double line_intensity = 0.1 * rds[i].velocity_R + 0.1 * rds[i].velocity_L + 0.5 * (rds[i].is_kick?1:0);
         intensity_sum += line_intensity;
         line++;
 
@@ -74,11 +79,9 @@ float HeadMotionGenerator::get_nod_angle(double beat_of_line, double nod_intensi
 
     // 세기
     // nodIntensity [0 1]
-    static double prev_nod_intensity = 0.0;
     double alpha = (i * nod_intensity + (n - i) * prev_nod_intensity) / (double)n;
 
     // beatSum 범위: [0 1)
-    static double beat_sum = 0.0;
     beat_sum += beat_of_line / 0.6 / n;
     beat_sum = beat_sum>=1.0?beat_sum-1.0:beat_sum;
 

@@ -305,7 +305,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::
         std::cerr << "[BehaviorPlanner] HIT rejected: only allowed in Idle\n";
         return sequence;
     }
-    
+
     MotionPrimitive start;
     start.type = MotionType::DRUM;
     start.flag = PlayFlag::START;
@@ -432,7 +432,7 @@ MotionPrimitive BehaviorPlanner::make_drum_hit(double t, int note_num, bool is_k
     motion.type     = MotionType::DRUM;
 
     DrumEvent Dummy;
-    motion.robotic_drum_score.push_back(Dummy);
+    motion.robotic_drum_score.push_back(Dummy);     // rds[0]
 
     DrumEvent event;
     event.bar = 1;
@@ -447,7 +447,7 @@ MotionPrimitive BehaviorPlanner::make_drum_hit(double t, int note_num, bool is_k
     event.is_kick = is_kick;
     event.is_closed_hihat = is_closed_hihat;
 
-    motion.robotic_drum_score.push_back(event);
+    motion.robotic_drum_score.push_back(event);     // rds[1]
 
     return motion;
 }

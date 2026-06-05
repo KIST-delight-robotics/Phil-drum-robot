@@ -69,6 +69,7 @@ void PlayMotionGenerator::initialize() {
 
 std::vector<double> PlayMotionGenerator::reset() {
     base_motion_generator.reset();
+    head_motion_generator.reset();
     state_motion_generator.reset();
 
     // TODO: 초기 위치 (스네어) 자세 반환하기
@@ -80,7 +81,7 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
     
     std::queue<std::array<double, ROBOT::NUM_JOINT>> q_queue;
 
-    int n = get_num_point(rds[1].t, rds[0].t);
+    int n = get_num_point(rds[0].t, rds[1].t);
 
     std::queue<BaseMotionPoint> base_motion = base_motion_generator.generate_motion(rds, n);
     std::queue<HeadMotionPoint> head_motion = head_motion_generator.generate_motion(rds, n);

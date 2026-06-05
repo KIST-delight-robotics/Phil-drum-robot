@@ -207,7 +207,7 @@ void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion
         trajectory_log.record(set_point.q);
     }
 
-    // TODO: update_last_q 해야 함
+    update_last_q(prev_q);
 }
 
 void TrajectoryGenerator::generate_idle_trajectory() {
@@ -429,6 +429,23 @@ std::pair<std::vector<double>, std::vector<double>> TrajectoryGenerator::sample_
 
 void TrajectoryGenerator::update_last_q(const std::vector<double>& q) {
     std::copy(q.begin(), q.end(), last_q.begin());
+    last_qd.fill(0.0);
+
+    std::array<double, 9> q_in;
+    std::copy(last_q.begin(), last_q.begin() + 9, q_in.begin());
+    KinematicsSolver::FKResult result = solver.fk_solve(q_in);
+
+    if (!result.success) {
+        std::cerr << "[TrajectoryGenerator] Failed to solve forward kinematics\n";
+        return;
+    }
+    
+    last_p_R = result.pR;
+    last_p_L = result.pL;
+}
+
+void TrajectoryGenerator::update_last_q(const std::array<double, ROBOT::NUM_JOINT>& q) {
+    last_q = q;
     last_qd.fill(0.0);
 
     std::array<double, 9> q_in;

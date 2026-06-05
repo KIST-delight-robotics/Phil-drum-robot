@@ -17,6 +17,8 @@ public:
     HeadMotionGenerator();
     ~HeadMotionGenerator();
 
+    void reset();
+
     void initialize(const std::map<int, InstrumentCoordinate>& coordinates);
 
     std::queue<HeadMotionPoint> generate_motion(const std::vector<DrumEvent> rds, int num_point);
@@ -28,4 +30,7 @@ private:
 
     int next_note = 0;
     int cur_note = 0;
+
+    double prev_nod_intensity = 0.0;
+    double beat_sum = 0.0;
 };

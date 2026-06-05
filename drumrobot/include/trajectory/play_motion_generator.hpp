@@ -35,5 +35,5 @@ private:
 
     int get_num_point(double t0, double t1);
 
-    int round_sum = 0.0;    // 소수점 오차 보정
+    int round_sum = 0;      // 소수점 오차 보정
 };

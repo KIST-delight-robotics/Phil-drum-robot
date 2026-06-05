@@ -82,6 +82,7 @@ private:
         int k
     );
     void update_last_q(const std::vector<double>& q);
+    void update_last_q(const std::array<double, ROBOT::NUM_JOINT>& q);
     void update_last_q(const std::vector<double>& p, const std::vector<double>& q);
 
     // ===== log =====
