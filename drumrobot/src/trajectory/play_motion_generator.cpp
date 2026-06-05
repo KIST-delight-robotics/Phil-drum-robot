@@ -1,7 +1,14 @@
 #include "trajectory/play_motion_generator.hpp"
 
-PlayMotionGenerator::PlayMotionGenerator() {
-
+PlayMotionGenerator::PlayMotionGenerator()
+    : log("play") {
+    std::vector<std::string> header = {
+        "XR", "YR", "ZR", "XL", "YL", "ZL",
+        "theta 0", "theta 7", "theta 8",
+        "elbow R", "elbow L", "wrist R", "wrist L",
+        "bass pedal", "hihat control", "head yaw", "head pitch"
+    };
+    log.set_header(header);
 }
 
 PlayMotionGenerator::~PlayMotionGenerator() {
@@ -35,7 +42,8 @@ void PlayMotionGenerator::initialize() {
     for (const auto& inst : root.at("instruments")) {
         InstrumentCoordinate coord;
 
-        int id = inst.at("id").get<int>();
+        std::string name = inst.at("name");
+        int id = instrument_name_to_id.at(name);
 
         const auto& right = inst.at("right");
         const auto& left  = inst.at("left");
@@ -57,7 +65,7 @@ void PlayMotionGenerator::initialize() {
         };
         coord.left_wrist_angle = left.at("wrist_angle_deg").get<double>() * M_PI / 180.0;
 
-        drum_coordinates[id] = coord;   // TODO: 저장은 (번호, 위치)로 하되 읽을 때, 악기 이름과 번호를 매칭할 수 있는 공유 자원 있으면 좋을 듯
+        drum_coordinates[id] = coord;
     }
 
     std::cout << "[PlayMotionGenerator] Loaded " << drum_coordinates.size()
@@ -81,7 +89,7 @@ std::array<double, ROBOT::NUM_JOINT> PlayMotionGenerator::reset() {
     KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8);
 
     if (!result.success) {
-        std::cerr << "[PlayMotionGenerator] reset: Failed to solve inverse kinematics\n";
+        std::cerr << "[PlayMotionGenerator] RESET: Failed to solve inverse kinematics\n";
         // TODO: 에러 처리 필요
     }
 
@@ -106,11 +114,13 @@ std::array<double, ROBOT::NUM_JOINT> PlayMotionGenerator::reset() {
     return q;
 }
 
-std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds) {
-    // rds[0]: 시작 자세
-    // rds[1]: 목표 자세
-    
+std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds) {    
     std::queue<std::array<double, ROBOT::NUM_JOINT>> q_queue;
+
+    if (rds.size() < 2) {
+        std::cerr << "[PlayMotionGenerator] TODO: 에러 메세지 작성해야 함\n";
+        return q_queue;
+    }
 
     int n = get_num_point(rds[0].t, rds[1].t);
 
@@ -142,8 +152,8 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
         KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8);
 
         if (!result.success) {
-            std::cerr << "[PlayMotionGenerator] play: Failed to solve inverse kinematics\n";
-            return q_queue; // TODO: 진행중인 동작을 멈춰야 함. 이렇게 중간에 끊고 다음거 이어서 만들면 계단 입력 나옴
+            // std::cerr << "[PlayMotionGenerator] PLAY: Failed to solve inverse kinematics\n";
+            // return q_queue; // TODO: 진행중인 동작을 멈춰야 함. 이렇게 중간에 끊고 다음거 이어서 만들면 계단 입력 나옴
         }
 
         for (int i = 0; i < 9; i++) {
@@ -163,6 +173,16 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
         q[12] = h.pitch;
 
         q_queue.push(q);
+
+        std::vector<double> values = {
+            pR[0], pR[1], pR[2],
+            pL[0], pL[1], pL[2],
+            theta0, theta7, theta8,
+            s.right_elbow, s.left_elbow,
+            s.right_wrist, s.left_wrist,
+            p.right, p.left, h.yaw, h.pitch
+        };
+        log.record(values);
     }
 
     return q_queue;

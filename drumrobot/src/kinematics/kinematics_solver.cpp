@@ -73,7 +73,7 @@ KinematicsSolver::IKResult KinematicsSolver::ik_solve(
     double rad_r  = 4.0 * L1 * L1 * L2_R * L2_R - x_r * x_r;
 
     if (rad_r < 0.0) {
-        std::cerr << "[KinematicsSolver] Right arm unreachable (rad < 0)\n";
+        // std::cerr << "[KinematicsSolver] Right arm unreachable (rad < 0)\n";
         return result;
     }
 
@@ -92,7 +92,7 @@ KinematicsSolver::IKResult KinematicsSolver::ik_solve(
     double rad_l  = 4.0 * L1 * L1 * L2_L * L2_L - x_l * x_l;
 
     if (rad_l < 0.0) {
-        std::cerr << "[KinematicsSolver] Left arm unreachable (rad < 0)\n";
+        // std::cerr << "[KinematicsSolver] Left arm unreachable (rad < 0)\n";
         return result;
     }
 
@@ -113,7 +113,7 @@ KinematicsSolver::IKResult KinematicsSolver::ik_solve(
     // NaN / Inf 체크
     for (double v : result.q) {
         if (std::isnan(v) || std::isinf(v)) {
-            std::cerr << "[KinematicsSolver] NaN/Inf in result\n";
+            // std::cerr << "[KinematicsSolver] NaN/Inf in result\n";
             return result;
         }
     }

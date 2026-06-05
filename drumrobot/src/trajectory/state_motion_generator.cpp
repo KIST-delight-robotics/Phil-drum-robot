@@ -123,7 +123,7 @@ std::vector<StateMotionGenerator::SubLine> StateMotionGenerator::split_line(cons
 StateMotionGenerator::HitSegment StateMotionGenerator::get_hit_segment(const std::vector<SubLine>& sub, int idx, Arm arm) {
     HitSegment seg;
     int n = (int)sub.size();
-    // TODO: idx + 1 == n 인 경우 처리 필요
+    // TODO: idx + 1 == n 인 경우 처리 필요 (근데 그런 경우 있을까?)
 
     const MotionContext& ctx = (arm == Arm::RIGHT) ? right_context : left_context;
     auto vel_of  = [&](int i) { return (arm == Arm::RIGHT) ? sub[i].vel_R  : sub[i].vel_L;  };

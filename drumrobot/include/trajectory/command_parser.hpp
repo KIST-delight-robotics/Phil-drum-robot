@@ -23,7 +23,7 @@ enum class Opcode {
     GESTURE,    // 행동           args: type (nod / shake / wave / hi / hurray / happy)
     MOVE,       // 개별 관절 이동   args: motorName, angleDeg, [moveTime=2.0]
     POSE,       // 사전 정의 포즈   args: poseName (home / ready / shutdown)
-    HIT,        // 드럼 타격       args: target (snare / hihat / kick / ...)
+    HIT,        // 드럼 타격       args: target (snare / ride / bass ...)
     PLAY,       // 악보 연주       args: scoreName
     
     // args 없음

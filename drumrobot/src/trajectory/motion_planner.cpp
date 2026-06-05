@@ -95,6 +95,7 @@ void MotionPlanner::record_motion(const MotionPrimitive& motion) {
 
     if (motion.type == MotionType::IDLE) log.push_back("idle");
     else if (motion.type == MotionType::TRANSLATE) log.push_back("translate");
+    else if (motion.type == MotionType::DRUM) log.push_back("drum");
 
     // TODO: 모션 로그 더 구체적으로 작성하기
 

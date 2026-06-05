@@ -1,6 +1,7 @@
 #include "trajectory/base_motion_generator.hpp"
 
-BaseMotionGenerator::BaseMotionGenerator() {
+BaseMotionGenerator::BaseMotionGenerator()
+    : log("s") {
 
 }
 
@@ -40,6 +41,27 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
     right_context = seg_R.next_context; // context update
     left_context = seg_L.next_context;
 
+    // std::cout << "===== rds =====\n";
+    // for (int i = 0; i < (int)rds.size(); i++) {
+    //     std::cout << "[" << i << "] t: " << rds[i].t
+    //               << "  note_R: " << rds[i].note_num_R
+    //               << "  note_L: " << rds[i].note_num_L
+    //               << "  vel_R: " << rds[i].velocity_R
+    //               << "  vel_L: " << rds[i].velocity_L << "\n";
+    // }
+
+    // std::cout << "===== R =====\n";
+    // std::cout << "start_time: " << seg_R.start_time << "\n";
+    // std::cout << "end_time: " << seg_R.end_time << "\n";
+    // std::cout << "t0: " << seg_R.t0 << "\n";
+    // std::cout << "t0: " << seg_R.t1 << "\n";
+
+    // std::cout << "===== L =====\n";
+    // std::cout << "start_time: " << seg_L.start_time << "\n";
+    // std::cout << "end_time: " << seg_L.end_time << "\n";
+    // std::cout << "t0: " << seg_L.t0 << "\n";
+    // std::cout << "t0: " << seg_L.t1 << "\n";
+
     for (int i = 0; i < num_point; i++) {
         BaseMotionPoint point;
 
@@ -58,6 +80,12 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
         point.waist = 0.0;  // TODO: 임시 허리각
 
         out.push(point);
+
+        std::vector<double> values {
+            seg_R.end_time - seg_R.start_time, t_R, s_R,
+            seg_L.end_time - seg_L.start_time, t_L, s_L,
+        };
+        log.record(values);
     }
 
     return out;
@@ -72,7 +100,9 @@ BaseMotionGenerator::MotionSegment BaseMotionGenerator::get_motion_segment(const
     // 팔에 따라 참조할 context / note 선택
     MotionContext& context = (arm == Arm::RIGHT) ? right_context : left_context;
     auto note_of = [&](int i) {
-        return (arm == Arm::RIGHT) ? rds[i].note_num_R : rds[i].note_num_L;
+        int note = (arm == Arm::RIGHT) ? rds[i].note_num_R : rds[i].note_num_L;
+        if (note == 5 && !rds[i].is_closed_hihat) note = 9; // 오픈 하이햇 처리
+        return note;
     };
 
     // ===== 타격 감지 =====
@@ -91,7 +121,8 @@ BaseMotionGenerator::MotionSegment BaseMotionGenerator::get_motion_segment(const
         if (note_of(i) != 0) {
             is_hit   = true;
             t_hit    = rds[i].t;
-            note_hit = note_of(i);  // TODO: 오픈 하이햇 처리 해야함
+            note_hit = note_of(i);
+            break;
         }
     }
 
@@ -209,7 +240,7 @@ std::array<double, 3> BaseMotionGenerator::make_path(const std::array<double, 3>
     if (pi == pf) {
         ps = pi;
     } else {
-        double h1 = 0.0, h2 = 0.0;  // TODO: 조절해야 함
+        double h1 = 0.2, h2 = 0.2;  // TODO: 조절해야 함
         
         std::array<double, 3> pm1;
         std::array<double, 3> pm2;

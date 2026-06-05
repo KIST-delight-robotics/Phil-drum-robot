@@ -14,6 +14,7 @@
 #include "common/motion_queue.hpp"
 #include "common/robot_config.hpp"
 #include "kinematics/kinematics_solver.hpp"
+#include "util/logger.hpp"
 
 struct BaseMotionPoint {
     std::array<double, 3> right_position;
@@ -69,4 +70,7 @@ private:
     void note_to_target(int note_num, Arm arm, std::array<double, 3>& out_position, double& out_wrist_angle_deg);
     double time_scaling(double ti, double tf, double t);
     std::array<double, 3> make_path(const std::array<double, 3>& pi, const std::array<double, 3>& pf, double s);
+
+    // ===== 로그 =====
+    Logger log;
 };

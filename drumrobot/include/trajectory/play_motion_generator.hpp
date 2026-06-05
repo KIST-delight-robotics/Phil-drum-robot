@@ -12,6 +12,7 @@
 #include "trajectory/head_motion_generator.hpp"
 #include "trajectory/pedal_motion_generator.hpp"
 #include "trajectory/state_motion_generator.hpp"
+#include "util/logger.hpp"
 
 class PlayMotionGenerator {
 public:
@@ -36,4 +37,7 @@ private:
     int get_num_point(double t0, double t1);
 
     int round_sum = 0;      // 소수점 오차 보정
+
+    // ===== 로그 =====
+    Logger log;
 };
