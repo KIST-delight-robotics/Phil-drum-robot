@@ -278,7 +278,7 @@ double Controller::cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_
     const double dt = 0.001;    // 1ms
     const double alpha = 0.2;   // 저역통과 필터 계수
  
-    double err = target_position - maxon->current_position;
+    double err = target_position - maxon->current_position; // current_position 갱신이 보장되진 않지만 그냥 사용 (비동기)
     double err_dot_raw = (err - maxon->prev_err) / dt;
 
     double err_dot_filtered = alpha * err_dot_raw + (1.0 - alpha) * maxon->prev_err_dot; // 근사 필터

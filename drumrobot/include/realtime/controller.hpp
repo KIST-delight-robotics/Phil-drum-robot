@@ -50,7 +50,7 @@ private:
     const double STICK_LEN_M   = 0.121;
     const double STICK_MASS_KG = 0.0845;
 
-    const double POS_DIFF_LIMIT = 10.0f * M_PI / 180.0f; // 10도
+    const double POS_DIFF_LIMIT = 30.0f * M_PI / 180.0f; // 30도
  
     // ===== RECV =====
     void read_frames(); // 소켓에서 프레임을 논블록으로 읽어 tempFrames 에 누적

@@ -78,7 +78,7 @@ private:
     double time_scaling(double ti, double tf, double t);
     std::array<double, 3> make_path(const std::array<double, 3>& pi, const std::array<double, 3>& pf, double s);
 
-    double prev_waist_angle;    // TODO: 초기화 필요
+    double prev_waist_angle;
     double cur_waist_angle;
     double cur_q0_min, cur_q0_max;
     double prev_t;
