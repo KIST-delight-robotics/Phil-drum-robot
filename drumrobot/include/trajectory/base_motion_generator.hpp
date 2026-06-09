@@ -73,7 +73,7 @@ private:
     MotionContext right_context;
     MotionContext left_context;
 
-    BaseMotionGenerator::MotionSegment get_motion_segment(const std::vector<DrumEvent>& rds, Arm arm);
+    BaseMotionGenerator::MotionSegment get_motion_segment(const std::vector<DrumEvent>& rds, Arm arm, const MotionContext& context);
     void note_to_target(int note_num, Arm arm, std::array<double, 3>& out_position, double& out_wrist_angle_deg);
     double time_scaling(double ti, double tf, double t);
     std::array<double, 3> make_path(const std::array<double, 3>& pi, const std::array<double, 3>& pf, double s);

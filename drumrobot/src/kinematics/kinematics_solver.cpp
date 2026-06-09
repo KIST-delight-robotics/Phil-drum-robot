@@ -415,11 +415,11 @@ bool KinematicsSolver::check_joint_limits(const std::array<double, 9>& q) const 
         if (it == joint_limits.end()) continue;
 
         if (q[i] < it->second.min_angle || q[i] > it->second.max_angle) {
-            std::cerr << "[KinematicsSolver] Joint " << i
-                      << " out of range: " << q[i] * 180.0 / M_PI << " deg"
-                      << "  (limit: "
-                      << it->second.min_angle * 180.0 / M_PI << " ~ "
-                      << it->second.max_angle * 180.0 / M_PI << " deg)\n";
+            // std::cerr << "[KinematicsSolver] Joint " << i
+            //           << " out of range: " << q[i] * 180.0 / M_PI << " deg"
+            //           << "  (limit: "
+            //           << it->second.min_angle * 180.0 / M_PI << " ~ "
+            //           << it->second.max_angle * 180.0 / M_PI << " deg)\n";
             return false;
         }
     }

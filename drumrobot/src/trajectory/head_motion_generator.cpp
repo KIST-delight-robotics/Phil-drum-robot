@@ -55,6 +55,8 @@ std::queue<HeadMotionPoint> HeadMotionGenerator::generate_motion(const std::vect
         out.push(point);
     }
 
+    cur_angle = next_note;
+
     return out;
 }
 

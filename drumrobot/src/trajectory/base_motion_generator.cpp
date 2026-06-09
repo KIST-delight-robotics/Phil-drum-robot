@@ -42,8 +42,8 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
         return out;
     }
 
-    MotionSegment seg_R = get_motion_segment(rds, Arm::RIGHT);
-    MotionSegment seg_L = get_motion_segment(rds, Arm::LEFT);
+    MotionSegment seg_R = get_motion_segment(rds, Arm::RIGHT, right_context);
+    MotionSegment seg_L = get_motion_segment(rds, Arm::LEFT, left_context);
 
     WaistSegment seg_w = get_waist_segment(rds);
 
@@ -101,14 +101,13 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
     return out;
 }
 
-BaseMotionGenerator::MotionSegment BaseMotionGenerator::get_motion_segment(const std::vector<DrumEvent>& rds, Arm arm) {
+BaseMotionGenerator::MotionSegment BaseMotionGenerator::get_motion_segment(const std::vector<DrumEvent>& rds, Arm arm, const MotionContext& context) {
     MotionSegment seg;
 
     seg.t0 = rds[0].t;
     seg.t1 = rds[1].t;
 
-    // 팔에 따라 참조할 context / note 선택
-    MotionContext& context = (arm == Arm::RIGHT) ? right_context : left_context;
+    // 팔에 따라 참조할 note 선택
     auto note_of = [&](int i) {
         int note = (arm == Arm::RIGHT) ? rds[i].note_num_R : rds[i].note_num_L;
         if (note == 5 && !rds[i].is_closed_hihat) note = 9; // 오픈 하이햇 처리
@@ -354,6 +353,37 @@ BaseMotionGenerator::WaistSegment BaseMotionGenerator::get_waist_segment(const s
 
 std::pair<double, std::array<double, 2>> BaseMotionGenerator::get_waist_angle(const std::vector<DrumEvent>& rds, int idx) {
     // idx 번째 허리 최적값, 범위 구하기
+
+    MotionContext tmp_context_R = right_context;
+    MotionContext tmp_context_L = left_context;
+
+    for (int i = 0; i < (int)rds.size() - 1; i++) {
+        MotionSegment seg_R = get_motion_segment(std::vector<DrumEvent>(rds.begin() + i, rds.end()), Arm::RIGHT, tmp_context_R);
+        MotionSegment seg_L = get_motion_segment(std::vector<DrumEvent>(rds.begin() + i, rds.end()), Arm::LEFT, tmp_context_L);
+
+        if (i + 1 == idx) {
+            double t_R = seg_R.t1 - seg_R.start_time;
+            double t_L = seg_L.t1 - seg_L.start_time;
+
+            double s_R = time_scaling(0.0, seg_R.end_time - seg_R.start_time, t_R);
+            double s_L = time_scaling(0.0, seg_L.end_time - seg_L.start_time, t_L);
+            
+            std::array<double, 3> right_position = make_path(seg_R.start_position, seg_R.end_position, s_R);
+            std::array<double, 3> left_position = make_path(seg_L.start_position, seg_L.end_position, s_L);
+
+            double right_wrist = s_R * (seg_R.end_wrist_angle - seg_R.start_wrist_angle) + seg_R.start_wrist_angle;
+            double left_wrist = s_L * (seg_L.end_wrist_angle - seg_L.start_wrist_angle) + seg_L.start_wrist_angle;
+
+            return compute_waist_range(right_position, left_position, right_wrist, left_wrist); 
+        }
+
+        tmp_context_R = seg_R.next_context;
+        tmp_context_L = seg_L.next_context;
+    }
+
+    // TODO: 에러 처리
+    std::array<double, 2> err{};
+    return {0.0, err};
 }
 
 std::pair<double, std::array<double, 2>> BaseMotionGenerator::compute_waist_range(std::array<double, 3> pR, std::array<double, 3> pL, double the7, double the8) {
@@ -378,7 +408,8 @@ std::pair<double, std::array<double, 2>> BaseMotionGenerator::compute_waist_rang
 
     if (num_sol == 0) {
         // TODO: 에러 메세지
-        // return
+        std::array<double, 2> err{};
+        return {0.0, err};
     } else {
         std::array<double, 2> range = {q_vec[0][0], q_vec[num_sol - 1][0]};
         w = 2.0 * M_PI / std::abs(range[1] - range[0]);
