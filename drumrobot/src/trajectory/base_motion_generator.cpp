@@ -398,7 +398,7 @@ std::pair<double, std::array<double, 2>> BaseMotionGenerator::compute_waist_rang
     double w, cost = 0.0;
 
     if (num_sol == 0) {
-        // TODO: 에러 매세지
+        std::cerr << "[BaseMotionGenerator] 허리 -90~90deg 전 범위에서 IK 해 없음\n";
         base_end_error = true;  // IK 오류: 연주 종료
         std::array<double, 2> err{};
         return {0.0, err};

@@ -114,7 +114,8 @@ bool PlayMotionGenerator::reset(std::array<double, ROBOT::NUM_JOINT>& q) {
 
 std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds) {    
     if (rds.size() < 2) {
-        std::cerr << "[PlayMotionGenerator] TODO: 에러 메세지 작성해야 함\n";
+        std::cerr << "[PlayMotionGenerator] generate_motion: 드럼 이벤트가 부족합니다 (size="
+                  << rds.size() << ", 최소 2개 필요). 해당 구간 생성을 건너뜁니다.\n";
         std::queue<std::array<double, ROBOT::NUM_JOINT>> empty_queue;
         return empty_queue;
     }

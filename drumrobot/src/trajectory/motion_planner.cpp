@@ -113,7 +113,6 @@ void MotionPlanner::abort_play_motion() {
 
     ctx.play_abort = false;
     std::cerr << "[MotionPlanner] 연주가 비정상 종료됩니다.\n";
-    ctx.robot_state = RobotState::Idle;
 }
 
 // ===== log =====
