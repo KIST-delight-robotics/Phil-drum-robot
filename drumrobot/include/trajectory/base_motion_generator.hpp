@@ -88,7 +88,4 @@ private:
     std::pair<double, std::array<double, 2>> compute_waist_range(std::array<double, 3> pR, std::array<double, 3> pL, double the7, double the8);
     std::array<double, 2> compute_slopes(const std::array<double, 4> &q, const std::array<double, 4> &t);
     double cubic_hermite(double ta, double qa, double va, double tb, double qb, double vb, double t);
-
-    // ===== 로그 =====
-    Logger log;
 };

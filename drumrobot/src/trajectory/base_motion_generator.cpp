@@ -1,7 +1,6 @@
 #include "trajectory/base_motion_generator.hpp"
 
-BaseMotionGenerator::BaseMotionGenerator()
-    : log("s") {
+BaseMotionGenerator::BaseMotionGenerator() {
 
 }
 
@@ -90,12 +89,6 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
         point.waist = cubic_hermite(seg_w.t0, seg_w.q0, seg_w.v0, seg_w.t1, seg_w.q1, seg_w.v1, t_w);
 
         out.push(point);
-
-        std::vector<double> values {
-            seg_R.end_time - seg_R.start_time, t_R, s_R,
-            seg_L.end_time - seg_L.start_time, t_L, s_L,
-        };
-        log.record(values);
     }
 
     return out;

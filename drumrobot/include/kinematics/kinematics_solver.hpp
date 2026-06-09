@@ -28,10 +28,11 @@ public:
         const std::array<double, 3>& pL,
         double theta0,
         double theta7,
-        double theta8
+        double theta8,
+        bool print_err
     ) const;
 
-    bool check_joint_limits(const std::array<double, 9>& q) const;    // q 벡터가 모든 관절 한계 내에 있는지 확인
+    bool check_joint_limits(const std::array<double, 9>& q, bool print_err) const;    // q 벡터가 모든 관절 한계 내에 있는지 확인
 
     struct FKResult {
         std::array<double, 3> pR;   // 오른손 끝 좌표 (드럼 스틱 끝)

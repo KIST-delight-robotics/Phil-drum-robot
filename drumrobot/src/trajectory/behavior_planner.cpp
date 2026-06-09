@@ -331,7 +331,6 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
         return sequence;
     }
 
-    ctx.robot_state = RobotState::Playing;
     const std::string& score_name = args[0];
 
     std::ifstream inputFile;
@@ -343,6 +342,8 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
         return sequence;
     }
 
+    ctx.robot_state = RobotState::Playing;
+    
     std::vector<DrumEvent> rds;
     DrumEvent Dummy;
     rds.push_back(Dummy);   // rds[0]

@@ -41,7 +41,8 @@ KinematicsSolver::IKResult KinematicsSolver::ik_solve(
     const std::array<double, 3>& pL,
     double theta0,
     double theta7,
-    double theta8
+    double theta8,
+    bool print_err
 ) const {
     IKResult result;
     result.q.fill(0.0);
@@ -73,7 +74,7 @@ KinematicsSolver::IKResult KinematicsSolver::ik_solve(
     double rad_r  = 4.0 * L1 * L1 * L2_R * L2_R - x_r * x_r;
 
     if (rad_r < 0.0) {
-        // std::cerr << "[KinematicsSolver] Right arm unreachable (rad < 0)\n";
+        if (print_err) std::cerr << "[KinematicsSolver] Right arm unreachable (rad < 0)\n";
         return result;
     }
 
@@ -92,7 +93,7 @@ KinematicsSolver::IKResult KinematicsSolver::ik_solve(
     double rad_l  = 4.0 * L1 * L1 * L2_L * L2_L - x_l * x_l;
 
     if (rad_l < 0.0) {
-        // std::cerr << "[KinematicsSolver] Left arm unreachable (rad < 0)\n";
+        if (print_err) std::cerr << "[KinematicsSolver] Left arm unreachable (rad < 0)\n";
         return result;
     }
 
@@ -113,13 +114,13 @@ KinematicsSolver::IKResult KinematicsSolver::ik_solve(
     // NaN / Inf 체크
     for (double v : result.q) {
         if (std::isnan(v) || std::isinf(v)) {
-            // std::cerr << "[KinematicsSolver] NaN/Inf in result\n";
+            if (print_err) std::cerr << "[KinematicsSolver] NaN/Inf in result\n";
             return result;
         }
     }
 
     // 관절 한계 검사
-    if (!check_joint_limits(result.q)) {
+    if (!check_joint_limits(result.q, print_err)) {
         return result;
     }
 
@@ -300,7 +301,7 @@ void KinematicsSolver::verify_fk_ik(int num_tests, double tolerance_deg) {
         }
  
         // IK: (pR, pL, theta0, theta7, theta8) → q_out
-        IKResult ik = ik_solve(fk.pR, fk.pL, q_in[0], q_in[7], q_in[8]);
+        IKResult ik = ik_solve(fk.pR, fk.pL, q_in[0], q_in[7], q_in[8], false);
         if (!ik.success) {
             ik_fail++;
             continue;
@@ -409,17 +410,19 @@ void KinematicsSolver::verify_fk_ik(int num_tests, double tolerance_deg) {
     std::cout << "===================================================\n\n";
 }
 
-bool KinematicsSolver::check_joint_limits(const std::array<double, 9>& q) const {
+bool KinematicsSolver::check_joint_limits(const std::array<double, 9>& q, bool print_err) const {
     for (int i = 0; i < static_cast<int>(q.size()); ++i) {
         auto it = joint_limits.find(i);
         if (it == joint_limits.end()) continue;
 
         if (q[i] < it->second.min_angle || q[i] > it->second.max_angle) {
-            // std::cerr << "[KinematicsSolver] Joint " << i
-            //           << " out of range: " << q[i] * 180.0 / M_PI << " deg"
-            //           << "  (limit: "
-            //           << it->second.min_angle * 180.0 / M_PI << " ~ "
-            //           << it->second.max_angle * 180.0 / M_PI << " deg)\n";
+            if (print_err) {
+                std::cerr << "[KinematicsSolver] Joint " << i
+                          << " out of range: " << q[i] * 180.0 / M_PI << " deg"
+                          << "  (limit: "
+                          << it->second.min_angle * 180.0 / M_PI << " ~ "
+                          << it->second.max_angle * 180.0 / M_PI << " deg)\n";
+            }
             return false;
         }
     }
