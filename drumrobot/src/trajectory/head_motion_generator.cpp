@@ -38,6 +38,7 @@ std::queue<HeadMotionPoint> HeadMotionGenerator::generate_motion(const std::vect
         next_note = rds[1].note_num_R;
     }
 
+    // TODO: 오른손만 따라가는게 급하게 움직이거나 왼팔만 타격이 있을 때 어색해 보임 
     double cur_angle = (cur_note == 0) ? 0.0 : 
         std::atan2(drum_coordinates[cur_note].right_position[1], drum_coordinates[cur_note].right_position[0]);
     double next_angle = (next_note == 0) ? 0.0 : 

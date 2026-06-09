@@ -342,8 +342,6 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
         return sequence;
     }
 
-    ctx.robot_state = RobotState::Playing;
-
     std::vector<DrumEvent> rds;
     DrumEvent Dummy;
     rds.push_back(Dummy);   // rds[0]
@@ -368,33 +366,41 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
             items.push_back(item);
         }
 
+        if (items.empty() || items[0].empty()) {
+            continue;   // 빈 줄 무시
+        }
+
         if (items[0] == "bpm") {
             bpm = stod(items[1]);
         } else if (items[0] == "end") {
             while (start_idx < end_idx) {
-                sequence.push_back(make_drum_play(std::vector<DrumEvent>(rds.begin() + start_idx, rds.end())));
+                sequence.push_back(make_drum_play(std::vector<DrumEvent>(rds.begin() + start_idx, rds.end()))); // rds.end() == rds.begin() + end_idx + 1
                 start_idx++;
             }
-
-            MotionPrimitive end;
-            end.type = MotionType::DRUM;
-            end.flag = PlayFlag::END;
-            sequence.push_back(end);
+            break;
         } else {
-            rds.push_back(make_drum_event(items, bpm, last_t));
+            DrumEvent ev;
+            if (!make_drum_event(items, bpm, last_t, ev)) break;
+            rds.push_back(ev);
 
             end_idx++;
             last_t = rds[end_idx].t;
 
             // 2.4s : 100bpm 기준 한 마디 시간
             if ((rds[end_idx].t - rds[start_idx].t) * bpm / 100.0 >= 2.4) {
-                sequence.push_back(make_drum_play(std::vector<DrumEvent>(rds.begin() + start_idx, rds.begin() + end_idx + 1))); // [start, end)
+                sequence.push_back(make_drum_play(std::vector<DrumEvent>(rds.begin() + start_idx, rds.begin() + end_idx + 1)));
                 start_idx++;
             }
         }
     }
     inputFile.close();
 
+    MotionPrimitive end;
+    end.type = MotionType::DRUM;
+    end.flag = PlayFlag::END;
+    sequence.push_back(end);
+
+    ctx.robot_state = RobotState::Playing;
     return sequence;
 }
 
@@ -463,18 +469,26 @@ std::string BehaviorPlanner::trim_whitespace(const std::string &str) {
     return str.substr(first, (last - first + 1));
 }
 
-DrumEvent BehaviorPlanner::make_drum_event(const std::vector<std::string>& items, double bpm, double last_t) {
-    DrumEvent event;
-    event.bar             = stoi(items[0]);
-    event.beat            = stod(items[1]);
-    event.note_num_R      = stoi(items[2]);
-    event.note_num_L      = stoi(items[3]);
-    event.velocity_R      = stoi(items[4]);
-    event.velocity_L      = stoi(items[5]);
-    event.is_kick         = (stoi(items[6]) == 1);
-    event.is_closed_hihat = (stoi(items[7]) == 1);
-    event.t               = event.beat * 100.0 / bpm + last_t;
-    return event;
+bool BehaviorPlanner::make_drum_event(const std::vector<std::string>& items, double bpm, double last_t, DrumEvent& out) {
+    if (items.size() < 8) {
+        std::cerr << "[BehaviorPlanner] PLAY: 악보 열 개수 부족 (" << items.size() << ")\n";
+        return false;
+    }
+    try {
+        out.bar             = std::stoi(items[0]);
+        out.beat            = std::stod(items[1]);
+        out.note_num_R      = std::stoi(items[2]);
+        out.note_num_L      = std::stoi(items[3]);
+        out.velocity_R      = std::stoi(items[4]);
+        out.velocity_L      = std::stoi(items[5]);
+        out.is_kick         = (std::stoi(items[6]) == 1);
+        out.is_closed_hihat = (std::stoi(items[7]) == 1);
+    } catch (const std::exception& e) {
+        std::cerr << "[BehaviorPlanner] PLAY: 악보 숫자 파싱 실패: " << e.what() << "\n";
+        return false;
+    }
+    out.t = out.beat * 100.0 / bpm + last_t;
+    return true;
 }
 
 MotionPrimitive BehaviorPlanner::make_drum_play(std::vector<DrumEvent> rds) {

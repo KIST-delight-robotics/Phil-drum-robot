@@ -53,7 +53,7 @@ private:
     MotionPrimitive make_translate(const std::vector<double>& q_target, double t_total, TrajectoryProfile profile = TrajectoryProfile::COSINE);
     MotionPrimitive make_drum_hit(double t, int note_num);
     std::string trim_whitespace(const std::string &str);
-    DrumEvent make_drum_event(const std::vector<std::string>& items, double bpm, double last_t);
+    bool make_drum_event(const std::vector<std::string>& items, double bpm, double last_t, DrumEvent& out);
     MotionPrimitive make_drum_play(std::vector<DrumEvent> rds);
     int find_motor_id(const std::string& motor_name) const;
     double deg_to_rad(double deg) const { return deg * M_PI / 180.0; }
