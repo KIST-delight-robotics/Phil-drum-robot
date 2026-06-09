@@ -132,7 +132,7 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
 
         if (!result.success) {
             std::cerr << "[TrajectoryGenerator] Failed to solve inverse kinematics\n";
-            return;
+            return; // TODO: 부분 궤적만 남는 부분 처리
         }
 
         // 13차원 set_point 구성: IK 결과(0~8) + 관절 보간값(9~12)

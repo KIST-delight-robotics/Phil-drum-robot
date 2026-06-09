@@ -204,8 +204,7 @@ void BaseMotionGenerator::note_to_target(int note_num, Arm arm, std::array<doubl
     if (it == drum_coordinates.end()) {
         std::cerr << "[BaseMotionGenerator] note_to_target: invalid note number "
                   << note_num << "\n";
-        out_position        = {0.0, 0.0, 0.0};
-        out_wrist_angle_deg = 0.0;
+        // TODO: 실패 처리
         return;
     }
     const InstrumentCoordinate& coord = it->second;
@@ -287,10 +286,10 @@ BaseMotionGenerator::WaistSegment BaseMotionGenerator::get_waist_segment(const s
     // 기울기 평균 이동: t0 -> t1
     std::array<double, 3> a0{};
     for (int i = 0; i < 3; i++) {
-        a0[i] = (q0_opt[i + 1] - q0_opt[0]) / (t_03[i + 1] - t_03[0]);
+        a0[i] = (q0_opt[i + 1] - cur_waist_angle) / (t_03[i + 1] - t_03[0]);
     }
     double avg_a0 = (a0[0] + a0[1] + a0[2]) / 3.0;
-    double next_waist_angle = avg_a0 * (t_03[1] - t_03[0]);
+    double next_waist_angle = cur_waist_angle + avg_a0 * (t_03[1] - t_03[0]);
 
     if (next_waist_angle <= q0_min[1] || next_waist_angle >= q0_max[1]) {
         next_waist_angle = (q0_min[1] + q0_max[1]) / 2.0;
@@ -299,10 +298,10 @@ BaseMotionGenerator::WaistSegment BaseMotionGenerator::get_waist_segment(const s
     // 기울기 평균 이동: t1 -> t2
     std::array<double, 2> a1{};
     for (int i = 0; i < 2; i++) {
-        a1[i] = (q0_opt[i + 2] - q0_opt[1]) / (t_03[i + 2] - t_03[1]);
+        a1[i] = (q0_opt[i + 2] - next_waist_angle) / (t_03[i + 2] - t_03[1]);
     }
     double avg_a1 = (a1[0] + a1[1]) / 2.0;
-    double next_next_waist_angle = avg_a1 * (t_03[2] - t_03[1]);
+    double next_next_waist_angle = next_waist_angle + avg_a1 * (t_03[2] - t_03[1]);
 
     if (next_next_waist_angle <= q0_min[2] || next_next_waist_angle >= q0_max[2]) {
         next_next_waist_angle = (q0_min[2] + q0_max[2]) / 2.0;

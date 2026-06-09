@@ -343,7 +343,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     }
 
     ctx.robot_state = RobotState::Playing;
-    
+
     std::vector<DrumEvent> rds;
     DrumEvent Dummy;
     rds.push_back(Dummy);   // rds[0]
@@ -447,7 +447,7 @@ MotionPrimitive BehaviorPlanner::make_drum_hit(double t, int note_num) {
     } else {
         event.note_num_L = note_num;
         event.velocity_L = 5;
-        if (note_num == 9) event.is_closed_hihat = true;
+        if (note_num == 5) event.is_closed_hihat = true;
     }
 
     motion.robotic_drum_score.push_back(event);     // rds[1]

@@ -258,7 +258,9 @@ OPCODE|arg1|arg2\n
 
 ### HIT target 목록
 
-`snare`, `floor`, `mid`, `top`, `closed`(closed hi-hat), `open`(open hi-hat), `ride`, `right`(right crash), `left`(left crash), `bass`(bass drum)
+`snare`, `floor`, `mid`, `top`, `closed hihat`, `open hihat`, `ride`, `right crash`, `left crash`, `bass`
+
+> 타깃 문자열은 코드의 `instrument_name_to_id`(`include/common/robot_config.hpp`) 키와 정확히 일치해야 합니다(공백 포함). 예: `closed hihat`, `right crash`. 일치하지 않으면 `Unknown target instrument`로 거부됩니다.
 
 ### 명령 예시
 
@@ -274,6 +276,7 @@ MOVE|right_wrist|45         # right_wrist를 45도로 이동 (기본 3.0초)
 MOVE|right_wrist|45|1.0     # right_wrist를 45도로 1.0초에 이동
 MOVE|waist|-30|2.0          # 허리를 -30도로 2초에 이동
 HIT|snare                   # 스네어 1회 타격
+HIT|closed hihat            # 클로즈드 하이햇 1회 타격 (타깃 문자열에 공백 포함)
 PLAY|BasicFillin_0          # data/scores/BasicFillin_0.txt 연주
 QUIT                        # shutdown 포즈 이동 후 종료
 ```
