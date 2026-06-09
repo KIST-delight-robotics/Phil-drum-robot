@@ -303,17 +303,13 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::
     const std::string& target = args[0];
 
     if (instrument_name_to_id.find(target) != instrument_name_to_id.end()) {
-        MotionPrimitive start;
-        start.type = MotionType::DRUM;
-        start.flag = PlayFlag::START;
+        MotionPrimitive start; start.type = MotionType::DRUM; start.flag = PlayFlag::START;
         sequence.push_back(start);
 
         int id = instrument_name_to_id.at(target);
         sequence.push_back(make_drum_hit(DEFAULT_HIT_TIME, id));
 
-        MotionPrimitive end;
-        end.type = MotionType::DRUM;
-        end.flag = PlayFlag::END;
+        MotionPrimitive end; end.type = MotionType::DRUM; end.flag = PlayFlag::END;
         sequence.push_back(end);
     } else {
         std::cerr << "[BehaviorPlanner] Unknown target instrument: " << target << "\n";
@@ -350,9 +346,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     double bpm = 100.0;
     double last_t = 0.0;
 
-    MotionPrimitive start;
-    start.type = MotionType::DRUM;
-    start.flag = PlayFlag::START;
+    MotionPrimitive start; start.type = MotionType::DRUM; start.flag = PlayFlag::START;
     sequence.push_back(start);
 
     std::string row;
@@ -396,12 +390,11 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     }
     inputFile.close();
 
-    MotionPrimitive end;
-    end.type = MotionType::DRUM;
-    end.flag = PlayFlag::END;
+    MotionPrimitive end; end.type = MotionType::DRUM; end.flag = PlayFlag::END;
     sequence.push_back(end);
 
     ctx.robot_state = RobotState::Playing;
+    ctx.play_abort = false;
     return sequence;
 }
 

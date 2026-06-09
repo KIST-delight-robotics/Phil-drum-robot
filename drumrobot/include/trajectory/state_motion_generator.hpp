@@ -22,6 +22,7 @@ public:
 
     StateMotionPoint reset();
     std::queue<StateMotionPoint> generate_motion(const std::vector<DrumEvent> rds, int num_point);
+    bool get_error();
 
 private:
     enum class Arm { RIGHT, LEFT };
@@ -99,4 +100,6 @@ private:
     // zero_vel_at_start == true  : q'(ta)=0 으로 결정되는 2차 (출발 속도 0)
     // zero_vel_at_start == false : q'(tb)=0 으로 결정되는 2차 (도착 속도 0)
     static double quadratic(double ta, double qa, double tb, double qb, bool zero_vel_at_start, double t);
+
+    bool state_end_error = false;
 };

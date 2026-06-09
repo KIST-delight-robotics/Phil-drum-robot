@@ -9,6 +9,7 @@
 #include <queue>
 #include <array>
 
+#include "common/app_context.hpp"
 #include "common/control_queue.hpp"
 #include "common/motion_queue.hpp"  // MotionPrimitive
 #include "common/robot_config.hpp"
@@ -18,13 +19,14 @@
 
 class TrajectoryGenerator {
 public:
-    TrajectoryGenerator(ControlQueue &controlQueueRef);
+    TrajectoryGenerator(AppContext& ctxRef, ControlQueue &controlQueueRef);
     ~TrajectoryGenerator();
 
     void initialize(const std::map<std::string, std::vector<double>>& pose);
     void generate_trajectory(const MotionPrimitive& motion);
  
 private:
+    AppContext &ctx;
     ControlQueue &control_queue;
 
     KinematicsSolver solver;

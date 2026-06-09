@@ -22,3 +22,9 @@ std::optional<MotionPrimitive> MotionQueue::try_pop() {
     queue_.pop();
     return motion;
 }
+
+void MotionQueue::clear() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::queue<MotionPrimitive> empty;
+    std::swap(queue_, empty);
+}

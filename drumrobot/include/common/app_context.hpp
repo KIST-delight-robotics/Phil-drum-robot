@@ -10,4 +10,6 @@ struct AppContext {
     std::atomic<bool> recv_active{false};           // recv_loop 활성화 신호
 
     std::atomic<RobotState> robot_state{RobotState::Standby};  // 로봇 상태
+
+    std::atomic<bool> play_abort{false};            // play 중 중단 플래그
 };

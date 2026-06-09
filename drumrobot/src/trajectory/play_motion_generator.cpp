@@ -136,7 +136,7 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
     std::queue<PedalMotionPoint> pedal_motion = pedal_motion_generator.generate_motion(rds, n);
     std::queue<StateMotionPoint> state_motion = state_motion_generator.generate_motion(rds, n);
 
-    if (base_motion_generator.get_base_end_error()) {
+    if (base_motion_generator.get_error() || state_motion_generator.get_error()) {
         std::queue<std::array<double, ROBOT::NUM_JOINT>> empty_queue;
         return empty_queue;
     }

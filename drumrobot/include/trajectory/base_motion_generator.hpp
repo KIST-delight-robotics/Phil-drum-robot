@@ -35,7 +35,7 @@ public:
 
     BaseMotionPoint reset();
     std::queue<BaseMotionPoint> generate_motion(const std::vector<DrumEvent>& rds, int num_point);
-    bool get_base_end_error();
+    bool get_error();
  
 private:
     KinematicsSolver solver;

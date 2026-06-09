@@ -1,7 +1,7 @@
 #include "trajectory/trajectory_generator.hpp"
 
-TrajectoryGenerator::TrajectoryGenerator(ControlQueue &controlQueueRef)
-    : control_queue(controlQueueRef), trajectory_log("trajectory") {
+TrajectoryGenerator::TrajectoryGenerator(AppContext& ctxRef, ControlQueue &controlQueueRef)
+    : ctx(ctxRef), control_queue(controlQueueRef), trajectory_log("trajectory") {
     
     std::vector<std::string> header = {
         "joint 0", "joint 1", "joint 2", "joint 3", "joint 4",
@@ -191,7 +191,7 @@ void TrajectoryGenerator::generate_play_start_trajectory() {
 
         update_last_q(q1);
     } else {
-        // TODO: 연주 안하기
+        ctx.play_abort = true;
     }
 }
 
@@ -227,7 +227,10 @@ void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion
     // 속도 계산을 위한 이전 관절각
     std::array<double, ROBOT::NUM_JOINT> prev_q = last_q;
 
-    // TODO: play_motion.empty() 인 경우(오류) 연주 종료하기
+    if (play_motion.empty()) {
+        ctx.play_abort = true;
+        return;
+    }
 
     while (!play_motion.empty()) {
         std::array<double, ROBOT::NUM_JOINT> q = play_motion.front();

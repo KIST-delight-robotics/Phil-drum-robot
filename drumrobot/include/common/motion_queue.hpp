@@ -51,6 +51,7 @@ public:
     void push(const MotionPrimitive& motion);
     bool empty();
     std::optional<MotionPrimitive> try_pop();
+    void clear();
 
 private:
     std::queue<MotionPrimitive> queue_;

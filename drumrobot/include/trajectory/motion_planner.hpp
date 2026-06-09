@@ -42,6 +42,7 @@ private:
 
     void parse_command(const std::string& cmd);
     void schedule_idle_motion();
+    void abort_play_motion();
 
     // ===== log =====
     Logger motion_log;

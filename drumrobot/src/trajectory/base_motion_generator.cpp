@@ -87,7 +87,7 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
     return out;
 }
 
-bool BaseMotionGenerator::get_base_end_error() {
+bool BaseMotionGenerator::get_error() {
     return base_end_error;
 }
 
@@ -210,6 +210,8 @@ void BaseMotionGenerator::note_to_target(int note_num, Arm arm, std::array<doubl
     if (it == drum_coordinates.end()) {
         std::cerr << "[BaseMotionGenerator] note_to_target: invalid note number "
                   << note_num << "\n";
+        out_position = {0.0, 0.0, 0.0};
+        out_wrist_angle_deg = 0.0;
         base_end_error = true;  // 악보 오류: 연주 종료
         return;
     }
@@ -370,7 +372,7 @@ std::pair<double, std::array<double, 2>> BaseMotionGenerator::get_waist_angle(co
         tmp_context_L = seg_L.next_context;
     }
 
-    // TODO: 에러 처리
+    base_end_error = true;  // 인덱싱 오류: 연주 종료
     std::array<double, 2> err{};
     return {0.0, err};
 }
@@ -396,7 +398,8 @@ std::pair<double, std::array<double, 2>> BaseMotionGenerator::compute_waist_rang
     double w, cost = 0.0;
 
     if (num_sol == 0) {
-        // TODO: 에러 메세지
+        // TODO: 에러 매세지
+        base_end_error = true;  // IK 오류: 연주 종료
         std::array<double, 2> err{};
         return {0.0, err};
     } else {

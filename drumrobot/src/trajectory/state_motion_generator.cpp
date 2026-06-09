@@ -25,6 +25,8 @@ StateMotionPoint StateMotionGenerator::reset() {
     point.right_wrist = w.stay;
     point.left_wrist = w.stay;
 
+    state_end_error = false;
+
     return point;
 }
 
@@ -104,6 +106,10 @@ std::queue<StateMotionPoint> StateMotionGenerator::generate_motion(const std::ve
     return out;
 }
 
+bool StateMotionGenerator::get_error() {
+    return state_end_error;
+}
+
 std::vector<StateMotionGenerator::SubLine> StateMotionGenerator::split_line(const std::vector<DrumEvent>& rds) {
     // 생성 대상은 첫 줄 (rds[0] -> rds[1]) 하나.
     // 단, 마지막 조각에서 다음 타격을 (0.5초 윈도우로) 탐색하려면
@@ -152,7 +158,10 @@ std::vector<StateMotionGenerator::SubLine> StateMotionGenerator::split_line(cons
 StateMotionGenerator::HitSegment StateMotionGenerator::get_hit_segment(const std::vector<SubLine>& sub, int idx, Arm arm) {
     HitSegment seg;
     int n = (int)sub.size();
-    // TODO: idx + 1 == n 인 경우 처리 필요 (근데 그런 경우 있을까?)
+    if (idx + 1 >= n) {
+        state_end_error = true;
+        return seg;   // 인덱싱 오류
+    }
 
     const MotionContext& ctx = (arm == Arm::RIGHT) ? right_context : left_context;
     auto vel_of  = [&](int i) { return (arm == Arm::RIGHT) ? sub[i].vel_R  : sub[i].vel_L;  };

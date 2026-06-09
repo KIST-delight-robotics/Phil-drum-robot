@@ -2,7 +2,7 @@
 
 MotionPlanner::MotionPlanner(AppContext &ctxRef, CommandQueue &commandQueueRef, ControlQueue &controlQueueRef, MotionQueue &motionQueueRef, Robot &robotRef)
     : ctx(ctxRef), command_queue(commandQueueRef), control_queue(controlQueueRef), motion_queue(motionQueueRef), robot(robotRef),
-    behavior_planner(ctxRef, robotRef), trajectory_generator(control_queue), motion_log("motion_command") {}
+    behavior_planner(ctxRef, robotRef), trajectory_generator(ctxRef, control_queue), motion_log("motion_command") {}
 
 MotionPlanner::~MotionPlanner() {}
 
@@ -24,6 +24,7 @@ void MotionPlanner::run() {
                 trajectory_generator.generate_trajectory(*motion);
                 if (!ctx.recv_active.load()) ctx.recv_active = true;
                 if (!ctx.send_active.load()) ctx.send_active = true;
+                if (ctx.robot_state == RobotState::Playing && ctx.play_abort.load()) abort_play_motion();
 
                 record_motion(*motion);
             }
@@ -103,6 +104,15 @@ void MotionPlanner::schedule_idle_motion() {
 
         record_motion(idle_motion);
     }
+}
+
+void MotionPlanner::abort_play_motion() {
+    motion_queue.clear();     // 남은 PLAYING 전부 폐기
+    MotionPrimitive end; end.type = MotionType::DRUM; end.flag = PlayFlag::END;
+    motion_queue.push(end);   // END(home 복귀)만 남김
+
+    std::cerr << "[MotionPlanner] 연주가 비정상 종료됩니다.\n";
+    ctx.robot_state = RobotState::Idle;
 }
 
 // ===== log =====
