@@ -371,7 +371,8 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
         }
 
         if (items[0] == "bpm") {
-            bpm = stod(items[1]);
+            if (items.size() < 2) continue;
+            try { bpm = std::stod(items[1]); } catch (...) { continue; }
         } else if (items[0] == "end") {
             while (start_idx < end_idx) {
                 sequence.push_back(make_drum_play(std::vector<DrumEvent>(rds.begin() + start_idx, rds.end()))); // rds.end() == rds.begin() + end_idx + 1
