@@ -26,7 +26,7 @@ void TrajectoryGenerator::initialize(const std::map<std::string, std::vector<dou
 void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
     switch (motion.type) {
     case MotionType::STANDBY:
-        generate_idle_trajectory(); // 키 제거하기 전 현재 위치 유지
+        generate_standby_trajectory();  // 키 제거하기 전 현재 위치 유지
         break;
     case MotionType::TRANSLATE:
         if (motion.space == TrajectorySpace::JOINT) {
@@ -128,7 +128,7 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
         double theta0 = q[0];
         double theta7 = q[7];
         double theta8 = q[8];
-        KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8);
+        KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8, true);
 
         if (!result.success) {
             std::cerr << "[TrajectoryGenerator] Failed to solve inverse kinematics\n";
@@ -492,7 +492,7 @@ void TrajectoryGenerator::update_last_q(const std::vector<double>& p, const std:
     double theta0 = q[0];
     double theta7 = q[7];
     double theta8 = q[8];
-    KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8);
+    KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8, true);
 
     if (!result.success) {
         std::cerr << "[TrajectoryGenerator] Failed to solve inverse kinematics\n";

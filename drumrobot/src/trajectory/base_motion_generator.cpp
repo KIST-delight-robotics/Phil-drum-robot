@@ -386,7 +386,7 @@ std::pair<double, std::array<double, 2>> BaseMotionGenerator::compute_waist_rang
     for (int i = 0; i < 1801; i++) {
         double the0 = -0.5 * M_PI + M_PI / 1800.0 * i;  // 범위 : -90deg ~ 90deg
 
-        KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, the0, the7, the8);
+        KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, the0, the7, the8, false);
 
         if (result.success) {
             q_vec.push_back(result.q);

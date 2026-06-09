@@ -86,7 +86,7 @@ std::array<double, ROBOT::NUM_JOINT> PlayMotionGenerator::reset() {
     double theta0 = b.waist;
     double theta7 = b.right_wrist;
     double theta8 = b.left_wrist;
-    KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8);
+    KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8, true);
 
     if (!result.success) {
         std::cerr << "[PlayMotionGenerator] RESET: Failed to solve inverse kinematics\n";
@@ -149,7 +149,7 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
         double theta0 = b.waist;
         double theta7 = b.right_wrist;
         double theta8 = b.left_wrist;
-        KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8);
+        KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8, true);
 
         if (!result.success) {
             // std::cerr << "[PlayMotionGenerator] PLAY: Failed to solve inverse kinematics\n";
