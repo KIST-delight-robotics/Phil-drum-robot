@@ -24,7 +24,7 @@ void MotionPlanner::run() {
                 trajectory_generator.generate_trajectory(*motion);
                 if (!ctx.recv_active.load()) ctx.recv_active = true;
                 if (!ctx.send_active.load()) ctx.send_active = true;
-                if (ctx.robot_state == RobotState::Playing && ctx.play_abort.load()) abort_play_motion();
+                if (ctx.play_abort.load()) abort_play_motion();
 
                 record_motion(*motion);
             }
@@ -111,6 +111,7 @@ void MotionPlanner::abort_play_motion() {
     MotionPrimitive end; end.type = MotionType::DRUM; end.flag = PlayFlag::END;
     motion_queue.push(end);   // END(home 복귀)만 남김
 
+    ctx.play_abort = false;
     std::cerr << "[MotionPlanner] 연주가 비정상 종료됩니다.\n";
     ctx.robot_state = RobotState::Idle;
 }

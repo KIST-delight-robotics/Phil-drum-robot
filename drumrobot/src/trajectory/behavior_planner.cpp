@@ -394,7 +394,6 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     sequence.push_back(end);
 
     ctx.robot_state = RobotState::Playing;
-    ctx.play_abort = false;
     return sequence;
 }
 
