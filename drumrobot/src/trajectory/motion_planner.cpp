@@ -74,14 +74,35 @@ void MotionPlanner::parse_command(const std::string& cmd) {
 }
 
 void MotionPlanner::schedule_idle_motion() {
-    if (ctx.robot_state.load() == RobotState::ShuttingDown) return; // 종료 상태가 되면 추가 명령 안받음
+    if (ctx.robot_state.load() == RobotState::ShuttingDown) {
+        return; // 종료 상태가 되면 추가 명령 안받음
+    } else if (ctx.robot_state.load() == RobotState::Init) {
+        // 키 제거하기 전 현재 위치 유지
+        MotionPrimitive standby_motion;
 
-    MotionPrimitive idle_motion;
+        standby_motion.type = MotionType::STANDBY;
+        motion_queue.push(standby_motion);
 
-    idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능
-    motion_queue.push(idle_motion);
+        record_motion(standby_motion);
+    } else if (ctx.robot_state.load() == RobotState::Idle) {
+        // 대기 동작
+        MotionPrimitive idle_motion;
 
-    record_motion(idle_motion);
+        idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능
+        motion_queue.push(idle_motion);
+
+        record_motion(idle_motion);
+    } else if (ctx.robot_state.load() == RobotState::Playing) {
+        // 연주 종료
+        std::cerr << "[MotionPlanner] 연주를 마쳤습니다.\n";
+        ctx.robot_state = RobotState::Idle;
+        MotionPrimitive idle_motion;
+
+        idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능
+        motion_queue.push(idle_motion);
+
+        record_motion(idle_motion);
+    }
 }
 
 // ===== log =====
@@ -96,6 +117,7 @@ void MotionPlanner::record_motion(const MotionPrimitive& motion) {
     if (motion.type == MotionType::IDLE) log.push_back("idle");
     else if (motion.type == MotionType::TRANSLATE) log.push_back("translate");
     else if (motion.type == MotionType::DRUM) log.push_back("drum");
+    else if (motion.type == MotionType::STANDBY) log.push_back("standby");
 
     // TODO: 모션 로그 더 구체적으로 작성하기
 

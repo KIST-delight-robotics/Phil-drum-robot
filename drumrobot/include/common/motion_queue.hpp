@@ -4,7 +4,7 @@
 #include <mutex>
 #include <optional>
 
-enum class MotionType { TRANSLATE, DRUM, IDLE };
+enum class MotionType { STANDBY, TRANSLATE, DRUM, IDLE };
 enum class TrajectorySpace { JOINT, TASK };
 enum class TrajectoryProfile { TRAPEZOIDAL, CUBIC, QUINTIC, COSINE };
 
@@ -23,6 +23,9 @@ struct DrumEvent {
 
 struct MotionPrimitive {
     MotionType type = MotionType::TRANSLATE;
+
+    // STANDBY
+    // 키 제거하기 전 현재 위치 유지
 
     // TRANSLATE용
     TrajectorySpace space = TrajectorySpace::JOINT;

@@ -40,6 +40,7 @@ private:
     ControlMode wrist_control_mode = ControlMode::CSP;
     ControlMode pedal_control_mode = ControlMode::CSP;
     
+    void generate_standby_trajectory();
     void generate_joint_space_trajectory(const MotionPrimitive& motion);
     void generate_task_space_trajectory(const MotionPrimitive& motion);
     void generate_play_start_trajectory();

@@ -25,6 +25,9 @@ void TrajectoryGenerator::initialize(const std::map<std::string, std::vector<dou
 
 void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
     switch (motion.type) {
+    case MotionType::STANDBY:
+        generate_idle_trajectory(); // 키 제거하기 전 현재 위치 유지
+        break;
     case MotionType::TRANSLATE:
         if (motion.space == TrajectorySpace::JOINT) {
             generate_joint_space_trajectory(motion);
@@ -49,6 +52,27 @@ void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
     default:
         std::cerr << "[TrajectoryGenerator] Unknown motion type\n";
         break;
+    }
+}
+
+void TrajectoryGenerator::generate_standby_trajectory() {
+    std::array<ControlMode, ROBOT::NUM_JOINT> modes = get_modes();
+    double t_total = 1.0;
+    int num_point = static_cast<int>(t_total / ROBOT::DT_SECOND);
+
+    std::vector<double> q0(last_q.begin(), last_q.end());
+    std::vector<double> q1(last_q.begin(), last_q.end());
+
+    for (int k = 1; k <= num_point; k++) {
+        auto [q, qd] = sample_cosine(q0, q1, num_point, k);
+
+        ControlSetPoint set_point;
+        std::copy(q.begin(),  q.end(),  set_point.q.begin());
+        std::copy(qd.begin(), qd.end(), set_point.qd.begin());
+        set_point.mode = modes;
+        control_queue.push(set_point);
+
+        trajectory_log.record(set_point.q);
     }
 }
 
