@@ -122,6 +122,15 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
         return q_queue;
     }
 
+    // std::cout << "===== rds =====\n";
+    // for (int i = 0; i < (int)rds.size(); i++) {
+    //     std::cout << "[" << i << "] t: " << rds[i].t
+    //               << "  note_R: " << rds[i].note_num_R
+    //               << "  note_L: " << rds[i].note_num_L
+    //               << "  vel_R: " << rds[i].velocity_R
+    //               << "  vel_L: " << rds[i].velocity_L << "\n";
+    // }
+
     int n = get_num_point(rds[0].t, rds[1].t);
 
     std::queue<BaseMotionPoint> base_motion = base_motion_generator.generate_motion(rds, n);

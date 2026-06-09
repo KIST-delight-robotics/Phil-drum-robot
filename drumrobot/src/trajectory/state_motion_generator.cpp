@@ -46,6 +46,13 @@ std::queue<StateMotionPoint> StateMotionGenerator::generate_motion(const std::ve
     int samples = static_cast<int>(round(rds[1].beat / BEAT_STEP));
     HitSegment seg_R, seg_L;
 
+    // std::cout << "[StateMotion] samples=" << samples << "\n";
+    // for (int i = 0; i < (int)sub.size(); i++) {
+    //     std::cout << "[" << i << "] t: " << sub[i].t
+    //               << "  vel_R: " << sub[i].vel_R
+    //               << "  vel_L: " << sub[i].vel_L << "\n";
+    // }
+
     for (int i = 0; i < num_point; i++) {
         if (i >= sub_line*num_point/samples) {
             seg_R = get_hit_segment(sub, sub_line, Arm::RIGHT);
@@ -53,6 +60,28 @@ std::queue<StateMotionPoint> StateMotionGenerator::generate_motion(const std::ve
 
             right_context = seg_R.next_context;
             left_context = seg_L.next_context;
+
+            // auto state_str = [](State s) -> const char* {
+            //     switch (s) {
+            //         case State::REST_TO_REST: return "REST_TO_REST";
+            //         case State::HIT_TO_REST:  return "HIT_TO_REST";
+            //         case State::REST_TO_HIT:  return "REST_TO_HIT";
+            //         case State::HIT_TO_HIT:   return "HIT_TO_HIT";
+            //         default:                  return "UNKNOWN";
+            //     }
+            // };
+
+            // std::cout << "[StateMotion] sub_line=" << sub_line
+            //           << "  i=" << i
+            //           << "\n  R: state=" << state_str(seg_R.state)
+            //           << " intensity=" << seg_R.intensity
+            //           << " start=" << seg_R.start_time
+            //           << " end=" << seg_R.end_time
+            //           << "\n  L: state=" << state_str(seg_L.state)
+            //           << " intensity=" << seg_L.intensity
+            //           << " start=" << seg_L.start_time
+            //           << " end=" << seg_L.end_time
+            //           << "\n";
 
             sub_line++;
         }
@@ -92,11 +121,11 @@ std::vector<StateMotionGenerator::SubLine> StateMotionGenerator::split_line(cons
 
     // rds[1..] 각 줄을 0.05초 단위로 쪼갬
     for (int line = 1; line < rds_size; line++) {
-        double line_time = rds[line].t - rds[line - 1].t;
-        int steps = (int)round(line_time / BEAT_STEP);
+        int steps = (int)round(rds[line].beat / BEAT_STEP);
         if (steps < 1) {
             steps = 1;
         }
+        double line_time = rds[line].t - rds[line - 1].t;
         double step_dt = line_time / steps;
 
         for (int s = 0; s < steps; s++) {

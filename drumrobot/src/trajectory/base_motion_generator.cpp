@@ -49,15 +49,6 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
     right_context = seg_R.next_context; // context update
     left_context = seg_L.next_context;
 
-    // std::cout << "===== rds =====\n";
-    // for (int i = 0; i < (int)rds.size(); i++) {
-    //     std::cout << "[" << i << "] t: " << rds[i].t
-    //               << "  note_R: " << rds[i].note_num_R
-    //               << "  note_L: " << rds[i].note_num_L
-    //               << "  vel_R: " << rds[i].velocity_R
-    //               << "  vel_L: " << rds[i].velocity_L << "\n";
-    // }
-
     // std::cout << "===== R =====\n";
     // std::cout << "start_time: " << seg_R.start_time << "\n";
     // std::cout << "end_time: " << seg_R.end_time << "\n";
