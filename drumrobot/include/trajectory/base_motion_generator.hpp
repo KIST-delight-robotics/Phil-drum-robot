@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <cmath>
+#include <utility>
 
 #include "nlohmann/json.hpp"
 
@@ -63,6 +64,12 @@ private:
         MotionContext next_context;                   // 이전 시간, 이전 악기, 상태
     };
 
+    struct WaistSegment {
+        double t0, t1;      // 시간
+        double q0, q1;      // 위치
+        double v0, v1;      // 속도
+    };
+
     MotionContext right_context;
     MotionContext left_context;
 
@@ -70,6 +77,17 @@ private:
     void note_to_target(int note_num, Arm arm, std::array<double, 3>& out_position, double& out_wrist_angle_deg);
     double time_scaling(double ti, double tf, double t);
     std::array<double, 3> make_path(const std::array<double, 3>& pi, const std::array<double, 3>& pf, double s);
+
+    double prev_waist_angle;    // TODO: 초기화 필요
+    double cur_waist_angle;
+    double cur_q0_min, cur_q0_max;
+    double prev_t;
+
+    BaseMotionGenerator::WaistSegment get_waist_segment(const std::vector<DrumEvent>& rds);
+    std::pair<double, std::array<double, 2>> get_waist_angle(const std::vector<DrumEvent>& rds, int idx);
+    std::pair<double, std::array<double, 2>> compute_waist_range(std::array<double, 3> pR, std::array<double, 3> pL, double the7, double the8);
+    std::array<double, 2> compute_slopes(const std::array<double, 4> &q, const std::array<double, 4> &t);
+    double cubic_hermite(double ta, double qa, double va, double tb, double qb, double vb, double t);
 
     // ===== 로그 =====
     Logger log;

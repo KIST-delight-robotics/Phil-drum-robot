@@ -23,7 +23,14 @@ BaseMotionPoint BaseMotionGenerator::reset() {
     note_to_target(1, Arm::RIGHT, point.right_position, point.right_wrist); // 스네어
     note_to_target(1, Arm::LEFT, point.left_position, point.left_wrist);
 
-    point.waist = 0.0;  // TODO: 임시 허리각
+    auto [opt, range] = compute_waist_range(point.right_position, point.left_position, point.right_wrist, point.left_wrist);
+    point.waist = opt;
+
+    prev_waist_angle = opt;
+    cur_waist_angle = opt;
+    prev_t = -1.0;
+    cur_q0_min = range[0];
+    cur_q0_max = range[1];
 
     return point;
 }
@@ -37,6 +44,8 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
 
     MotionSegment seg_R = get_motion_segment(rds, Arm::RIGHT);
     MotionSegment seg_L = get_motion_segment(rds, Arm::LEFT);
+
+    WaistSegment seg_w = get_waist_segment(rds);
 
     right_context = seg_R.next_context; // context update
     left_context = seg_L.next_context;
@@ -54,13 +63,13 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
     // std::cout << "start_time: " << seg_R.start_time << "\n";
     // std::cout << "end_time: " << seg_R.end_time << "\n";
     // std::cout << "t0: " << seg_R.t0 << "\n";
-    // std::cout << "t0: " << seg_R.t1 << "\n";
+    // std::cout << "t1: " << seg_R.t1 << "\n";
 
     // std::cout << "===== L =====\n";
     // std::cout << "start_time: " << seg_L.start_time << "\n";
     // std::cout << "end_time: " << seg_L.end_time << "\n";
     // std::cout << "t0: " << seg_L.t0 << "\n";
-    // std::cout << "t0: " << seg_L.t1 << "\n";
+    // std::cout << "t1: " << seg_L.t1 << "\n";
 
     for (int i = 0; i < num_point; i++) {
         BaseMotionPoint point;
@@ -77,7 +86,8 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
         point.right_wrist = s_R * (seg_R.end_wrist_angle - seg_R.start_wrist_angle) + seg_R.start_wrist_angle;
         point.left_wrist = s_L * (seg_L.end_wrist_angle - seg_L.start_wrist_angle) + seg_L.start_wrist_angle;
 
-        point.waist = 0.0;  // TODO: 임시 허리각
+        double t_w = i * ROBOT::DT_SECOND + seg_w.t0;
+        point.waist = cubic_hermite(seg_w.t0, seg_w.q0, seg_w.v0, seg_w.t1, seg_w.q1, seg_w.v1, t_w);
 
         out.push(point);
 
@@ -263,4 +273,179 @@ std::array<double, 3> BaseMotionGenerator::make_path(const std::array<double, 3>
     }
 
     return ps;
+}
+
+BaseMotionGenerator::WaistSegment BaseMotionGenerator::get_waist_segment(const std::vector<DrumEvent>& rds) {
+    std::array<double, 4> t_03{};
+    std::array<double, 4> q0_opt{};
+    std::array<double, 4> q0_min{};
+    std::array<double, 4> q0_max{};
+
+    t_03[0] = rds[0].t;
+    q0_opt[0] = cur_waist_angle;
+    q0_min[0] = cur_q0_min;
+    q0_max[0] = cur_q0_max;
+
+    for (int i = 1; i < 4; i++) {
+        if ((int)rds.size() > i) {
+            t_03[i] = rds[i].t;
+            auto [opt, range] = get_waist_angle(rds, i);
+            q0_opt[i] = opt;
+            q0_min[i] = range[0];
+            q0_max[i] = range[1];
+        } else {
+            t_03[i] = t_03[i - 1] + 1.0;
+            q0_opt[i] = q0_opt[i - 1];
+            q0_min[i] = q0_min[i - 1];
+            q0_max[i] = q0_max[i - 1];
+        }
+    }
+
+    // 기울기 평균 이동: t0 -> t1
+    std::array<double, 3> a0{};
+    for (int i = 0; i < 3; i++) {
+        a0[i] = (q0_opt[i + 1] - q0_opt[0]) / (t_03[i + 1] - t_03[0]);
+    }
+    double avg_a0 = (a0[0] + a0[1] + a0[2]) / 3.0;
+    double next_waist_angle = avg_a0 * (t_03[1] - t_03[0]);
+
+    if (next_waist_angle <= q0_min[1] || next_waist_angle >= q0_max[1]) {
+        next_waist_angle = (q0_min[1] + q0_max[1]) / 2.0;
+    }
+
+    // 기울기 평균 이동: t1 -> t2
+    std::array<double, 2> a1{};
+    for (int i = 0; i < 2; i++) {
+        a1[i] = (q0_opt[i + 2] - q0_opt[1]) / (t_03[i + 2] - t_03[1]);
+    }
+    double avg_a1 = (a1[0] + a1[1]) / 2.0;
+    double next_next_waist_angle = avg_a1 * (t_03[2] - t_03[1]);
+
+    if (next_next_waist_angle <= q0_min[2] || next_next_waist_angle >= q0_max[2]) {
+        next_next_waist_angle = (q0_min[2] + q0_max[2]) / 2.0;
+    }
+
+    // 기울기 계산
+    std::array<double, 4> q = {prev_waist_angle, cur_waist_angle, next_waist_angle, next_next_waist_angle};
+    std::array<double, 4> t = {prev_t, t_03[0], t_03[1], t_03[2]};
+
+    std::array<double, 2> m = compute_slopes(q, t);
+
+    // 반환
+    WaistSegment seg;
+
+    seg.t0 = t_03[0];
+    seg.t1 = t_03[1];
+    
+    seg.q0 = cur_waist_angle;
+    seg.q1 = next_waist_angle;
+
+    seg.v0 = m[0];
+    seg.v1 = m[1];
+
+    prev_t = t_03[0];
+    prev_waist_angle = cur_waist_angle;
+    cur_waist_angle = next_waist_angle;
+    cur_q0_min = q0_min[1];
+    cur_q0_max = q0_max[1];
+
+    return seg;
+}
+
+std::pair<double, std::array<double, 2>> BaseMotionGenerator::get_waist_angle(const std::vector<DrumEvent>& rds, int idx) {
+    // idx 번째 허리 최적값, 범위 구하기
+}
+
+std::pair<double, std::array<double, 2>> BaseMotionGenerator::compute_waist_range(std::array<double, 3> pR, std::array<double, 3> pL, double the7, double the8) {
+    std::vector<std::array<double, 9>> q_vec;
+    int num_sol = 0;
+
+    for (int i = 0; i < 1801; i++) {
+        double the0 = -0.5 * M_PI + M_PI / 1800.0 * i;  // 범위 : -90deg ~ 90deg
+
+        KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, the0, the7, the8);
+
+        if (result.success) {
+            q_vec.push_back(result.q);
+            num_sol++;
+        }
+    }
+
+    double w0 = 2.0, w1 = 1.0;
+    double min_cost = w0 + w1;
+    int min_idx = 0;
+    double w, cost = 0.0;
+
+    if (num_sol == 0) {
+        // TODO: 에러 메세지
+        // return
+    } else {
+        std::array<double, 2> range = {q_vec[0][0], q_vec[num_sol - 1][0]};
+        w = 2.0 * M_PI / std::abs(range[1] - range[0]);
+
+        for (int i = 0; i < num_sol; i++) {
+            // 양 팔의 관절각 합이 180도에 가까운 값 선택 + solution set 중 가운데 값 선택
+            cost = w0 * cos(q_vec[i][1] + q_vec[i][2]) + w1 * cos(w * std::abs(q_vec[i][0] - range[0]));
+
+            if (cost < min_cost) {
+                min_cost = cost;
+                min_idx = i;
+            }
+        }
+
+        return {q_vec[min_idx][0], range};
+    }
+}
+
+std::array<double, 2> BaseMotionGenerator::compute_slopes(const std::array<double, 4> &q, const std::array<double, 4> &t) {
+    // Monotone Cubic Interpolation 을 위한 기울기 계산
+    std::array<double, 2> m{};
+    std::array<double, 3> a{};
+
+    for (int i = 0; i < 3; i++) {
+        a[i] = (q[i + 1] - q[i]) / (t[i + 1] - t[i]);
+    }
+    double m1 = 0.5 * (a[0] + a[1]);
+    double m2 = 0.5 * (a[1] + a[2]);
+
+    double alph, bet;
+    if (q[1] == q[2]) {
+        m1 = 0;
+        m2 = 0;
+    } else {
+        if((q[0] == q[1]) || (a[0] * a[1] < 0)){
+            m1 = 0;
+        } else if((q[2] == q[3]) || (a[1] * a[2] < 0)){
+            m2 = 0;
+        }
+        alph = m1 / (q[2] - q[1]);
+        bet = m2 / (q[2] - q[1]);
+
+        double e = std::sqrt(std::pow(alph, 2) + std::pow(bet, 2));
+        if (e > 3.0) {
+            m1 = (3 * m1) / e;
+            m2 = (3 * m2) / e;
+        }
+    }
+    
+    m[0] = m1;
+    m[1] = m2;
+    
+    return m;
+}
+
+double BaseMotionGenerator::cubic_hermite(double ta, double qa, double va, double tb, double qb, double vb, double t) {
+    // [ta,tb] 구간을 q(ta)=qa, q'(ta)=va, q(tb)=qb, q'(tb)=vb 로 보간하는 3차 다항식.
+    double T = tb - ta;
+    if (T == 0.0) {
+        return qa;
+    }
+    double tau = (t - ta) / T;      // 0 ~ 1
+
+    double h00 =  2.0*tau*tau*tau - 3.0*tau*tau + 1.0;
+    double h10 =      tau*tau*tau - 2.0*tau*tau + tau;
+    double h01 = -2.0*tau*tau*tau + 3.0*tau*tau;
+    double h11 =      tau*tau*tau -     tau*tau;
+
+    return h00*qa + h10*T*va + h01*qb + h11*T*vb;
 }
