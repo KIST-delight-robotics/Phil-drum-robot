@@ -31,6 +31,8 @@ BaseMotionPoint BaseMotionGenerator::reset() {
     cur_q0_min = range[0];
     cur_q0_max = range[1];
 
+    base_end_error = false;
+
     return point;
 }
 
@@ -83,6 +85,10 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
     }
 
     return out;
+}
+
+bool BaseMotionGenerator::get_base_end_error() {
+    return base_end_error;
 }
 
 BaseMotionGenerator::MotionSegment BaseMotionGenerator::get_motion_segment(const std::vector<DrumEvent>& rds, Arm arm, const MotionContext& context) {
@@ -204,7 +210,7 @@ void BaseMotionGenerator::note_to_target(int note_num, Arm arm, std::array<doubl
     if (it == drum_coordinates.end()) {
         std::cerr << "[BaseMotionGenerator] note_to_target: invalid note number "
                   << note_num << "\n";
-        // TODO: 실패 처리
+        base_end_error = true;  // 악보 오류: 연주 종료
         return;
     }
     const InstrumentCoordinate& coord = it->second;

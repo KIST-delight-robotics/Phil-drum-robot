@@ -75,7 +75,7 @@ void PlayMotionGenerator::initialize() {
     head_motion_generator.initialize(drum_coordinates);
 }
 
-std::array<double, ROBOT::NUM_JOINT> PlayMotionGenerator::reset() {
+bool PlayMotionGenerator::reset(std::array<double, ROBOT::NUM_JOINT>& q) {
     BaseMotionPoint b = base_motion_generator.reset();
     HeadMotionPoint h = head_motion_generator.reset();
     PedalMotionPoint p = pedal_motion_generator.reset();
@@ -90,10 +90,8 @@ std::array<double, ROBOT::NUM_JOINT> PlayMotionGenerator::reset() {
 
     if (!result.success) {
         std::cerr << "[PlayMotionGenerator] RESET: Failed to solve inverse kinematics\n";
-        // TODO: 에러 처리 필요
+        return false;
     }
-
-    std::array<double, ROBOT::NUM_JOINT> q;
 
     for (int i = 0; i < 9; i++) {
         q[i] = result.q[i];   // 관절 0~8 (팔)
@@ -111,15 +109,14 @@ std::array<double, ROBOT::NUM_JOINT> PlayMotionGenerator::reset() {
     q[11] = h.yaw - q[0];
     q[12] = h.pitch;
 
-    return q;
+    return true;
 }
 
 std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds) {    
-    std::queue<std::array<double, ROBOT::NUM_JOINT>> q_queue;
-
     if (rds.size() < 2) {
         std::cerr << "[PlayMotionGenerator] TODO: 에러 메세지 작성해야 함\n";
-        return q_queue;
+        std::queue<std::array<double, ROBOT::NUM_JOINT>> empty_queue;
+        return empty_queue;
     }
 
     // std::cout << "===== rds =====\n";
@@ -131,12 +128,18 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
     //               << "  vel_L: " << rds[i].velocity_L << "\n";
     // }
 
+    std::queue<std::array<double, ROBOT::NUM_JOINT>> q_queue;
     int n = get_num_point(rds[0].t, rds[1].t);
 
     std::queue<BaseMotionPoint> base_motion = base_motion_generator.generate_motion(rds, n);
     std::queue<HeadMotionPoint> head_motion = head_motion_generator.generate_motion(rds, n);
     std::queue<PedalMotionPoint> pedal_motion = pedal_motion_generator.generate_motion(rds, n);
     std::queue<StateMotionPoint> state_motion = state_motion_generator.generate_motion(rds, n);
+
+    if (base_motion_generator.get_base_end_error()) {
+        std::queue<std::array<double, ROBOT::NUM_JOINT>> empty_queue;
+        return empty_queue;
+    }
 
     for (int i = 0; i < n; i++) {
         std::array<double, ROBOT::NUM_JOINT> q;
@@ -161,8 +164,9 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
         KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8, true);
 
         if (!result.success) {
-            // std::cerr << "[PlayMotionGenerator] PLAY: Failed to solve inverse kinematics\n";
-            // return q_queue; // TODO: 진행중인 동작을 멈춰야 함. 이렇게 중간에 끊고 다음거 이어서 만들면 계단 입력 나옴
+            std::cerr << "[PlayMotionGenerator] PLAY: Failed to solve inverse kinematics\n";
+            std::queue<std::array<double, ROBOT::NUM_JOINT>> empty_queue;
+            return empty_queue;
         }
 
         for (int i = 0; i < 9; i++) {

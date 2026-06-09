@@ -119,6 +119,8 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
     std::array<double, 9> prev_q;
     std::copy(last_q.begin(), last_q.begin() + 9, prev_q.begin());
 
+    std::queue<ControlSetPoint> buffer;
+
     for (int k = 1; k <= num_point; k++) {
         auto [q, qd] = sample(q0, q1, num_point, k, motion.profile);
         auto [p, pd] = sample(p0, p1, num_point, k, motion.profile);
@@ -132,7 +134,7 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
 
         if (!result.success) {
             std::cerr << "[TrajectoryGenerator] Failed to solve inverse kinematics\n";
-            return; // TODO: 부분 궤적만 남는 부분 처리
+            return;
         }
 
         // 13차원 set_point 구성: IK 결과(0~8) + 관절 보간값(9~12)
@@ -146,11 +148,18 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
             set_point.qd[i] = qd[i]; 
         }
         set_point.mode = modes;
-        control_queue.push(set_point);
+        buffer.push(set_point);
 
         prev_q = result.q;
+    }
 
-        trajectory_log.record(set_point.q);
+    // IK 오류가 없으면 적재
+    while (!buffer.empty()) {
+        ControlSetPoint sp = buffer.front();
+        buffer.pop();
+        control_queue.push(sp);
+
+        trajectory_log.record(sp.q);
     }
 
     update_last_q(p1, q1);
@@ -163,23 +172,27 @@ void TrajectoryGenerator::generate_play_start_trajectory() {
     double t_total = 4.0;
     int num_point = static_cast<int>(t_total / ROBOT::DT_SECOND);
 
-    std::vector<double> q0(last_q.begin(), last_q.end());
-    std::array<double, ROBOT::NUM_JOINT> q_target = play_motion_generator.reset();
-    std::vector<double> q1(q_target.begin(), q_target.end());
+    std::array<double, ROBOT::NUM_JOINT> q_target;
+    if (play_motion_generator.reset(q_target)) {
+        std::vector<double> q0(last_q.begin(), last_q.end());
+        std::vector<double> q1(q_target.begin(), q_target.end());
 
-    for (int k = 1; k <= num_point; k++) {
-        auto [q, qd] = sample(q0, q1, num_point, k, TrajectoryProfile::COSINE);
+        for (int k = 1; k <= num_point; k++) {
+            auto [q, qd] = sample(q0, q1, num_point, k, TrajectoryProfile::COSINE);
 
-        ControlSetPoint set_point;
-        std::copy(q.begin(),  q.end(),  set_point.q.begin());
-        std::copy(qd.begin(), qd.end(), set_point.qd.begin());
-        set_point.mode = modes;
-        control_queue.push(set_point);
+            ControlSetPoint set_point;
+            std::copy(q.begin(),  q.end(),  set_point.q.begin());
+            std::copy(qd.begin(), qd.end(), set_point.qd.begin());
+            set_point.mode = modes;
+            control_queue.push(set_point);
 
-        trajectory_log.record(set_point.q);
+            trajectory_log.record(set_point.q);
+        }
+
+        update_last_q(q1);
+    } else {
+        // TODO: 연주 안하기
     }
-
-    update_last_q(q1);
 }
 
 void TrajectoryGenerator::generate_play_end_trajectory() {
@@ -213,6 +226,8 @@ void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion
 
     // 속도 계산을 위한 이전 관절각
     std::array<double, ROBOT::NUM_JOINT> prev_q = last_q;
+
+    // TODO: play_motion.empty() 인 경우(오류) 연주 종료하기
 
     while (!play_motion.empty()) {
         std::array<double, ROBOT::NUM_JOINT> q = play_motion.front();

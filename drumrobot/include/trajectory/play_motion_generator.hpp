@@ -20,7 +20,7 @@ public:
     ~PlayMotionGenerator();
 
     void initialize();
-    std::array<double, ROBOT::NUM_JOINT> reset();
+    bool reset(std::array<double, ROBOT::NUM_JOINT>& q);
 
     std::queue<std::array<double, ROBOT::NUM_JOINT>> generate_motion(const std::vector<DrumEvent>& rds);
 
