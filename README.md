@@ -287,7 +287,7 @@ QUIT                        # shutdown 포즈 이동 후 종료
 
 | 포즈 이름 | 설명 |
 |---|---|
-| `init`     | `motors.json`의 `initial_joint_angle`과 일치하는 초기 자세 |
+| `init`     | 초기 자세. TMotor / Maxon(관절 0~10)은 `motors.json`의 `initial_joint_angle`과 일치 |
 | `home`     | 연주 대기 자세 (`START` 시 이동, 고정 키 위치) |
 | `ready`    | 준비 자세 |
 | `shutdown` | 종료 전 안전 자세 |
