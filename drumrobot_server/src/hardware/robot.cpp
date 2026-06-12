@@ -484,7 +484,7 @@ void Robot::init_dynamixel() {
 }
 
 void Robot::set_dxl_latency(const std::string &dev_path, int latency_ms) {
-    // latency_timer 값 바꿔주기    // TODO: 잘 바뀌는지 확인 필요
+    // latency_timer 값 바꿔주기
     auto pos = dev_path.find_last_of('/');
     std::string dev = (pos == std::string::npos) ? dev_path : dev_path.substr(pos + 1);
 
