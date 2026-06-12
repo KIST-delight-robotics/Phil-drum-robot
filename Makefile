@@ -1,9 +1,9 @@
 all:
-	$(MAKE) -C drumrobot
+	$(MAKE) -C drumrobot_server
 
 clean:
-	$(MAKE) -C drumrobot clean
+	$(MAKE) -C drumrobot_server clean
 
 run:
-	$(MAKE) -C drumrobot
-	sudo ./drumrobot/bin/main.out
+	$(MAKE) -C drumrobot_server
+	sudo ./drumrobot_server/bin/main.out
