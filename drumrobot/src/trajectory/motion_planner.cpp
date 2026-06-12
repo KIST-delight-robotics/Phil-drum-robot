@@ -12,7 +12,7 @@ void MotionPlanner::run() {
     while (ctx.running.load()) {
         if (auto cmd = command_queue.try_pop()) {
             // 명령이 있으면 파싱해서 motion_queue에 적재
-            parse_command(*cmd);
+            // generate_motions(*cmd);
         } else if (ctx.send_active.load() && motion_queue.empty()) {
             // send_active 이 후 motion_queue가 없으면 대기 모션
             schedule_idle_motion();
@@ -59,12 +59,10 @@ void MotionPlanner::initialize() {
     trajectory_generator.initialize(behavior_planner.poses);
 }
 
-void MotionPlanner::parse_command(const std::string& cmd) {
+void MotionPlanner::generate_motions(const ParsedCommand& cmd) {
     if (ctx.robot_state.load() == RobotState::ShuttingDown) return; // 종료 상태가 되면 추가 명령 안받음
 
-    ParsedCommand parsed = command_parser.parse(cmd);
-
-    std::vector<MotionPrimitive> motion_sequence = behavior_planner.generate_motion_sequence(parsed);
+    std::vector<MotionPrimitive> motion_sequence = behavior_planner.generate_motion_sequence(cmd);
 
     int n = motion_sequence.size();
     for (int i = 0; i < n; i++) {
@@ -116,8 +114,10 @@ void MotionPlanner::abort_play_motion() {
 }
 
 // ===== log =====
-void MotionPlanner::record_command(const std::string& cmd) {
-    std::vector<std::string> log = {"CMD", cmd};
+void MotionPlanner::record_command(const ParsedCommand& cmd) {
+    std::vector<std::string> log = {"CMD"};
+
+    
     motion_log.record(log);
 }
 

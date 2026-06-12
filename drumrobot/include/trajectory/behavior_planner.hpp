@@ -13,7 +13,7 @@
 #include "common/app_context.hpp"
 #include "common/motion_queue.hpp"          // MotionPrimitive
 #include "hardware/robot.hpp"
-#include "trajectory/command_parser.hpp"    // ParsedCommand, Opcode
+#include "tcp/command_parser.hpp"           // ParsedCommand, Opcode
 
 class BehaviorPlanner {
 public:

@@ -10,7 +10,7 @@
 #include "common/control_queue.hpp"
 #include "common/motion_queue.hpp"
 #include "hardware/robot.hpp"
-#include "net/tcp_server.hpp"
+#include "tcp/tcp_server.hpp"
 #include "realtime/controller.hpp"
 #include "trajectory/motion_planner.hpp"
 

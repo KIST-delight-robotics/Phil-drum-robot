@@ -1,4 +1,4 @@
-#include "trajectory/command_parser.hpp"
+#include "tcp/command_parser.hpp"
 
 CommandParser::CommandParser() {
 

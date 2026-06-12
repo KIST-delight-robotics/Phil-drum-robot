@@ -13,7 +13,6 @@
 #include "common/motion_queue.hpp"
 #include "hardware/robot.hpp"
 #include "trajectory/behavior_planner.hpp"
-#include "trajectory/command_parser.hpp"
 #include "trajectory/trajectory_generator.hpp"
 #include "util/logger.hpp"
 
@@ -33,20 +32,19 @@ private:
     Robot &robot;
 
     BehaviorPlanner behavior_planner;
-    CommandParser command_parser;
     TrajectoryGenerator trajectory_generator;
 
     const long unsigned int threshold = 20;     // 궤적 생성 임계값
 
     void initialize();
 
-    void parse_command(const std::string& cmd);
+    void generate_motions(const ParsedCommand& cmd);
     void schedule_idle_motion();
     void abort_play_motion();
 
     // ===== log =====
     Logger motion_log;
 
-    void record_command(const std::string& cmd);
+    void record_command(const ParsedCommand& cmd);
     void record_motion(const MotionPrimitive& motion);
 };

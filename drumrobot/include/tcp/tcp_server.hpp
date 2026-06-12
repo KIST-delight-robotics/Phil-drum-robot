@@ -12,6 +12,7 @@
  
 #include "common/app_context.hpp"
 #include "common/command_queue.hpp"
+#include "tcp/command_parser.hpp"
  
 class TcpServer {
 public:
@@ -29,6 +30,8 @@ private:
  
     bool quitting = false;
     CommandQueue &command_queue;
+
+    CommandParser command_parser;
  
     void set_server();
 };

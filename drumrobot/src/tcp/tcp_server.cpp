@@ -1,4 +1,4 @@
-#include "net/tcp_server.hpp"
+#include "tcp/tcp_server.hpp"
 
 TcpServer::TcpServer(AppContext &ctxRef, int port, CommandQueue &commandQueueRef)
     : ctx(ctxRef), port_(port), server_fd_(-1), running_(false), command_queue(commandQueueRef) {}
@@ -49,7 +49,8 @@ void TcpServer::run() {
 
             // 명령을 CommandQueue 에 push
             if (!input.empty()) {
-                command_queue.push(input);
+                ParsedCommand parsed = command_parser.parse(input);
+                command_queue.push(parsed);
             }
 
             std::string upper = input;
