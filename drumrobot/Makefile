@@ -29,7 +29,7 @@ all: directories $(BINDIR)/$(EXECUTABLE)
 # ===== 폴더 생성 =====
 directories:
 	mkdir -p $(BINDIR)
-	mkdir -p $(OBJDIR)/common $(OBJDIR)/hardware $(OBJDIR)/input $(OBJDIR)/kinematics $(OBJDIR)/net $(OBJDIR)/realtime $(OBJDIR)/trajectory $(OBJDIR)/util
+	mkdir -p $(OBJDIR)/common $(OBJDIR)/hardware $(OBJDIR)/kinematics $(OBJDIR)/net $(OBJDIR)/realtime $(OBJDIR)/trajectory $(OBJDIR)/util
 	mkdir -p $(OBJDIR)/dxl
 
 # ===== 링크: .o 파일들 → 실행파일 =====

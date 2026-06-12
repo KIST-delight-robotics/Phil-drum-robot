@@ -10,7 +10,6 @@
 #include "common/control_queue.hpp"
 #include "common/motion_queue.hpp"
 #include "hardware/robot.hpp"
-#include "input/keyboard_handler.hpp"
 #include "net/tcp_server.hpp"
 #include "realtime/controller.hpp"
 #include "trajectory/motion_planner.hpp"
@@ -27,13 +26,6 @@ void set_priority(std::thread& t, int priority) {
 }
 
 int main(int argc, char* argv[]) {
-    std::string mode = "keyboard"; // 기본값
-    for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "--mode" && i + 1 < argc) {
-            mode = argv[i + 1];
-        }
-    }
-
     AppContext ctx;
     CommandQueue command_queue;
     ControlQueue control_queue;
@@ -41,8 +33,7 @@ int main(int argc, char* argv[]) {
 
     Robot robot;
     robot.initialize();
-
-    KeyboardHandler keyboard_handler(ctx, command_queue);
+    
     TcpServer server(ctx, PORT, command_queue);
     Controller controller(ctx, control_queue, robot);
     MotionPlanner motion_planner(ctx, command_queue, control_queue, motion_queue, robot);
@@ -50,25 +41,18 @@ int main(int argc, char* argv[]) {
     std::thread send_thread(&Controller::send_loop, &controller);
     std::thread recv_thread(&Controller::recv_loop, &controller);
     std::thread motion_planning_thread(&MotionPlanner::run, &motion_planner);
+    std::thread tcp_server_thread(&TcpServer::run, &server);
 
     set_priority(send_thread, 40);
     set_priority(recv_thread, 30);
     set_priority(motion_planning_thread, 20);
-
-    if (mode == "keyboard") {
-        std::thread keyboard_input_thread(&KeyboardHandler::run, &keyboard_handler);
-        set_priority(keyboard_input_thread, 10);
-        keyboard_input_thread.join();
-    } else if (mode == "llm") {
-        std::thread tcp_server_thread(&TcpServer::run, &server);
-        set_priority(tcp_server_thread, 10);
-        tcp_server_thread.join();
-        server.stop();
-    }
+    set_priority(tcp_server_thread, 10);
 
     send_thread.join();
     recv_thread.join();
     motion_planning_thread.join();
+    tcp_server_thread.join();
+    server.stop();
 
     return 0;
 }

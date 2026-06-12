@@ -137,7 +137,6 @@ Phil/
     ├── include/
     │   ├── common/                         # app_context, command/control/motion_queue, robot_config
     │   ├── hardware/                       # can_interface, motor, motor_codec, robot
-    │   ├── input/                          # keyboard_handler
     │   ├── kinematics/                     # kinematics_solver
     │   ├── net/                            # tcp_server
     │   ├── realtime/                       # controller
