@@ -30,7 +30,7 @@ void Robot::initialize() {
 void Robot::init_motor_from_json() {
     using json = nlohmann::json;
 
-    std::ifstream f("drumrobot/config/motors.json");
+    std::ifstream f("drumrobot_server/config/motors.json");
     if (!f.is_open()) {
         std::cerr << "[Robot] Failed to open config/motors.json\n";
         return;

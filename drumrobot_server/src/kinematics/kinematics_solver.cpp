@@ -6,7 +6,7 @@ KinematicsSolver::~KinematicsSolver() {}
 void KinematicsSolver::initialize() {
     using json = nlohmann::json;
 
-    std::ifstream f("drumrobot/config/kinematics.json");
+    std::ifstream f("drumrobot_server/config/kinematics.json");
     if (!f.is_open()) {
         std::cerr << "[KinematicsSolver] Failed to open config/kinematics.json\n";
         return;

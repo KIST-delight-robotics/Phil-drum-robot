@@ -82,7 +82,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
 void BehaviorPlanner::init_poses_from_json() {
     using json = nlohmann::json;
 
-    std::ifstream f("drumrobot/config/robot_poses.json");
+    std::ifstream f("drumrobot_server/config/robot_poses.json");
     if (!f.is_open()) {
         std::cerr << "[BehaviorPlanner] Failed to open config/robot_poses.json\n";
         return;

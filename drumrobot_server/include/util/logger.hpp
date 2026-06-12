@@ -23,7 +23,7 @@ public:
 private:
     std::ofstream file;
     std::chrono::steady_clock::time_point start;
-    const std::string base_path = "drumrobot/log/";
+    const std::string base_path = "drumrobot_server/log/";
 
     std::string make_filename(const std::string& name);
 };

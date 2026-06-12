@@ -20,7 +20,7 @@ void PlayMotionGenerator::initialize() {
  
     solver.initialize();
 
-    const std::string config_path = "drumrobot/config/drum_coordinate.json";
+    const std::string config_path = "drumrobot_server/config/drum_coordinate.json";
     std::ifstream ifs(config_path);
     if (!ifs.is_open()) {
         std::cerr << "[PlayMotionGenerator] Failed to open config file: "

@@ -17,7 +17,7 @@ void CanInterface::resetCanPorts() {
         return;
     }
  
-    std::ifstream f("drumrobot/config/can_ports.json");
+    std::ifstream f("drumrobot_server/config/can_ports.json");
     if (!f.is_open()) {
         std::cerr << "[CanInterface] Failed to open config/can_ports.json, skip CAN reset\n";
         return;
