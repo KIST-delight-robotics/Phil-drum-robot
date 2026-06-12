@@ -11,8 +11,8 @@ void MotionPlanner::run() {
 
     while (ctx.running.load()) {
         if (auto cmd = command_queue.try_pop()) {
-            // 명령이 있으면 파싱해서 motion_queue에 적재
-            // generate_motions(*cmd);
+            // 명령이 있으면 motion_queue에 적재
+            generate_motions(*cmd);
         } else if (ctx.send_active.load() && motion_queue.empty()) {
             // send_active 이 후 motion_queue가 없으면 대기 모션
             schedule_idle_motion();
@@ -115,21 +115,111 @@ void MotionPlanner::abort_play_motion() {
 
 // ===== log =====
 void MotionPlanner::record_command(const ParsedCommand& cmd) {
+    // Opcode -> 문자열
+    auto opcode_to_string = [](Opcode op) -> std::string {
+        switch (op) {
+            case Opcode::LOOK:    return "LOOK";
+            case Opcode::GESTURE: return "GESTURE";
+            case Opcode::MOVE:    return "MOVE";
+            case Opcode::POSE:    return "POSE";
+            case Opcode::HIT:     return "HIT";
+            case Opcode::PLAY:    return "PLAY";
+            case Opcode::START:   return "START";
+            case Opcode::READY:   return "READY";
+            case Opcode::QUIT:    return "QUIT";
+            case Opcode::UNKNOWN: return "UNKNOWN";
+            default:              return "UNKNOWN";
+        }
+    };
+
     std::vector<std::string> log = {"CMD"};
 
-    
+    log.push_back(opcode_to_string(cmd.opcode));
+    log.push_back(cmd.valid ? "valid" : "invalid");
+
+    // 인자 (OPCODE|arg1|arg2... 형태 그대로)
+    for (const auto& arg : cmd.args) {
+        log.push_back(arg);
+    }
+
     motion_log.record(log);
 }
 
 void MotionPlanner::record_motion(const MotionPrimitive& motion) {
+    auto profile_to_string = [](TrajectoryProfile p) -> std::string {
+        switch (p) {
+            case TrajectoryProfile::TRAPEZOIDAL: return "trapezoidal";
+            case TrajectoryProfile::CUBIC:       return "cubic";
+            case TrajectoryProfile::QUINTIC:     return "quintic";
+            case TrajectoryProfile::COSINE:      return "cosine";
+            default:                             return "?";
+        }
+    };
+    auto space_to_string = [](TrajectorySpace s) -> std::string {
+        return s == TrajectorySpace::JOINT ? "joint" : "task";
+    };
+    auto flag_to_string = [](PlayFlag f) -> std::string {
+        switch (f) {
+            case PlayFlag::START:   return "start";
+            case PlayFlag::PLAYING: return "playing";
+            case PlayFlag::END:     return "end";
+            default:                return "?";
+        }
+    };
+
     std::vector<std::string> log = {"MOTION"};
 
-    if (motion.type == MotionType::IDLE) log.push_back("idle");
-    else if (motion.type == MotionType::TRANSLATE) log.push_back("translate");
-    else if (motion.type == MotionType::DRUM) log.push_back("drum");
-    else if (motion.type == MotionType::STANDBY) log.push_back("standby");
+    switch (motion.type) {
+        case MotionType::IDLE:
+            log.push_back("idle");
+            break;
 
-    // TODO: 모션 로그 더 구체적으로 작성하기
+        case MotionType::STANDBY:
+            log.push_back("standby");
+            break;
+
+        case MotionType::TRANSLATE:
+            log.push_back("translate");
+            log.push_back(space_to_string(motion.space));
+            log.push_back(profile_to_string(motion.profile));
+            log.push_back("t_total=" + std::to_string(motion.t_total));
+            if (motion.space == TrajectorySpace::JOINT) {
+                log.push_back("q_target_n=" + std::to_string(motion.q_target.size()));
+                for (double q : motion.q_target) {
+                    log.push_back(std::to_string(q));
+                }
+            } else {
+                // task space: 오른팔/왼팔 목표 좌표
+                std::string pr = "R(";
+                for (size_t i = 0; i < motion.p_target_R.size(); ++i) {
+                    pr += std::to_string(motion.p_target_R[i]);
+                    if (i + 1 < motion.p_target_R.size()) pr += ",";
+                }
+                pr += ")";
+                std::string pl = "L(";
+                for (size_t i = 0; i < motion.p_target_L.size(); ++i) {
+                    pl += std::to_string(motion.p_target_L[i]);
+                    if (i + 1 < motion.p_target_L.size()) pl += ",";
+                }
+                pl += ")";
+                log.push_back(pr);
+                log.push_back(pl);
+            }
+            break;
+
+        case MotionType::DRUM:
+            log.push_back("drum");
+            log.push_back(flag_to_string(motion.flag));
+            log.push_back("events=" + std::to_string(motion.robotic_drum_score.size()));
+            // 구간의 시간 범위 (첫/마지막 이벤트 누적 시간)
+            if (!motion.robotic_drum_score.empty()) {
+                log.push_back("t_first=" + std::to_string(motion.robotic_drum_score.front().t));
+                log.push_back("t_last="  + std::to_string(motion.robotic_drum_score.back().t));
+                log.push_back("bar_first=" + std::to_string(motion.robotic_drum_score.front().bar));
+                log.push_back("bar_last="  + std::to_string(motion.robotic_drum_score.back().bar));
+            }
+            break;
+    }
 
     motion_log.record(log);
 }

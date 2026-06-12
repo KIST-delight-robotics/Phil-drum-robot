@@ -11,9 +11,9 @@
 #include "nlohmann/json.hpp"
 
 #include "common/app_context.hpp"
+#include "common/command_queue.hpp"         // ParsedCommand, Opcode
 #include "common/motion_queue.hpp"          // MotionPrimitive
 #include "hardware/robot.hpp"
-#include "tcp/command_parser.hpp"           // ParsedCommand, Opcode
 
 class BehaviorPlanner {
 public:
