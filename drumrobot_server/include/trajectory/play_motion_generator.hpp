@@ -39,5 +39,5 @@ private:
     int round_sum = 0;      // 소수점 오차 보정
 
     // ===== 로그 =====
-    Logger log;
+    // Logger log;
 };

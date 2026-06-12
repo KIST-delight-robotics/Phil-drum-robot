@@ -1,14 +1,14 @@
 #include "trajectory/play_motion_generator.hpp"
 
-PlayMotionGenerator::PlayMotionGenerator()
-    : log("play") {
-    std::vector<std::string> header = {
-        "XR", "YR", "ZR", "XL", "YL", "ZL",
-        "theta 0", "theta 7", "theta 8",
-        "elbow R", "elbow L", "wrist R", "wrist L",
-        "bass pedal", "hihat control", "head yaw", "head pitch"
-    };
-    log.set_header(header);
+PlayMotionGenerator::PlayMotionGenerator() {
+    // : log("play") {
+    // std::vector<std::string> header = {
+    //     "XR", "YR", "ZR", "XL", "YL", "ZL",
+    //     "theta 0", "theta 7", "theta 8",
+    //     "elbow R", "elbow L", "wrist R", "wrist L",
+    //     "bass pedal", "hihat control", "head yaw", "head pitch"
+    // };
+    // log.set_header(header);
 }
 
 PlayMotionGenerator::~PlayMotionGenerator() {
@@ -188,15 +188,15 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
 
         q_queue.push(q);
 
-        std::vector<double> values = {
-            pR[0], pR[1], pR[2],
-            pL[0], pL[1], pL[2],
-            theta0, theta7, theta8,
-            s.right_elbow, s.left_elbow,
-            s.right_wrist, s.left_wrist,
-            p.right, p.left, h.yaw, h.pitch
-        };
-        log.record(values);
+        // std::vector<double> values = {
+        //     pR[0], pR[1], pR[2],
+        //     pL[0], pL[1], pL[2],
+        //     theta0, theta7, theta8,
+        //     s.right_elbow, s.left_elbow,
+        //     s.right_wrist, s.left_wrist,
+        //     p.right, p.left, h.yaw, h.pitch
+        // };
+        // log.record(values);
     }
 
     return q_queue;
