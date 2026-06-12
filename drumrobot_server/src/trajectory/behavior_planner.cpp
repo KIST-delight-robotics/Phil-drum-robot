@@ -330,7 +330,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     const std::string& score_name = args[0];
 
     std::ifstream inputFile;
-    std::string score_path = "drumrobot/data/scores/" + score_name + ".txt";
+    std::string score_path = "drumrobot_server/data/scores/" + score_name + ".txt";
     inputFile.open(score_path); // 파일 열기
 
     if (!inputFile.is_open()) {

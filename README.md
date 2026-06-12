@@ -21,8 +21,8 @@ CAN 통신 기반으로 TMotor / Maxon / Dynamixel 모터를 제어하며, LLM(T
 
 ### 의존성 (저장소에 포함)
 
-- **Dynamixel SDK** — `drumrobot/lib/dynamixel_sdk/`
-- **nlohmann/json** — `drumrobot/lib/nlohmann/json.hpp`
+- **Dynamixel SDK** — `drumrobot_server/lib/dynamixel_sdk/`
+- **nlohmann/json** — `drumrobot_server/lib/nlohmann/json.hpp`
 
 ### 하드웨어
 
@@ -114,9 +114,9 @@ CAN 통신 기반으로 TMotor / Maxon / Dynamixel 모터를 제어하며, LLM(T
 ```
 Phil/
 ├── Makefile
-├── planner/
+├── drumrobot_client/
 │   └── main.py                             # TCP 클라이언트 (LLM 모드용)
-└── drumrobot/
+└── drumrobot_server/
     ├── Makefile
     ├── bin/                                # 실행 파일 (빌드 시 생성)
     ├── obj/                                # 오브젝트 파일 (빌드 시 생성)
@@ -138,12 +138,12 @@ Phil/
     │   ├── common/                         # app_context, command/control/motion_queue, robot_config
     │   ├── hardware/                       # can_interface, motor, motor_codec, robot
     │   ├── kinematics/                     # kinematics_solver
-    │   ├── net/                            # tcp_server
+    │   ├── tcp/                            # tcp_server, command_parser
     │   ├── realtime/                       # controller
-    │   ├── trajectory/                     # behavior_planner, command_parser, motion_planner,
+    │   ├── trajectory/                     # behavior_planner, motion_planner,
     │   │                                   #   trajectory_generator, play/base/state/pedal/head_motion_generator
     │   └── util/                           # logger
-    └── src/                                # 위 헤더에 대응하는 구현
+    └── src/                                # 위 헤더에 대응하는 구현 (main.cpp 포함)
 ```
 
 ---
@@ -455,7 +455,7 @@ make
 TCP 서버로 실행됩니다 (포트 1951):
 
 ```bash
-sudo ./drumrobot/bin/main.out
+sudo ./drumrobot_server/bin/main.out
 ```
 
 또는 최상위 Makefile 사용:
@@ -467,7 +467,7 @@ make run
 ### TCP 클라이언트 (LLM 모드, 별도 터미널)
 
 ```bash
-python3 planner/main.py
+python3 drumrobot_client/main.py
 ```
 
 호스트 `127.0.0.1`, 포트 `1951`로 연결됩니다.
@@ -480,7 +480,7 @@ python3 planner/main.py
 - **CAN 포트 리셋**: `can_ports.json`에 등록된 머신에서 `uhubctl`로 USB 허브 전원을 껐다 켭니다. 미등록 머신은 리셋을 건너뜁니다.
 - **Maxon 보간**: `send_loop`에서 5ms 구간을 1ms × 5 스텝으로 분할해 CSP 위치를 선형 보간 전송. 5ms 시점에 TMotor / Maxon / Dynamixel 동시 송신
 - **`virtual_maxon_motor`**: 소켓당 Maxon 모터 1개를 대표로 선정해 Sync 프레임(0x80) 전송에 사용
-- **Logger**: 런타임에 `drumrobot/log/`에 `log_MMDD_HHmm_{name}.csv` 생성 (motor / trajectory / motion_command)
+- **Logger**: 런타임에 `drumrobot_server/log/`에 `log_MMDD_HHmm_{name}.csv` 생성 (motor / trajectory / motion_command)
 
 ---
 
@@ -490,5 +490,5 @@ python3 planner/main.py
 
 | 라이브러리 | 위치 | 라이선스 |
 |---|---|---|
-| nlohmann/json   | `drumrobot/lib/nlohmann/json.hpp` | MIT        |
-| Dynamixel SDK   | `drumrobot/lib/dynamixel_sdk/`    | Apache 2.0 |
+| nlohmann/json   | `drumrobot_server/lib/nlohmann/json.hpp` | MIT        |
+| Dynamixel SDK   | `drumrobot_server/lib/dynamixel_sdk/`    | Apache 2.0 |

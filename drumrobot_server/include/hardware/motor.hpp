@@ -9,7 +9,7 @@
 #include <cstring>
 #include <utility>
 
-#include "dynamixel_sdk/include/dynamixel_sdk.h"
+#include "dynamixel_sdk.h"
 
 #include "common/control_queue.hpp"
 

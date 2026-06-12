@@ -7,7 +7,7 @@
 #include <cmath>
 #include <vector>
 
-#include "dynamixel_sdk/include/dynamixel_sdk.h"
+#include "dynamixel_sdk.h"
 #include "nlohmann/json.hpp"
 
 #include "common/robot_config.hpp"
