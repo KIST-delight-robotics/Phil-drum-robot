@@ -24,6 +24,7 @@ void MotionPlanner::run() {
 
             if (auto motion = motion_queue.try_pop()) {
                 trajectory_generator.generate_trajectory(*motion);
+
                 if (!ctx.recv_active.load()) ctx.recv_active = true;
                 if (!ctx.send_active.load()) ctx.send_active = true;
                 if (ctx.play_abort.load()) abort_play_motion();
@@ -213,6 +214,9 @@ void MotionPlanner::record_motion(const MotionPrimitive& motion) {
                 log.push_back("t_last="  + std::to_string(motion.robotic_drum_score.back().t));
                 log.push_back("bar_first=" + std::to_string(motion.robotic_drum_score.front().bar));
                 log.push_back("bar_last="  + std::to_string(motion.robotic_drum_score.back().bar));
+            } else if (flag_to_string(motion.flag) == "start") {
+                log.push_back("init_note_r="  + std::to_string(motion.init_note_r));
+                log.push_back("init_note_l="  + std::to_string(motion.init_note_l));
             }
             break;
     }

@@ -347,6 +347,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     double last_t = 0.0;
 
     MotionPrimitive start; start.type = MotionType::DRUM; start.flag = PlayFlag::START;
+    // start.init_note_r = 8; start.init_note_l = 1;    // TODO: 음악이랑 같이 json 파일로 저장
     sequence.push_back(start);
 
     std::string row;

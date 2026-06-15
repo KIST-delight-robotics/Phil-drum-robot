@@ -39,7 +39,7 @@ void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
         break;
     case MotionType::DRUM:
         if (motion.flag == PlayFlag::START) {
-            generate_play_start_trajectory();
+            generate_play_start_trajectory(motion);
         } else if (motion.flag == PlayFlag::END) {
             generate_play_end_trajectory();
         } else {
@@ -165,15 +165,13 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
     update_last_q(p1, q1);
 }
 
-void TrajectoryGenerator::generate_play_start_trajectory() {
-    // TODO: 초기 악기로 보내는 것도 좋을 듯
-    // 스네어 위치로 이동
+void TrajectoryGenerator::generate_play_start_trajectory(const MotionPrimitive& motion) {
     std::array<ControlMode, ROBOT::NUM_JOINT> modes = get_modes();
     double t_total = 4.0;
     int num_point = static_cast<int>(t_total / ROBOT::DT_SECOND);
 
     std::array<double, ROBOT::NUM_JOINT> q_target;
-    if (play_motion_generator.reset(q_target)) {
+    if (play_motion_generator.reset(q_target, motion.init_note_r, motion.init_note_l)) {
         std::vector<double> q0(last_q.begin(), last_q.end());
         std::vector<double> q1(q_target.begin(), q_target.end());
 

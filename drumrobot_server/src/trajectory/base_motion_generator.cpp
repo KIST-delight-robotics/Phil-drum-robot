@@ -14,13 +14,13 @@ void BaseMotionGenerator::initialize(const std::map<int, InstrumentCoordinate>& 
     drum_coordinates = coordinates;
 }
 
-BaseMotionPoint BaseMotionGenerator::reset() {
-    right_context = MotionContext{};
-    left_context = MotionContext{};
+BaseMotionPoint BaseMotionGenerator::reset(int note_r, int note_l) {
+    right_context = MotionContext{note_r};
+    left_context = MotionContext{note_l};
 
     BaseMotionPoint point;
-    note_to_target(1, Arm::RIGHT, point.right_position, point.right_wrist); // 스네어
-    note_to_target(1, Arm::LEFT, point.left_position, point.left_wrist);
+    note_to_target(note_r, Arm::RIGHT, point.right_position, point.right_wrist);
+    note_to_target(note_l, Arm::LEFT, point.left_position, point.left_wrist);
 
     auto [opt, range] = compute_waist_range(point.right_position, point.left_position, point.right_wrist, point.left_wrist);
     point.waist = opt;

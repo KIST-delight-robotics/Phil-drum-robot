@@ -38,6 +38,7 @@ struct MotionPrimitive {
     // DRUM용
     std::vector<DrumEvent> robotic_drum_score;
     PlayFlag flag = PlayFlag::PLAYING;
+    int init_note_r = 1, init_note_l = 1;    // 초기 위치 기본값: 스네어
 
     // IDLE용
     // ... 별도 필드

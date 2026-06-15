@@ -17,7 +17,7 @@ public:
     HeadMotionGenerator();
     ~HeadMotionGenerator();
 
-    HeadMotionPoint reset();
+    HeadMotionPoint reset(int note_r = 1);  // 초기 위치 기본값: 스네어
     void initialize(const std::map<int, InstrumentCoordinate>& coordinates);
 
     std::queue<HeadMotionPoint> generate_motion(const std::vector<DrumEvent> rds, int num_point);

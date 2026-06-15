@@ -12,15 +12,15 @@ void HeadMotionGenerator::initialize(const std::map<int, InstrumentCoordinate>& 
     drum_coordinates = coordinates;
 }
 
-HeadMotionPoint HeadMotionGenerator::reset() {
-    cur_note = 1;   // 스네어
+HeadMotionPoint HeadMotionGenerator::reset(int note_r) {
+    cur_note = note_r;
 
     prev_nod_intensity = 0.0;
     beat_sum = 0.0;
 
     HeadMotionPoint point;
     point.pitch = ready_angle;
-    point.yaw = std::atan2(drum_coordinates[1].right_position[1], drum_coordinates[1].right_position[0]) - 90.0*M_PI/180.0; // 스네어
+    point.yaw = std::atan2(drum_coordinates[note_r].right_position[1], drum_coordinates[note_r].right_position[0]) - 90.0*M_PI/180.0;
 
     return point;
 }

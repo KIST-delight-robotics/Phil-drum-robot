@@ -33,7 +33,7 @@ public:
  
     void initialize(const std::map<int, InstrumentCoordinate>& coordinates);
 
-    BaseMotionPoint reset();
+    BaseMotionPoint reset(int note_r = 1, int note_l = 1);  // 초기 위치 기본값: 스네어
     std::queue<BaseMotionPoint> generate_motion(const std::vector<DrumEvent>& rds, int num_point);
     bool get_error();
  
@@ -52,9 +52,12 @@ private:
         HIT_TO_HIT       // 이전 있음 -> 다음 있음 (연속 타격)
     };
     struct MotionContext {
-        double last_t = 0.0;        // 이전 시간
-        int last_instrument = 1;    // 이전 악기 (초기 위치는 스네어)
-        State state = State::REST_TO_REST;
+        double last_t;          // 이전 시간
+        int last_instrument;    // 이전 악기
+        State state;
+
+        MotionContext(int init_instrument = 1)  // 초기 위치 기본값: 스네어
+            : last_t(0.0), last_instrument(init_instrument), state(State::REST_TO_REST) {}
     };
 
     struct MotionSegment {

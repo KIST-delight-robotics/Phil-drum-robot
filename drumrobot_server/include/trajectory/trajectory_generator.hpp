@@ -45,7 +45,7 @@ private:
     void generate_standby_trajectory();
     void generate_joint_space_trajectory(const MotionPrimitive& motion);
     void generate_task_space_trajectory(const MotionPrimitive& motion);
-    void generate_play_start_trajectory();
+    void generate_play_start_trajectory(const MotionPrimitive& motion);
     void generate_play_end_trajectory();
     void generate_play_trajectory(const MotionPrimitive& motion);
     void generate_idle_trajectory();

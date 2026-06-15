@@ -75,9 +75,9 @@ void PlayMotionGenerator::initialize() {
     head_motion_generator.initialize(drum_coordinates);
 }
 
-bool PlayMotionGenerator::reset(std::array<double, ROBOT::NUM_JOINT>& q) {
-    BaseMotionPoint b = base_motion_generator.reset();
-    HeadMotionPoint h = head_motion_generator.reset();
+bool PlayMotionGenerator::reset(std::array<double, ROBOT::NUM_JOINT>& q, int note_r, int note_l) {
+    BaseMotionPoint b = base_motion_generator.reset(note_r, note_l);
+    HeadMotionPoint h = head_motion_generator.reset(note_r);
     PedalMotionPoint p = pedal_motion_generator.reset();
     StateMotionPoint s = state_motion_generator.reset();
 

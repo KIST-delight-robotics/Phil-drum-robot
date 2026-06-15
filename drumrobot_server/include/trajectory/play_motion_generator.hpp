@@ -20,7 +20,7 @@ public:
     ~PlayMotionGenerator();
 
     void initialize();
-    bool reset(std::array<double, ROBOT::NUM_JOINT>& q);
+    bool reset(std::array<double, ROBOT::NUM_JOINT>& q, int note_r = 1, int note_l = 1);    // 초기 위치 기본값: 스네어
 
     std::queue<std::array<double, ROBOT::NUM_JOINT>> generate_motion(const std::vector<DrumEvent>& rds);
 
