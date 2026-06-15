@@ -11,7 +11,7 @@ enum class CAN_PACKET_ID {
     CAN_PACKET_SET_POS_SPD
 };
 
-std::tuple<int, float, float, float, int8_t, int8_t> TMotorServoCodec::parseReceiveCommand(struct can_frame *frame) {
+std::tuple<int, float, float, float, int8_t, int8_t> TMotorServoCodec::decodeFeedback(struct can_frame *frame) {
     int id = frame->can_id & 0xFF;
     int16_t pos_int = (frame)->data[0] << 8 | (frame)->data[1];
     int16_t spd_int = (frame)->data[2] << 8 | (frame)->data[3];
@@ -26,14 +26,14 @@ std::tuple<int, float, float, float, int8_t, int8_t> TMotorServoCodec::parseRece
     return std::make_tuple(id, pos, spd, cur, temp, error);
 }
 
-void TMotorServoCodec::setOrigin(uint32_t node_id, struct can_frame *frame, uint8_t set_origin_mode) {
+void TMotorServoCodec::encodeSetOrigin(uint32_t node_id, struct can_frame *frame, uint8_t set_origin_mode) {
     frame->can_id = node_id |
                     ((uint32_t)CAN_PACKET_ID::CAN_PACKET_SET_ORIGIN_HERE << 8 | CAN_EFF_FLAG);
     frame->can_dlc = 1;
     frame->data[0] = set_origin_mode; 
 }
 
-void TMotorServoCodec::setPositionVelocity(uint32_t node_id, struct can_frame *frame, float pos, int16_t spd, int16_t RPA) {
+void TMotorServoCodec::encodePositionVelocity(uint32_t node_id, struct can_frame *frame, float pos, int16_t spd, int16_t RPA) {
     // 라디안에서 도로 변환
     float pos_deg = pos * (180.0 / M_PI);
 
@@ -56,7 +56,7 @@ void TMotorServoCodec::setPositionVelocity(uint32_t node_id, struct can_frame *f
     frame->data[7] = (RPA / 10) & 0xFF;
 }
 
-void TMotorServoCodec::setCurrentBrake(uint32_t node_id, struct can_frame *frame, float current) {
+void TMotorServoCodec::encodeCurrentBrake(uint32_t node_id, struct can_frame *frame, float current) {
     frame->can_id = node_id |
                     ((uint32_t)CAN_PACKET_ID::CAN_PACKET_SET_DUTY_CURRENT_BRAKE << 8 | CAN_EFF_FLAG);
     frame->can_dlc = 4;
@@ -67,7 +67,7 @@ void TMotorServoCodec::setCurrentBrake(uint32_t node_id, struct can_frame *frame
     frame->data[3] = current_int & 0xFF;
 }
 
-void TMotorServoCodec::setVelocity(uint32_t node_id, struct can_frame *frame, float spd_erpm) {
+void TMotorServoCodec::encodeVelocity(uint32_t node_id, struct can_frame *frame, float spd_erpm) {
     frame->can_id = node_id |
                     ((uint32_t)CAN_PACKET_ID::CAN_PACKET_SET_RPM << 8 | CAN_EFF_FLAG);
     frame->can_dlc = 4;
@@ -81,7 +81,7 @@ void TMotorServoCodec::setVelocity(uint32_t node_id, struct can_frame *frame, fl
     frame->data[3] = spd_int & 0xFF;
 }
 
-void TMotorServoCodec::setPosition(uint32_t node_id, struct can_frame *frame, float pos) {
+void TMotorServoCodec::encodePosition(uint32_t node_id, struct can_frame *frame, float pos) {
     frame->can_id = node_id |
                     ((uint32_t)CAN_PACKET_ID::CAN_PACKET_SET_POS << 8 | CAN_EFF_FLAG);
     frame->can_dlc = 4;
@@ -97,7 +97,7 @@ void TMotorServoCodec::setPosition(uint32_t node_id, struct can_frame *frame, fl
 }
 
 // ===== TMotor MIT mode Codec =====
-void TMotorMITCodec::parseSendCommand(struct can_frame *frame, int canId, int dlc, float p_des, float v_des, float kp, float kd, float t_ff) {
+void TMotorMITCodec::encodeCommand(struct can_frame *frame, int canId, int dlc, float p_des, float v_des, float kp, float kd, float t_ff) {
     // 기존 변수를 계산
     p_des = fminf(fmaxf(GLOBAL_P_MIN, p_des), GLOBAL_P_MAX);
     v_des = fminf(fmaxf(GLOBAL_V_MIN, v_des), GLOBAL_V_MAX);
@@ -126,7 +126,7 @@ void TMotorMITCodec::parseSendCommand(struct can_frame *frame, int canId, int dl
     frame->data[7] = t_int & 0xff;                         // torque 4 bit lower
 }
 
-std::tuple<int, float, float, float> TMotorMITCodec::parseReceiveCommand(struct can_frame *frame) {
+std::tuple<int, float, float, float> TMotorMITCodec::decodeFeedback(struct can_frame *frame) {
     int id;
     float position, speed, torque;
 
@@ -159,7 +159,7 @@ float TMotorMITCodec::uintToFloat(int x_int, float x_min, float x_max, int bits)
     return ((float)x_int) * span / ((float)((1 << bits) - 1)) + offset;
 }
 
-void TMotorMITCodec::getCheck(uint32_t node_id, struct can_frame *frame) {
+void TMotorMITCodec::encodeCheck(uint32_t node_id, struct can_frame *frame) {
     frame->can_id = node_id;
     frame->can_dlc = 8;
 
@@ -173,7 +173,7 @@ void TMotorMITCodec::getCheck(uint32_t node_id, struct can_frame *frame) {
     frame->data[7] = 0x00;
 }
 
-void TMotorMITCodec::getControlMode(uint32_t node_id, struct can_frame *frame) {
+void TMotorMITCodec::encodeEnterControlMode(uint32_t node_id, struct can_frame *frame) {
     frame->can_id = node_id;
     frame->can_dlc = 8;
 
@@ -187,7 +187,7 @@ void TMotorMITCodec::getControlMode(uint32_t node_id, struct can_frame *frame) {
     frame->data[7] = 0xFC;
 }
 
-void TMotorMITCodec::getExit(uint32_t node_id, struct can_frame *frame) {
+void TMotorMITCodec::encodeExitControlMode(uint32_t node_id, struct can_frame *frame) {
     frame->can_id = node_id;
     frame->can_dlc = 8;
 
@@ -201,7 +201,7 @@ void TMotorMITCodec::getExit(uint32_t node_id, struct can_frame *frame) {
     frame->data[7] = 0xFD;
 }
 
-void TMotorMITCodec::getZero(uint32_t node_id, struct can_frame *frame) {
+void TMotorMITCodec::encodeSetZero(uint32_t node_id, struct can_frame *frame) {
     frame->can_id = node_id;
     frame->can_dlc = 8;
 
@@ -215,7 +215,7 @@ void TMotorMITCodec::getZero(uint32_t node_id, struct can_frame *frame) {
     frame->data[7] = 0xFE;
 }
 
-void TMotorMITCodec::getQuickStop(uint32_t node_id, struct can_frame *frame) {
+void TMotorMITCodec::encodeQuickStop(uint32_t node_id, struct can_frame *frame) {
     frame->can_id = node_id;
     frame->can_dlc = 8;
 
@@ -230,7 +230,7 @@ void TMotorMITCodec::getQuickStop(uint32_t node_id, struct can_frame *frame) {
 }
 
 // ===== Maxon Motor Codec =====
-std::tuple<int, float, float, unsigned char> MaxonMotorCodec::parseReceiveCommand(struct can_frame *frame) {
+std::tuple<int, float, float, unsigned char> MaxonMotorCodec::decodeFeedback(struct can_frame *frame) {
     int id = frame->can_id;
 
     unsigned char statusBit = frame->data[1];
@@ -259,7 +259,7 @@ std::tuple<int, float, float, unsigned char> MaxonMotorCodec::parseReceiveComman
 }
 
 // System
-void MaxonMotorCodec::getActualPos(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeReadActualPos(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x40;
@@ -272,7 +272,7 @@ void MaxonMotorCodec::getActualPos(uint32_t can_send_id, struct can_frame *frame
     frame->data[7] = 0x00;  
 }
 
-void MaxonMotorCodec::getCheck(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeCheck(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x00;
@@ -285,7 +285,7 @@ void MaxonMotorCodec::getCheck(uint32_t can_send_id, struct can_frame *frame) {
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getStop(uint32_t node_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeStop(uint32_t node_id, struct can_frame *frame) {
     frame->can_id = 0x00;
     frame->can_dlc = 8;
     frame->data[0] = 0x02;
@@ -298,7 +298,7 @@ void MaxonMotorCodec::getStop(uint32_t node_id, struct can_frame *frame) {
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getOperational(uint32_t node_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeEnterOperational(uint32_t node_id, struct can_frame *frame) {
     frame->can_id = 0x00;
     frame->can_dlc = 8;
     frame->data[0] = 0x01;
@@ -311,7 +311,7 @@ void MaxonMotorCodec::getOperational(uint32_t node_id, struct can_frame *frame) 
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getShutdown(uint32_t tx_pdo_id_0, struct can_frame *frame) {
+void MaxonMotorCodec::encodeShutdown(uint32_t tx_pdo_id_0, struct can_frame *frame) {
     frame->can_id = tx_pdo_id_0;
     frame->can_dlc = 8;
     frame->data[0] = 0x06;
@@ -324,7 +324,7 @@ void MaxonMotorCodec::getShutdown(uint32_t tx_pdo_id_0, struct can_frame *frame)
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getEnable(uint32_t tx_pdo_id_0, struct can_frame *frame) {
+void MaxonMotorCodec::encodeEnable(uint32_t tx_pdo_id_0, struct can_frame *frame) {
     frame->can_id = tx_pdo_id_0;
     frame->can_dlc = 8;
     frame->data[0] = 0x0F;
@@ -337,13 +337,13 @@ void MaxonMotorCodec::getEnable(uint32_t tx_pdo_id_0, struct can_frame *frame) {
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getSync(struct can_frame *frame) {
+void MaxonMotorCodec::encodeSync(struct can_frame *frame) {
     frame->can_id = 0x80;
     frame->can_dlc = 0;
 }
 
 // ===== CSP mode =====
-void MaxonMotorCodec::getCSPMode(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeCSPMode(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x22;
@@ -356,7 +356,7 @@ void MaxonMotorCodec::getCSPMode(uint32_t can_send_id, struct can_frame *frame) 
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getTorqueOffset(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeTorqueOffset(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x22;
@@ -369,7 +369,7 @@ void MaxonMotorCodec::getTorqueOffset(uint32_t can_send_id, struct can_frame *fr
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getPosOffset(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodePosOffset(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x22;
@@ -382,7 +382,7 @@ void MaxonMotorCodec::getPosOffset(uint32_t can_send_id, struct can_frame *frame
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::setPosition(uint32_t tx_pdo_id_1, struct can_frame *frame, float p_des_radians) {
+void MaxonMotorCodec::encodePosition(uint32_t tx_pdo_id_1, struct can_frame *frame, float p_des_radians) {
     // 라디안 값을 인코더 값으로 변환
     float p_des_degrees = p_des_radians * (180.0f / M_PI);                        // 라디안을 도로 변환
     int p_des_enc = static_cast<int>(p_des_degrees * (35.0f * 4096.0f) / 360.0f); // 도를 인코더 값으로 변환
@@ -406,7 +406,7 @@ void MaxonMotorCodec::setPosition(uint32_t tx_pdo_id_1, struct can_frame *frame,
 }
 
 // ===== HMM mode =====
-void MaxonMotorCodec::getHomeMode(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeHomeMode(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x22;
@@ -419,7 +419,7 @@ void MaxonMotorCodec::getHomeMode(uint32_t can_send_id, struct can_frame *frame)
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getFollowingErrorWindow(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeFollowingErrorWindow(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x22;
@@ -432,7 +432,7 @@ void MaxonMotorCodec::getFollowingErrorWindow(uint32_t can_send_id, struct can_f
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getHomeoffsetDistance(uint32_t can_send_id, struct can_frame *frame, int degree) {
+void MaxonMotorCodec::encodeHomeoffsetDistance(uint32_t can_send_id, struct can_frame *frame, int degree) {
     // 1도당 값
     float value_per_degree = 398.22;
 
@@ -451,7 +451,7 @@ void MaxonMotorCodec::getHomeoffsetDistance(uint32_t can_send_id, struct can_fra
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getHomePosition(uint32_t can_send_id, struct can_frame *frame, int degree) {
+void MaxonMotorCodec::encodeHomePosition(uint32_t can_send_id, struct can_frame *frame, int degree) {
     float value_per_degree = 398.22;
     int32_t value = static_cast<int32_t>(degree * value_per_degree);
 
@@ -467,7 +467,7 @@ void MaxonMotorCodec::getHomePosition(uint32_t can_send_id, struct can_frame *fr
     frame->data[7] = (value >> 24) & 0xFF;
 }
 
-void MaxonMotorCodec::getHomingMethodL(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeHomingMethodLeft(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x22;
@@ -479,11 +479,11 @@ void MaxonMotorCodec::getHomingMethodL(uint32_t can_send_id, struct can_frame *f
     frame->data[6] = 0x00;
     frame->data[7] = 0x00;
 
-    // getHomingMethodR 동일한 함수
+    // encodeHomingMethodRight 동일한 함수
     // 현재 사용하지 않는 기능
 }
 
-void MaxonMotorCodec::getHomingMethodR(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeHomingMethodRight(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x22;
@@ -495,11 +495,11 @@ void MaxonMotorCodec::getHomingMethodR(uint32_t can_send_id, struct can_frame *f
     frame->data[6] = 0x00;
     frame->data[7] = 0x00;
 
-    // getHomingMethodL 이랑 동일한 함수
+    // encodeHomingMethodLeft 이랑 동일한 함수
     // 현재 사용하지 않는 기능
 }
 
-void MaxonMotorCodec::getHomingMethodTest(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeHomingMethodTest(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x22;
@@ -512,7 +512,7 @@ void MaxonMotorCodec::getHomingMethodTest(uint32_t can_send_id, struct can_frame
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getStartHoming(uint32_t tx_pdo_id_0, struct can_frame *frame) {
+void MaxonMotorCodec::encodeStartHoming(uint32_t tx_pdo_id_0, struct can_frame *frame) {
     frame->can_id = tx_pdo_id_0;
     frame->can_dlc = 8;
     frame->data[0] = 0x1F;
@@ -525,7 +525,7 @@ void MaxonMotorCodec::getStartHoming(uint32_t tx_pdo_id_0, struct can_frame *fra
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getCurrentThresholdR(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeCurrentThresholdRight(uint32_t can_send_id, struct can_frame *frame) {
     // 1000 = 3E8
     // 500 = 01F4
     frame->can_id = can_send_id;
@@ -540,7 +540,7 @@ void MaxonMotorCodec::getCurrentThresholdR(uint32_t can_send_id, struct can_fram
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getCurrentThresholdL(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeCurrentThresholdLeft(uint32_t can_send_id, struct can_frame *frame) {
     // 1000 =03E8
     // 500 = 01F4
     frame->can_id = can_send_id;
@@ -556,7 +556,7 @@ void MaxonMotorCodec::getCurrentThresholdL(uint32_t can_send_id, struct can_fram
 }
 
 // ===== CSV mode =====
-void MaxonMotorCodec::getCSVMode(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeCSVMode(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x22;
@@ -569,7 +569,7 @@ void MaxonMotorCodec::getCSVMode(uint32_t can_send_id, struct can_frame *frame) 
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getVelOffset(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeVelOffset(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x22;
@@ -582,7 +582,7 @@ void MaxonMotorCodec::getVelOffset(uint32_t can_send_id, struct can_frame *frame
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getTargetVelocity(uint32_t tx_pdo_id_2, struct can_frame *frame, int targetVelocity) {
+void MaxonMotorCodec::encodeTargetVelocity(uint32_t tx_pdo_id_2, struct can_frame *frame, int targetVelocity) {
     unsigned char velByte0 = targetVelocity & 0xFF;
     unsigned char velByte1 = (targetVelocity >> 8) & 0xFF;
     unsigned char velByte2 = (targetVelocity >> 16) & 0xFF;
@@ -602,7 +602,7 @@ void MaxonMotorCodec::getTargetVelocity(uint32_t tx_pdo_id_2, struct can_frame *
 }
 
 // ===== CST mode =====
-void MaxonMotorCodec::getCSTMode(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::encodeCSTMode(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x22;
@@ -615,7 +615,7 @@ void MaxonMotorCodec::getCSTMode(uint32_t can_send_id, struct can_frame *frame) 
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::setTorque(uint32_t tx_pdo_id_3, struct can_frame *frame, int targetTorquemNm) {
+void MaxonMotorCodec::encodeTorque(uint32_t tx_pdo_id_3, struct can_frame *frame, int targetTorquemNm) {
     // Motor rated torque 값 (mN·m)
     const float motorRatedTorquemNm = 31.052;
     const float maxTorquemNm = 293.8;
@@ -647,7 +647,7 @@ void MaxonMotorCodec::setTorque(uint32_t tx_pdo_id_3, struct can_frame *frame, i
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::setTargetTorque(uint32_t can_send_id, struct can_frame *frame, int targetTorque) {
+void MaxonMotorCodec::encodeTorqueSDO(uint32_t can_send_id, struct can_frame *frame, int targetTorque) {
     unsigned char torByte0 = targetTorque & 0xFF;
     unsigned char torByte1 = (targetTorque >> 8) & 0xFF;
 

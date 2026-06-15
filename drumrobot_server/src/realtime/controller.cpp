@@ -21,7 +21,7 @@ void Controller::send_loop() {
 
     while (ctx.running.load()) {
         if (!ctx.send_active.load()) {
-            if (ctx.robot_state.load() == RobotState::ShuttingDown) break;  // send_active 전 종료 상태가 되면 바로 탈출
+            if (ctx.robot_state.load() == RobotState::SHUTTINGDOWN) break;  // send_active 전 종료 상태가 되면 바로 탈출
             std::this_thread::sleep_for(std::chrono::milliseconds(10));     // send_active 전까지 대기
             continue;
         }
@@ -58,7 +58,7 @@ void Controller::send_loop() {
             cnt++;
 
             // 종료 상태 + 큐 소진 -> 루프 탈출
-            if ((ctx.robot_state.load() == RobotState::ShuttingDown) && control_queue.empty()) {
+            if ((ctx.robot_state.load() == RobotState::SHUTTINGDOWN) && control_queue.empty()) {
                 ctx.running = false;
                 break;
             }
@@ -120,7 +120,7 @@ void Controller::send_task_1ms(int cnt) {
 
     // Sync 프레임: 소켓당 1회
     struct can_frame sync_frame;
-    m_codec.getSync(&sync_frame);
+    m_codec.encodeSync(&sync_frame);
     for (auto &maxon : robot.virtual_maxon_motor) {
         robot.can.sendFrame(maxon->socket, sync_frame);
     }
@@ -133,7 +133,7 @@ void Controller::send_task_5ms() {
  
     // Sync 프레임: 소켓당 1회
     struct can_frame sync_frame;
-    m_codec.getSync(&sync_frame);
+    m_codec.encodeSync(&sync_frame);
     for (auto &maxon : robot.virtual_maxon_motor) {
         robot.can.sendFrame(maxon->socket, sync_frame);
     }
@@ -167,7 +167,7 @@ void Controller::tmotor_send_task(const ControlSetPoint &point) {
         }
  
         if (mode == ControlMode::POS) {
-            t_codec.setPosition(tmotor->node_id, &frame, static_cast<float>(motor_position));
+            t_codec.encodePosition(tmotor->node_id, &frame, static_cast<float>(motor_position));
 
             std::vector<double> values = {(double)tmotor->id,
                 1.0,    // mode
@@ -184,7 +184,7 @@ void Controller::tmotor_send_task(const ControlSetPoint &point) {
             double control_input = ermp + tmotor->control_gain * err;
             control_input = std::clamp(control_input, -100000.0, 100000.0);
 
-            t_codec.setVelocity(tmotor->node_id, &frame, static_cast<float>(control_input));
+            t_codec.encodeVelocity(tmotor->node_id, &frame, static_cast<float>(control_input));
 
             std::vector<double> values = {(double)tmotor->id,
                 2.0,    // mode
@@ -217,7 +217,7 @@ void Controller::maxon_motor_send_task(const ControlSetPoint &point) {
         if (mode == ControlMode::CSP) {
             if (mode != maxon->mode) set_maxon_mode(maxon, ControlMode::CSP);   // 모터가 현재 설정된 모드와 다르면 변경
 
-            m_codec.setPosition(maxon->tx_pdo_ids[1], &frame, motor_position);
+            m_codec.encodePosition(maxon->tx_pdo_ids[1], &frame, motor_position);
 
             std::vector<double> values = {(double)maxon->id,
                 1.0,    // mode
@@ -231,7 +231,7 @@ void Controller::maxon_motor_send_task(const ControlSetPoint &point) {
             if (mode != maxon->mode) set_maxon_mode(maxon, ControlMode::CST);   // 모터가 현재 설정된 모드와 다르면 변경
 
             double torque_mNm = cal_torque(maxon, motor_position);
-            m_codec.setTorque(maxon->tx_pdo_ids[3], &frame, static_cast<int>(torque_mNm));
+            m_codec.encodeTorque(maxon->tx_pdo_ids[3], &frame, static_cast<int>(torque_mNm));
 
             std::vector<double> values = {(double)maxon->id,
                 0.0,    // mode
@@ -258,17 +258,17 @@ void Controller::set_maxon_mode(std::shared_ptr<MaxonMotor> &maxon, ControlMode 
     struct can_frame frame;
 
     if (target_mode == ControlMode::CST) {
-        m_codec.getCSTMode(maxon->can_send_id, &frame);
+        m_codec.encodeCSTMode(maxon->can_send_id, &frame);
         robot.can.sendFrame(maxon->socket, frame);
     } else if (target_mode == ControlMode::CSP) {
-        m_codec.getCSPMode(maxon->can_send_id, &frame);
+        m_codec.encodeCSPMode(maxon->can_send_id, &frame);
         robot.can.sendFrame(maxon->socket, frame);
     }
 
     // 모드 바꾸고 shutdown -> enable 해주기
-    m_codec.getShutdown(maxon->tx_pdo_ids[0], &frame);
+    m_codec.encodeShutdown(maxon->tx_pdo_ids[0], &frame);
     robot.can.sendFrame(maxon->socket, frame);
-    m_codec.getEnable(maxon->tx_pdo_ids[0], &frame);
+    m_codec.encodeEnable(maxon->tx_pdo_ids[0], &frame);
     robot.can.sendFrame(maxon->socket, frame);
 
     maxon->mode = target_mode;
@@ -395,7 +395,7 @@ void Controller::distribute_frames() {
         if (auto tmotor = std::dynamic_pointer_cast<TMotor>(motor_ptr)) {
             for (auto &frame : temp_frames[tmotor->socket]) {
                 if ((frame.can_id & 0xFF) == tmotor->node_id) {
-                    auto [mid, pos, spd, cur, temp, err] = t_codec.parseReceiveCommand(&frame);
+                    auto [mid, pos, spd, cur, temp, err] = t_codec.decodeFeedback(&frame);
                     tmotor->current_position     = pos;
                     tmotor->current_velocity     = spd;
                     tmotor->current_motor_current      = cur;
@@ -411,7 +411,7 @@ void Controller::distribute_frames() {
         } else if (auto maxon = std::dynamic_pointer_cast<MaxonMotor>(motor_ptr)) {
             for (auto &frame : temp_frames[maxon->socket]) {
                 if (frame.can_id == maxon->rx_pdo_ids[0]) {
-                    auto [mid, pos, torque, status] = m_codec.parseReceiveCommand(&frame);
+                    auto [mid, pos, torque, status] = m_codec.decodeFeedback(&frame);
                     maxon->current_position    = pos;
                     maxon->current_torque      = torque;
                     maxon->status_bit          = status;
@@ -461,13 +461,13 @@ bool Controller::safety_check_recv_maxon(std::shared_ptr<MaxonMotor> &motor) {
         std::cerr << "[Controller] MaxonMotor 범위 초과 (" << motor->name << ")"
                   << "  joint=" << angle * 180.0 / M_PI << "deg\n";
 
-        // getShutdown 송신
+        // encodeShutdown 송신
         struct can_frame frame;
-        m_codec.getShutdown(motor->tx_pdo_ids[0], &frame);
+        m_codec.encodeShutdown(motor->tx_pdo_ids[0], &frame);
         robot.can.sendFrame(motor->socket, frame);
 
         struct can_frame sync_frame;
-        m_codec.getSync(&sync_frame);
+        m_codec.encodeSync(&sync_frame);
         robot.can.sendFrame(motor->socket, sync_frame);
 
         return false;

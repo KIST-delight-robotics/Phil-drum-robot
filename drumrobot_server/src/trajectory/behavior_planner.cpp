@@ -48,7 +48,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
         if (opcode == Opcode::START) {
             return handle_start();
         } else if (opcode == Opcode::QUIT) {
-            ctx.robot_state = RobotState::ShuttingDown;
+            ctx.robot_state = RobotState::SHUTTINGDOWN;
             return sequence;
         } else {
             std::cerr << "[BehaviorPlanner] 수행할 수 없는 명령 (send_active=false): opcode="
@@ -118,23 +118,23 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_start() {
                 << " 1. 고정 키를 모두 제거하세요.\n"
                 << " 2. 제거 후 'READY' 명령을 입력하세요.\n"
                 << "========================================\n\n";
-    ctx.robot_state = RobotState::Init;
+    ctx.robot_state = RobotState::INIT;
 
     return sequence;
 }
 
 // READY: idle state로 변경
 void BehaviorPlanner::handle_ready() {
-    if (ctx.robot_state.load() == RobotState::Init) {
-        ctx.robot_state = RobotState::Idle;
+    if (ctx.robot_state.load() == RobotState::INIT) {
+        ctx.robot_state = RobotState::IDLE;
     }
 }
 
 // LOOK pan tilt : 머리 yaw, pitch 제어
 std::vector<MotionPrimitive> BehaviorPlanner::handle_look(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
-    if (ctx.robot_state.load() != RobotState::Idle) {
-        std::cerr << "[BehaviorPlanner] LOOK rejected: only allowed in Idle\n";
+    if (ctx.robot_state.load() != RobotState::IDLE) {
+        std::cerr << "[BehaviorPlanner] LOOK rejected: only allowed in IDLE\n";
         return sequence;
     }
 
@@ -159,8 +159,8 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_look(const std::vector<std:
 // GESTURE type : 미리 정의된 제스처 시퀀스
 std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
-    if (ctx.robot_state.load() != RobotState::Idle) {
-        std::cerr << "[BehaviorPlanner] GESTURE rejected: only allowed in Idle\n";
+    if (ctx.robot_state.load() != RobotState::IDLE) {
+        std::cerr << "[BehaviorPlanner] GESTURE rejected: only allowed in IDLE\n";
         return sequence;
     }
 
@@ -237,8 +237,8 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
 // MOVE motor_name angle_deg [move_time]
 std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std::string>& args) {   // TODO: 여러개의 관절 동시에 움직이기
     std::vector<MotionPrimitive> sequence;
-    if (ctx.robot_state.load() != RobotState::Idle) {
-        std::cerr << "[BehaviorPlanner] MOVE rejected: only allowed in Idle\n";
+    if (ctx.robot_state.load() != RobotState::IDLE) {
+        std::cerr << "[BehaviorPlanner] MOVE rejected: only allowed in IDLE\n";
         return sequence;
     }
 
@@ -268,8 +268,8 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std:
 // POSE pose_name : 사전 정의 포즈로 이동
 std::vector<MotionPrimitive> BehaviorPlanner::handle_pose(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
-    if (ctx.robot_state.load() != RobotState::Idle) {
-        std::cerr << "[BehaviorPlanner] POSE rejected: only allowed in Idle\n";
+    if (ctx.robot_state.load() != RobotState::IDLE) {
+        std::cerr << "[BehaviorPlanner] POSE rejected: only allowed in IDLE\n";
         return sequence;
     }
 
@@ -286,7 +286,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_pose(const std::vector<std:
 
     // shutdown 포즈로 이동하는 경우 종료 플래그 세팅
     if (pose_name == "shutdown") {
-        ctx.robot_state = RobotState::ShuttingDown;
+        ctx.robot_state = RobotState::SHUTTINGDOWN;
     }
 
     return sequence;
@@ -295,8 +295,8 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_pose(const std::vector<std:
 // HIT target : 드럼 타격
 std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
-    if (ctx.robot_state.load() != RobotState::Idle) {
-        std::cerr << "[BehaviorPlanner] HIT rejected: only allowed in Idle\n";
+    if (ctx.robot_state.load() != RobotState::IDLE) {
+        std::cerr << "[BehaviorPlanner] HIT rejected: only allowed in IDLE\n";
         return sequence;
     }
 
@@ -322,8 +322,8 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::
 // PLAY score_name : 드럼 연주
 std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
-    if (ctx.robot_state.load() != RobotState::Idle) {
-        std::cerr << "[BehaviorPlanner] PLAY rejected: only allowed in Idle\n";
+    if (ctx.robot_state.load() != RobotState::IDLE) {
+        std::cerr << "[BehaviorPlanner] PLAY rejected: only allowed in IDLE\n";
         return sequence;
     }
 
@@ -393,14 +393,14 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     MotionPrimitive end; end.type = MotionType::DRUM; end.flag = PlayFlag::END;
     sequence.push_back(end);
 
-    ctx.robot_state = RobotState::Playing;
+    ctx.robot_state = RobotState::PLAYING;
     return sequence;
 }
 
 std::vector<MotionPrimitive> BehaviorPlanner::handle_quit() {
     std::vector<MotionPrimitive> sequence;
-    if (ctx.robot_state.load() != RobotState::Idle) {
-        std::cerr << "[BehaviorPlanner] PLAY rejected: only allowed in Idle\n";
+    if (ctx.robot_state.load() != RobotState::IDLE) {
+        std::cerr << "[BehaviorPlanner] PLAY rejected: only allowed in IDLE\n";
         return sequence;
     }
 
@@ -410,7 +410,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_quit() {
         sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME));
         last_q_target = it->second;
     }
-    ctx.robot_state = RobotState::ShuttingDown;
+    ctx.robot_state = RobotState::SHUTTINGDOWN;
     return sequence;
 }
 

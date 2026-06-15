@@ -62,7 +62,7 @@ void MotionPlanner::initialize() {
 }
 
 void MotionPlanner::plan_motions(const ParsedCommand& cmd) {
-    if (ctx.robot_state.load() == RobotState::ShuttingDown) return; // 종료 상태가 되면 추가 명령 안받음
+    if (ctx.robot_state.load() == RobotState::SHUTTINGDOWN) return; // 종료 상태가 되면 추가 명령 안받음
 
     std::vector<MotionPrimitive> motion_sequence = behavior_planner.generate_motion_sequence(cmd);
 
@@ -75,24 +75,24 @@ void MotionPlanner::plan_motions(const ParsedCommand& cmd) {
 }
 
 void MotionPlanner::schedule_idle_motion() {
-    if (ctx.robot_state.load() == RobotState::ShuttingDown) {
+    if (ctx.robot_state.load() == RobotState::SHUTTINGDOWN) {
         return; // 종료 상태가 되면 추가 명령 안받음
-    } else if (ctx.robot_state.load() == RobotState::Init) {
+    } else if (ctx.robot_state.load() == RobotState::INIT) {
         // 키 제거하기 전 현재 위치 유지
         MotionPrimitive standby_motion;
 
         standby_motion.type = MotionType::STANDBY;
         motion_queue.push(standby_motion);
-    } else if (ctx.robot_state.load() == RobotState::Idle) {
+    } else if (ctx.robot_state.load() == RobotState::IDLE) {
         // 대기 동작
         MotionPrimitive idle_motion;
 
         idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능
         motion_queue.push(idle_motion);
-    } else if (ctx.robot_state.load() == RobotState::Playing) {
+    } else if (ctx.robot_state.load() == RobotState::PLAYING) {
         // 연주 종료
         std::cerr << "[MotionPlanner] 연주를 마쳤습니다.\n";
-        ctx.robot_state = RobotState::Idle;
+        ctx.robot_state = RobotState::IDLE;
         MotionPrimitive idle_motion;
 
         idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능

@@ -114,7 +114,7 @@ void Robot::set_motors_socket() {
             } else if (std::shared_ptr<MaxonMotor> maxon = std::dynamic_pointer_cast<MaxonMotor>(motor)) {
                 if (!maxon->is_connected) {
                     maxon->socket = socket_fd;
-                    m_codec.getCheck(maxon->can_send_id, &frame);
+                    m_codec.encodeCheck(maxon->can_send_id, &frame);
                     can.sendFrame(maxon->socket, frame);
 
                     usleep(50000);
@@ -217,43 +217,43 @@ void Robot::maxon_motor_setting() {
         if (!maxon) continue;
 
         // CSP Settings
-        m_codec.getCSPMode(maxon->can_send_id, &frame);
+        m_codec.encodeCSPMode(maxon->can_send_id, &frame);
         can.sendandReceiveFrame(maxon->socket, frame);
 
-        m_codec.getPosOffset(maxon->can_send_id, &frame);
+        m_codec.encodePosOffset(maxon->can_send_id, &frame);
         can.sendandReceiveFrame(maxon->socket, frame);
 
-        m_codec.getTorqueOffset(maxon->can_send_id, &frame);
+        m_codec.encodeTorqueOffset(maxon->can_send_id, &frame);
         can.sendandReceiveFrame(maxon->socket, frame);
 
         // CSV Settings
-        m_codec.getCSVMode(maxon->can_send_id, &frame);
+        m_codec.encodeCSVMode(maxon->can_send_id, &frame);
         can.sendandReceiveFrame(maxon->socket, frame);
 
-        m_codec.getVelOffset(maxon->can_send_id, &frame);
+        m_codec.encodeVelOffset(maxon->can_send_id, &frame);
         can.sendandReceiveFrame(maxon->socket, frame);
 
         // CST Settings
-        m_codec.getCSTMode(maxon->can_send_id, &frame);
+        m_codec.encodeCSTMode(maxon->can_send_id, &frame);
         can.sendandReceiveFrame(maxon->socket, frame);
 
-        m_codec.getTorqueOffset(maxon->can_send_id, &frame);
+        m_codec.encodeTorqueOffset(maxon->can_send_id, &frame);
         can.sendandReceiveFrame(maxon->socket, frame);
 
         // HMM Settings
-        m_codec.getHomeMode(maxon->can_send_id, &frame);
+        m_codec.encodeHomeMode(maxon->can_send_id, &frame);
         can.sendandReceiveFrame(maxon->socket, frame);
 
-        m_codec.getHomingMethodR(maxon->can_send_id, &frame);
+        m_codec.encodeHomingMethodRight(maxon->can_send_id, &frame);
         can.sendandReceiveFrame(maxon->socket, frame);
 
-        m_codec.getHomeoffsetDistance(maxon->can_send_id, &frame, 0);
+        m_codec.encodeHomeoffsetDistance(maxon->can_send_id, &frame, 0);
         can.sendandReceiveFrame(maxon->socket, frame);
 
-        m_codec.getHomePosition(maxon->can_send_id, &frame, 0);
+        m_codec.encodeHomePosition(maxon->can_send_id, &frame, 0);
         can.sendandReceiveFrame(maxon->socket, frame);
 
-        // m_codec.getCurrentThresholdL(maxon->can_send_id, &frame);
+        // m_codec.encodeCurrentThresholdLeft(maxon->can_send_id, &frame);
         // can.sendandReceiveFrame(maxon->socket, frame);
     }
 }
@@ -265,7 +265,7 @@ void Robot::set_zero_tmotor() {
         auto tmotor = std::dynamic_pointer_cast<TMotor>(motor);
         if (!tmotor) continue;
 
-        t_codec.setOrigin(tmotor->node_id, &frame, 0);
+        t_codec.encodeSetOrigin(tmotor->node_id, &frame, 0);
         can.sendFrame(tmotor->socket, frame);
 
         usleep(100000);    // 100ms
@@ -284,35 +284,35 @@ void Robot::maxon_motor_enable() {
         auto maxon = std::dynamic_pointer_cast<MaxonMotor>(motor);
         if (!maxon) continue;
 
-        m_codec.getHomeMode(maxon->can_send_id, &frame);
+        m_codec.encodeHomeMode(maxon->can_send_id, &frame);
         can.sendFrame(maxon->socket, frame);
 
-        m_codec.getOperational(maxon->node_id, &frame);
+        m_codec.encodeEnterOperational(maxon->node_id, &frame);
         can.sendFrame(maxon->socket, frame);
 
         usleep(100000);
 
-        m_codec.getShutdown(maxon->tx_pdo_ids[0], &frame);
+        m_codec.encodeShutdown(maxon->tx_pdo_ids[0], &frame);
         can.sendFrame(maxon->socket, frame);
 
-        m_codec.getSync(&frame);
+        m_codec.encodeSync(&frame);
         can.sendFrame(maxon->socket, frame);
 
         usleep(100000);
         
-        m_codec.getEnable(maxon->tx_pdo_ids[0], &frame);
+        m_codec.encodeEnable(maxon->tx_pdo_ids[0], &frame);
         can.sendFrame(maxon->socket, frame);
 
-        m_codec.getSync(&frame);
+        m_codec.encodeSync(&frame);
         can.sendFrame(maxon->socket, frame);
 
         usleep(100000);
 
         // 현재 사용하지 않는 기능
-        // m_codec.getStartHoming(maxon->tx_pdo_ids[0], &frame);
+        // m_codec.encodeStartHoming(maxon->tx_pdo_ids[0], &frame);
         // can.sendFrame(maxon->socket, frame);
 
-        // m_codec.getSync(&frame);
+        // m_codec.encodeSync(&frame);
         // can.sendFrame(maxon->socket, frame);
 
         // usleep(100000);
@@ -330,33 +330,33 @@ void Robot::set_maxon_motor_mode(const std::string& targetMode) {
         if (!maxon) continue;
 
         if (targetMode == "CSV") {          // Cyclic Sync Velocity Mode
-            m_codec.getCSVMode(maxon->can_send_id, &frame);
+            m_codec.encodeCSVMode(maxon->can_send_id, &frame);
             can.sendFrame(maxon->socket, frame);
         } else if (targetMode == "CST") {   // Cyclic Sync Torque Mode
-            m_codec.getCSTMode(maxon->can_send_id, &frame);
+            m_codec.encodeCSTMode(maxon->can_send_id, &frame);
             can.sendFrame(maxon->socket, frame);
         } else if (targetMode == "HMM") {   // Homming Mode
-            m_codec.getHomeMode(maxon->can_send_id, &frame);
+            m_codec.encodeHomeMode(maxon->can_send_id, &frame);
             can.sendFrame(maxon->socket, frame);
         } else if (targetMode == "CSP") {   // Cyclic Sync Position Mode
-            m_codec.getCSPMode(maxon->can_send_id, &frame);
+            m_codec.encodeCSPMode(maxon->can_send_id, &frame);
             can.sendFrame(maxon->socket, frame);
         }
 
         // 모드 바꾸고 껐다 켜주기
 
-        m_codec.getShutdown(maxon->tx_pdo_ids[0], &frame);
+        m_codec.encodeShutdown(maxon->tx_pdo_ids[0], &frame);
         can.sendFrame(maxon->socket, frame);
 
-        m_codec.getSync(&frame);
+        m_codec.encodeSync(&frame);
         can.sendFrame(maxon->socket, frame);
 
         usleep(100);
 
-        m_codec.getEnable(maxon->tx_pdo_ids[0], &frame);
+        m_codec.encodeEnable(maxon->tx_pdo_ids[0], &frame);
         can.sendFrame(maxon->socket, frame);
 
-        m_codec.getSync(&frame);
+        m_codec.encodeSync(&frame);
         can.sendFrame(maxon->socket, frame);
 
         usleep(100);

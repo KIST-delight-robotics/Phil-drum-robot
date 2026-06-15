@@ -10,22 +10,22 @@ using namespace std;
 class TMotorServoCodec {
 public:
     // node_id: motor.node_id, 0: tempoaray origin  1: setting a permanent zero point
-    void setOrigin(uint32_t node_id, struct can_frame *frame, uint8_t set_origin_mode);
+    void encodeSetOrigin(uint32_t node_id, struct can_frame *frame, uint8_t set_origin_mode);
     
     // node_id: motor.node_id, pos [rad], speed[erpm], acceleration [erpm/s^2]
-    void setPositionVelocity(uint32_t node_id, struct can_frame *frame, float pos, int16_t spd, int16_t RPA);
+    void encodePositionVelocity(uint32_t node_id, struct can_frame *frame, float pos, int16_t spd, int16_t RPA);
 
     // id, position, speed, current, temperature, error
-    std::tuple<int, float, float, float, int8_t, int8_t> parseReceiveCommand(struct can_frame *frame);
+    std::tuple<int, float, float, float, int8_t, int8_t> decodeFeedback(struct can_frame *frame);
 
     // node_id: motor.node_id, current break
-    void setCurrentBrake(uint32_t node_id, struct can_frame *frame, float current);
+    void encodeCurrentBrake(uint32_t node_id, struct can_frame *frame, float current);
 
     // node_id: motor.node_id, speed [erpm]
-    void setVelocity(uint32_t node_id, struct can_frame *frame, float spd_erpm);
+    void encodeVelocity(uint32_t node_id, struct can_frame *frame, float spd_erpm);
 
     // node_id: motor.node_id, pos [rad]
-    void setPosition(uint32_t node_id, struct can_frame *frame, float pos);
+    void encodePosition(uint32_t node_id, struct can_frame *frame, float pos);
 
 private:
 };
@@ -42,23 +42,23 @@ public:
     float GLOBAL_I_MAX, Kt;
 
 
-    void parseSendCommand(struct can_frame *frame, int canId, int dlc, float p_des, float v_des, float kp, float kd, float t_ff);
-    std::tuple<int, float, float, float> parseReceiveCommand(struct can_frame *frame);
+    void encodeCommand(struct can_frame *frame, int canId, int dlc, float p_des, float v_des, float kp, float kd, float t_ff);
+    std::tuple<int, float, float, float> decodeFeedback(struct can_frame *frame);
 
     // node_id: motor.node_id
-    void getCheck(uint32_t node_id, struct can_frame *frame);
+    void encodeCheck(uint32_t node_id, struct can_frame *frame);
 
     // node_id: motor.node_id
-    void getControlMode(uint32_t node_id, struct can_frame *frame);
+    void encodeEnterControlMode(uint32_t node_id, struct can_frame *frame);
 
     // node_id: motor.node_id
-    void getExit(uint32_t node_id, struct can_frame *frame);
+    void encodeExitControlMode(uint32_t node_id, struct can_frame *frame);
 
     // node_id: motor.node_id
-    void getZero(uint32_t node_id, struct can_frame *frame);
+    void encodeSetZero(uint32_t node_id, struct can_frame *frame);
 
     // node_id: motor.node_id
-    void getQuickStop(uint32_t node_id, struct can_frame *frame);
+    void encodeQuickStop(uint32_t node_id, struct can_frame *frame);
 
 private:
     int floatToUint(float x, float x_min, float x_max, unsigned int bits);
@@ -67,93 +67,93 @@ private:
 
 class MaxonMotorCodec {
 public:
-    std::tuple<int, float, float, unsigned char> parseReceiveCommand(struct can_frame *frame);
+    std::tuple<int, float, float, unsigned char> decodeFeedback(struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void getActualPos(uint32_t can_send_id, struct can_frame *frame);
+    void encodeReadActualPos(uint32_t can_send_id, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void getCheck(uint32_t can_send_id, struct can_frame *frame);
+    void encodeCheck(uint32_t can_send_id, struct can_frame *frame);
 
     // node_id: motor.node_id
-    void getStop(uint32_t node_id, struct can_frame *frame);
+    void encodeStop(uint32_t node_id, struct can_frame *frame);
 
     // node_id: motor.node_id
-    void getOperational(uint32_t node_id, struct can_frame *frame);
+    void encodeEnterOperational(uint32_t node_id, struct can_frame *frame);
 
     // tx_pdo_id_0: motor.tx_pdo_ids[0]
-    void getShutdown(uint32_t tx_pdo_id_0, struct can_frame *frame);
+    void encodeShutdown(uint32_t tx_pdo_id_0, struct can_frame *frame);
 
     // tx_pdo_id_0: motor.tx_pdo_ids[0]
-    void getEnable(uint32_t tx_pdo_id_0, struct can_frame *frame);
+    void encodeEnable(uint32_t tx_pdo_id_0, struct can_frame *frame);
 
-    void getSync(struct can_frame *frame);
+    void encodeSync(struct can_frame *frame);
 
     // ====== CSP 모드 관련 명령 구성 메서드 ======
 
     // can_send_id: motor.can_send_id
-    void getCSPMode(uint32_t can_send_id, struct can_frame *frame);
+    void encodeCSPMode(uint32_t can_send_id, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void getTorqueOffset(uint32_t can_send_id, struct can_frame *frame);
+    void encodeTorqueOffset(uint32_t can_send_id, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void getPosOffset(uint32_t can_send_id, struct can_frame *frame);
+    void encodePosOffset(uint32_t can_send_id, struct can_frame *frame);
 
     // tx_pdo_id_1: motor.tx_pdo_ids[1]
-    void setPosition(uint32_t tx_pdo_id_1, struct can_frame *frame, float p_des_radians);
+    void encodePosition(uint32_t tx_pdo_id_1, struct can_frame *frame, float p_des_radians);
 
     // ====== HMM 모드 관련 명령 구성 메서드 ======
     
     // can_send_id: motor.can_send_id
-    void getHomeMode(uint32_t can_send_id, struct can_frame *frame);
+    void encodeHomeMode(uint32_t can_send_id, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void getFollowingErrorWindow(uint32_t can_send_id, struct can_frame *frame);
+    void encodeFollowingErrorWindow(uint32_t can_send_id, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void getHomeoffsetDistance(uint32_t can_send_id, struct can_frame *frame, int degree);
+    void encodeHomeoffsetDistance(uint32_t can_send_id, struct can_frame *frame, int degree);
 
     // motor.can_send_id
-    void getHomePosition(uint32_t can_send_id, struct can_frame *frame, int degree);
+    void encodeHomePosition(uint32_t can_send_id, struct can_frame *frame, int degree);
 
     // can_send_id: motor.can_send_id
-    void getHomingMethodL(uint32_t can_send_id, struct can_frame *frame);
+    void encodeHomingMethodLeft(uint32_t can_send_id, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void getHomingMethodR(uint32_t can_send_id, struct can_frame *frame);
+    void encodeHomingMethodRight(uint32_t can_send_id, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void getHomingMethodTest(uint32_t can_send_id, struct can_frame *frame);
+    void encodeHomingMethodTest(uint32_t can_send_id, struct can_frame *frame);
 
     // tx_pdo_id_0: motor.tx_pdo_ids[0]
-    void getStartHoming(uint32_t tx_pdo_id_0, struct can_frame *frame);
+    void encodeStartHoming(uint32_t tx_pdo_id_0, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void getCurrentThresholdR(uint32_t can_send_id, struct can_frame *frame);
+    void encodeCurrentThresholdRight(uint32_t can_send_id, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void getCurrentThresholdL(uint32_t can_send_id, struct can_frame *frame);
+    void encodeCurrentThresholdLeft(uint32_t can_send_id, struct can_frame *frame);
 
     // ===== CSV 모드 관련 명령 구성 메서드 ======
 
     // can_send_id: motor.can_send_id
-    void getCSVMode(uint32_t can_send_id, struct can_frame *frame);
+    void encodeCSVMode(uint32_t can_send_id, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void getVelOffset(uint32_t can_send_id, struct can_frame *frame);
+    void encodeVelOffset(uint32_t can_send_id, struct can_frame *frame);
 
     // tx_pdo_id_2: motor.tx_pdo_ids[2]
-    void getTargetVelocity(uint32_t tx_pdo_id_2, struct can_frame *frame, int targetVelocity);
+    void encodeTargetVelocity(uint32_t tx_pdo_id_2, struct can_frame *frame, int targetVelocity);
 
     // ====== CST 모드 관련 명령 구성 메서드 ======
 
     // can_send_id: motor.can_send_id
-    void getCSTMode(uint32_t can_send_id, struct can_frame *frame);
+    void encodeCSTMode(uint32_t can_send_id, struct can_frame *frame);
 
     // tx_pdo_id_3: motor.tx_pdo_ids[3]
-    void setTorque(uint32_t tx_pdo_id_3, struct can_frame *frame, int targetTorquemNm);
+    void encodeTorque(uint32_t tx_pdo_id_3, struct can_frame *frame, int targetTorquemNm);
 
     // can_send_id: motor.can_send_id
-    void setTargetTorque(uint32_t can_send_id, struct can_frame *frame, int targetTorque);
+    void encodeTorqueSDO(uint32_t can_send_id, struct can_frame *frame, int targetTorque);
 };
