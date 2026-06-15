@@ -38,7 +38,7 @@ private:
 
     void initialize();
 
-    void generate_motions(const ParsedCommand& cmd);
+    void plan_motions(const ParsedCommand& cmd);
     void schedule_idle_motion();
     void abort_play_motion();
 

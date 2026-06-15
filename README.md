@@ -492,3 +492,9 @@ python3 drumrobot_client/main.py
 |---|---|---|
 | nlohmann/json   | `drumrobot_server/lib/nlohmann/json.hpp` | MIT        |
 | Dynamixel SDK   | `drumrobot_server/lib/dynamixel_sdk/`    | Apache 2.0 |
+
+---
+
+## TODO
+음악이랑 싱크 어떻게 맞추지?
+강화학습 적용 어떻게 하지?

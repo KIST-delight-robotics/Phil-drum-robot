@@ -12,14 +12,16 @@ void MotionPlanner::run() {
     while (ctx.running.load()) {
         if (auto cmd = command_queue.try_pop()) {
             // 명령이 있으면 motion_queue에 적재
-            generate_motions(*cmd);
-        } else if (ctx.send_active.load() && motion_queue.empty()) {
-            // send_active 이 후 motion_queue가 없으면 대기 모션
-            schedule_idle_motion();
+            plan_motions(*cmd);
         }
 
         // control_queue 잔량이 임계값 이하면 다음 모션 생성
         if (control_queue.size() < threshold) {
+            // send_active 이 후 motion_queue가 없으면 모션 채우기
+            if (ctx.send_active.load() && motion_queue.empty()) {
+                schedule_idle_motion();
+            }
+
             if (auto motion = motion_queue.try_pop()) {
                 trajectory_generator.generate_trajectory(*motion);
                 if (!ctx.recv_active.load()) ctx.recv_active = true;
@@ -59,7 +61,7 @@ void MotionPlanner::initialize() {
     trajectory_generator.initialize(behavior_planner.poses);
 }
 
-void MotionPlanner::generate_motions(const ParsedCommand& cmd) {
+void MotionPlanner::plan_motions(const ParsedCommand& cmd) {
     if (ctx.robot_state.load() == RobotState::ShuttingDown) return; // 종료 상태가 되면 추가 명령 안받음
 
     std::vector<MotionPrimitive> motion_sequence = behavior_planner.generate_motion_sequence(cmd);
@@ -81,16 +83,12 @@ void MotionPlanner::schedule_idle_motion() {
 
         standby_motion.type = MotionType::STANDBY;
         motion_queue.push(standby_motion);
-
-        record_motion(standby_motion);
     } else if (ctx.robot_state.load() == RobotState::Idle) {
         // 대기 동작
         MotionPrimitive idle_motion;
 
         idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능
         motion_queue.push(idle_motion);
-
-        record_motion(idle_motion);
     } else if (ctx.robot_state.load() == RobotState::Playing) {
         // 연주 종료
         std::cerr << "[MotionPlanner] 연주를 마쳤습니다.\n";
@@ -99,8 +97,6 @@ void MotionPlanner::schedule_idle_motion() {
 
         idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능
         motion_queue.push(idle_motion);
-
-        record_motion(idle_motion);
     }
 }
 
