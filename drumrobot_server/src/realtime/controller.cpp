@@ -174,7 +174,7 @@ void Controller::tmotor_send_task(const ControlSetPoint &point) {
                 motor_position,
                 tmotor->current_position,
                 motor_position - tmotor->current_position,
-                tmotor->current_current
+                tmotor->current_motor_current
             };
             motor_log.record(values);
         } else if (mode == ControlMode::VEL) {
@@ -191,11 +191,11 @@ void Controller::tmotor_send_task(const ControlSetPoint &point) {
                 motor_position,
                 tmotor->current_position,
                 motor_position - tmotor->current_position,
-                tmotor->current_current,
+                tmotor->current_motor_current,
                 control_input
             };
             motor_log.record(values);
-        } else if (mode == ControlMode::None) {
+        } else if (mode == ControlMode::NONE) {
             std::cerr << "[Controller] TMotor ControlMode 미설정 (" << tmotor->name << ")\n";
             continue;
         }
@@ -245,7 +245,7 @@ void Controller::maxon_motor_send_task(const ControlSetPoint &point) {
         } else if (mode == ControlMode::CSV) {
             std::cerr << "[Controller] MaxonMotor CSV 모드 구현 안됨 (" << maxon->name << ")\n";
             continue;
-        } else if (mode == ControlMode::None) {
+        } else if (mode == ControlMode::NONE) {
             std::cerr << "[Controller] MaxonMotor ControlMode 미설정 (" << maxon->name << ")\n";
             continue;
         }
@@ -311,9 +311,9 @@ double Controller::cal_torque(std::shared_ptr<MaxonMotor> &maxon, double target_
 }
 
 void Controller::dynamixel_send_task(const ControlSetPoint &point) {
-    if (!robot.dxl_sw || !robot.dxl_sr) return;
+    if (!robot.dxl_sync_write || !robot.dxl_sync_read) return;
 
-    // 모든 dxl 모터의 목표값을 dxl_sw에 한 번에 등록
+    // 모든 dxl 모터의 목표값을 dxl_sync_write에 한 번에 등록
     for (auto &[id, motor] : robot.motors) {
         auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
         if (!dxl) continue;
@@ -328,26 +328,26 @@ void Controller::dynamixel_send_task(const ControlSetPoint &point) {
         values[2] = dxl->angle_to_tick(motor_position);
         memcpy(param, values, sizeof(values));
 
-        if (!robot.dxl_sw->addParam(dxl->dxl_id, param)) {
-            std::cerr << "[Controller] dxl_sw addParam failed for ID:"
+        if (!robot.dxl_sync_write->addParam(dxl->dxl_id, param)) {
+            std::cerr << "[Controller] dxl_sync_write addParam failed for ID:"
                     << (int)dxl->dxl_id << "\n";
             continue;
         }
     }
 
     // 한 번에 송신
-    robot.dxl_sw->txPacket();
-    robot.dxl_sw->clearParam();
+    robot.dxl_sync_write->txPacket();
+    robot.dxl_sync_write->clearParam();
 
     // 한 번에 수신
-    int comm = robot.dxl_sr->txRxPacket();
+    int comm = robot.dxl_sync_read->txRxPacket();
     if (comm == COMM_SUCCESS) {
         for (auto &[id, motor] : robot.motors) {
             auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
             if (!dxl) continue;
 
-            if (robot.dxl_sr->isAvailable(dxl->dxl_id, 132, 4)) {
-                int32_t tick = robot.dxl_sr->getData(dxl->dxl_id, 132, 4);
+            if (robot.dxl_sync_read->isAvailable(dxl->dxl_id, 132, 4)) {
+                int32_t tick = robot.dxl_sync_read->getData(dxl->dxl_id, 132, 4);
                 double pos   = dxl->tick_to_angle(tick);
                 dxl->current_position    = pos;
                 dxl->current_joint_angle = dxl->motor_position_to_joint_angle(pos);
@@ -395,10 +395,10 @@ void Controller::distribute_frames() {
         if (auto tmotor = std::dynamic_pointer_cast<TMotor>(motor_ptr)) {
             for (auto &frame : temp_frames[tmotor->socket]) {
                 if ((frame.can_id & 0xFF) == tmotor->node_id) {
-                    auto [mid, pos, spd, cur, temp, err] = t_codec.parseRecieveCommand(&frame);
+                    auto [mid, pos, spd, cur, temp, err] = t_codec.parseReceiveCommand(&frame);
                     tmotor->current_position     = pos;
                     tmotor->current_velocity     = spd;
-                    tmotor->current_current      = cur;
+                    tmotor->current_motor_current      = cur;
                     tmotor->current_joint_angle  = tmotor->motor_position_to_joint_angle(pos);
 
                     if (!safety_check_recv_tmotor(tmotor)) {
@@ -411,7 +411,7 @@ void Controller::distribute_frames() {
         } else if (auto maxon = std::dynamic_pointer_cast<MaxonMotor>(motor_ptr)) {
             for (auto &frame : temp_frames[maxon->socket]) {
                 if (frame.can_id == maxon->rx_pdo_ids[0]) {
-                    auto [mid, pos, torque, status] = m_codec.parseRecieveCommand(&frame);
+                    auto [mid, pos, torque, status] = m_codec.parseReceiveCommand(&frame);
                     maxon->current_position    = pos;
                     maxon->current_torque      = torque;
                     maxon->status_bit          = status;
@@ -441,10 +441,10 @@ bool Controller::safety_check_recv_tmotor(std::shared_ptr<TMotor> &motor) {
         return false;
     }
 
-    if (motor->current_current > motor->current_limit) {
+    if (motor->current_motor_current > motor->current_limit) {
         if (motor->cnt++ > 5) {
             std::cerr << "[Controller] TMotor 전류 초과 (" << motor->name << ")"
-                    << "  current=" << motor->current_current << "A\n";
+                    << "  current=" << motor->current_motor_current << "A\n";
             return false;
         }
     } else {

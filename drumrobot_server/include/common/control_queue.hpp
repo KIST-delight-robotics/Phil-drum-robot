@@ -19,7 +19,7 @@ enum class ControlMode {
     CSP,
 
     // Dynamixel or None
-    None,
+    NONE,
 };
 
 struct ControlSetPoint {

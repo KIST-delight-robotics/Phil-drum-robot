@@ -36,7 +36,7 @@ void KinematicsSolver::initialize() {
     // verify_fk_ik();
 }
 
-KinematicsSolver::IKResult KinematicsSolver::ik_solve(
+KinematicsSolver::IKResult KinematicsSolver::solve_ik(
     const std::array<double, 3>& pR,
     const std::array<double, 3>& pL,
     double theta0,
@@ -128,7 +128,7 @@ KinematicsSolver::IKResult KinematicsSolver::ik_solve(
     return result;
 }
 
-KinematicsSolver::FKResult KinematicsSolver::fk_solve(const std::array<double, 9>& q) {
+KinematicsSolver::FKResult KinematicsSolver::solve_fk(const std::array<double, 9>& q) {
     FKResult result;
  
     if (q.size() < 9) {
@@ -294,14 +294,14 @@ void KinematicsSolver::verify_fk_ik(int num_tests, double tolerance_deg) {
         }
  
         // FK: q_in → (pR, pL)
-        FKResult fk = fk_solve(q_in);
+        FKResult fk = solve_fk(q_in);
         if (!fk.success) {
             fk_fail++;
             continue;
         }
  
         // IK: (pR, pL, theta0, theta7, theta8) → q_out
-        IKResult ik = ik_solve(fk.pR, fk.pL, q_in[0], q_in[7], q_in[8], false);
+        IKResult ik = solve_ik(fk.pR, fk.pL, q_in[0], q_in[7], q_in[8], false);
         if (!ik.success) {
             ik_fail++;
             continue;
@@ -325,7 +325,7 @@ void KinematicsSolver::verify_fk_ik(int num_tests, double tolerance_deg) {
         }
  
         // 관절각 mismatch → IK 결과를 다시 FK로 검증
-        FKResult fk2 = fk_solve(ik.q);
+        FKResult fk2 = solve_fk(ik.q);
         if (!fk2.success) {
             mismatch_diff_endpoint++;
             continue;

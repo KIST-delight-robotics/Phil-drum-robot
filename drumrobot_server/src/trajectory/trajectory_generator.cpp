@@ -130,7 +130,7 @@ void TrajectoryGenerator::generate_task_space_trajectory(const MotionPrimitive& 
         double theta0 = q[0];
         double theta7 = q[7];
         double theta8 = q[8];
-        KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8, true);
+        KinematicsSolver::IKResult result = solver.solve_ik(pR, pL, theta0, theta7, theta8, true);
 
         if (!result.success) {
             std::cerr << "[TrajectoryGenerator] Failed to solve inverse kinematics\n";
@@ -295,8 +295,8 @@ std::array<ControlMode, ROBOT::NUM_JOINT> TrajectoryGenerator::get_modes(bool is
         wrist_control_mode,
         pedal_control_mode,
         pedal_control_mode,
-        ControlMode::None,
-        ControlMode::None
+        ControlMode::NONE,
+        ControlMode::NONE
     };
 
     return modes;
@@ -476,7 +476,7 @@ void TrajectoryGenerator::update_last_q(const std::vector<double>& q) {
 
     std::array<double, 9> q_in;
     std::copy(last_q.begin(), last_q.begin() + 9, q_in.begin());
-    KinematicsSolver::FKResult result = solver.fk_solve(q_in);
+    KinematicsSolver::FKResult result = solver.solve_fk(q_in);
 
     if (!result.success) {
         std::cerr << "[TrajectoryGenerator] Failed to solve forward kinematics\n";
@@ -493,7 +493,7 @@ void TrajectoryGenerator::update_last_q(const std::array<double, ROBOT::NUM_JOIN
 
     std::array<double, 9> q_in;
     std::copy(last_q.begin(), last_q.begin() + 9, q_in.begin());
-    KinematicsSolver::FKResult result = solver.fk_solve(q_in);
+    KinematicsSolver::FKResult result = solver.solve_fk(q_in);
 
     if (!result.success) {
         std::cerr << "[TrajectoryGenerator] Failed to solve forward kinematics\n";
@@ -510,7 +510,7 @@ void TrajectoryGenerator::update_last_q(const std::vector<double>& p, const std:
     double theta0 = q[0];
     double theta7 = q[7];
     double theta8 = q[8];
-    KinematicsSolver::IKResult result = solver.ik_solve(pR, pL, theta0, theta7, theta8, true);
+    KinematicsSolver::IKResult result = solver.solve_ik(pR, pL, theta0, theta7, theta8, true);
 
     if (!result.success) {
         std::cerr << "[TrajectoryGenerator] Failed to solve inverse kinematics\n";

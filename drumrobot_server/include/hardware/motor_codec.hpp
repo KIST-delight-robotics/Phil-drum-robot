@@ -16,7 +16,7 @@ public:
     void setPositionVelocity(uint32_t node_id, struct can_frame *frame, float pos, int16_t spd, int16_t RPA);
 
     // id, position, speed, current, temperature, error
-    std::tuple<int, float, float, float, int8_t, int8_t> parseRecieveCommand(struct can_frame *frame);
+    std::tuple<int, float, float, float, int8_t, int8_t> parseReceiveCommand(struct can_frame *frame);
 
     // node_id: motor.node_id, current break
     void setCurrentBrake(uint32_t node_id, struct can_frame *frame, float current);
@@ -43,7 +43,7 @@ public:
 
 
     void parseSendCommand(struct can_frame *frame, int canId, int dlc, float p_des, float v_des, float kp, float kd, float t_ff);
-    std::tuple<int, float, float, float> parseRecieveCommand(struct can_frame *frame);
+    std::tuple<int, float, float, float> parseReceiveCommand(struct can_frame *frame);
 
     // node_id: motor.node_id
     void getCheck(uint32_t node_id, struct can_frame *frame);
@@ -67,7 +67,7 @@ private:
 
 class MaxonMotorCodec {
 public:
-    std::tuple<int, float, float, unsigned char> parseRecieveCommand(struct can_frame *frame);
+    std::tuple<int, float, float, unsigned char> parseReceiveCommand(struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
     void getActualPos(uint32_t can_send_id, struct can_frame *frame);
@@ -109,7 +109,7 @@ public:
     void getHomeMode(uint32_t can_send_id, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void getFlowingErrorWindow(uint32_t can_send_id, struct can_frame *frame);
+    void getFollowingErrorWindow(uint32_t can_send_id, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
     void getHomeoffsetDistance(uint32_t can_send_id, struct can_frame *frame, int degree);

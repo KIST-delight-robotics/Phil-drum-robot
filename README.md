@@ -217,7 +217,7 @@ Phil/
 - TMotor(0~6) = `VEL`
 - Wrist(7, 8) = `CSP` (단, 연주 중에는 `CST`로 전환)
 - Pedal(9, 10) = `CSP`
-- Head(11, 12) = Dynamixel 위치 제어 (`ControlMode::None`)
+- Head(11, 12) = Dynamixel 위치 제어 (`ControlMode::NONE`)
 
 ### 모터 통신
 

@@ -464,20 +464,20 @@ void Robot::init_dynamixel() {
         return;  // group sync 생성 안 함
     }
 
-    dxl_sw = std::make_unique<dynamixel::GroupSyncWrite>(port, pkt, 108, 12);
-    dxl_sr = std::make_unique<dynamixel::GroupSyncRead>(port, pkt, 132, 4);
+    dxl_sync_write = std::make_unique<dynamixel::GroupSyncWrite>(port, pkt, 108, 12);
+    dxl_sync_read = std::make_unique<dynamixel::GroupSyncRead>(port, pkt, 132, 4);
     for (auto &[id, motor] : motors) {
         auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
         if (!dxl) continue;
         // read는 한 번만 등록하면 끝  
-        if (!dxl_sr->addParam(dxl->dxl_id)) {
-            std::cerr << "[Robot] dxl_sr addParam failed for ID:"
+        if (!dxl_sync_read->addParam(dxl->dxl_id)) {
+            std::cerr << "[Robot] dxl_sync_read addParam failed for ID:"
                     << (int)dxl->dxl_id << "\n";
             continue;
         }
     }
     dxl_port = port;
-    dxl_pkt  = pkt;
+    dxl_packet  = pkt;
 
     // 초기 위치로 보내기
     set_dxl_initial_pose();
@@ -510,7 +510,7 @@ void Robot::set_dxl_initial_pose() {
     // 다이나믹셀은 초기 위치가 고정되어 있지 않음
     const int32_t total_time = 2000;  // 이동 시간 [ms]
 
-    dxl_sw->clearParam();
+    dxl_sync_write->clearParam();
     for (auto &[id, motor] : motors) {
         auto dxl = std::dynamic_pointer_cast<DynamixelMotor>(motor);
         if (!dxl) continue;
@@ -525,8 +525,8 @@ void Robot::set_dxl_initial_pose() {
         values[2] = dxl->angle_to_tick(motor_position);
         memcpy(param, values, sizeof(values));
 
-        if (!dxl_sw->addParam(dxl->dxl_id, param)) {
-            std::cerr << "[Robot] init pose: dxl_sw addParam failed for ID:"
+        if (!dxl_sync_write->addParam(dxl->dxl_id, param)) {
+            std::cerr << "[Robot] init pose: dxl_sync_write addParam failed for ID:"
                       << (int)dxl->dxl_id << "\n";
             continue;
         }
@@ -535,7 +535,7 @@ void Robot::set_dxl_initial_pose() {
         dxl->current_joint_angle = 0.0;
     }
 
-    if (dxl_sw->txPacket() != COMM_SUCCESS) {
+    if (dxl_sync_write->txPacket() != COMM_SUCCESS) {
         std::cerr << "[Robot] init pose: SyncWrite failed\n";
     } else {
         printf("[Robot] -------------- Dynamixel moving to initial pose\n");

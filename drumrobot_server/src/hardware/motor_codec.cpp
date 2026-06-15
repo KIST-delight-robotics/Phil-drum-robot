@@ -11,7 +11,7 @@ enum class CAN_PACKET_ID {
     CAN_PACKET_SET_POS_SPD
 };
 
-std::tuple<int, float, float, float, int8_t, int8_t> TMotorServoCodec::parseRecieveCommand(struct can_frame *frame) {
+std::tuple<int, float, float, float, int8_t, int8_t> TMotorServoCodec::parseReceiveCommand(struct can_frame *frame) {
     int id = frame->can_id & 0xFF;
     int16_t pos_int = (frame)->data[0] << 8 | (frame)->data[1];
     int16_t spd_int = (frame)->data[2] << 8 | (frame)->data[3];
@@ -126,7 +126,7 @@ void TMotorMITCodec::parseSendCommand(struct can_frame *frame, int canId, int dl
     frame->data[7] = t_int & 0xff;                         // torque 4 bit lower
 }
 
-std::tuple<int, float, float, float> TMotorMITCodec::parseRecieveCommand(struct can_frame *frame) {
+std::tuple<int, float, float, float> TMotorMITCodec::parseReceiveCommand(struct can_frame *frame) {
     int id;
     float position, speed, torque;
 
@@ -230,7 +230,7 @@ void TMotorMITCodec::getQuickStop(uint32_t node_id, struct can_frame *frame) {
 }
 
 // ===== Maxon Motor Codec =====
-std::tuple<int, float, float, unsigned char> MaxonMotorCodec::parseRecieveCommand(struct can_frame *frame) {
+std::tuple<int, float, float, unsigned char> MaxonMotorCodec::parseReceiveCommand(struct can_frame *frame) {
     int id = frame->can_id;
 
     unsigned char statusBit = frame->data[1];
@@ -419,7 +419,7 @@ void MaxonMotorCodec::getHomeMode(uint32_t can_send_id, struct can_frame *frame)
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::getFlowingErrorWindow(uint32_t can_send_id, struct can_frame *frame) {
+void MaxonMotorCodec::getFollowingErrorWindow(uint32_t can_send_id, struct can_frame *frame) {
     frame->can_id = can_send_id;
     frame->can_dlc = 8;
     frame->data[0] = 0x22;

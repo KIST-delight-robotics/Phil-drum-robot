@@ -28,10 +28,10 @@ public:
     std::map<int, std::shared_ptr<Motor>> motors;
     std::vector<std::shared_ptr<MaxonMotor>> virtual_maxon_motor;   // Sync 신호를 위한 가상 모터
 
-    std::unique_ptr<dynamixel::GroupSyncWrite> dxl_sw;
-    std::unique_ptr<dynamixel::GroupSyncRead>  dxl_sr;
+    std::unique_ptr<dynamixel::GroupSyncWrite> dxl_sync_write;
+    std::unique_ptr<dynamixel::GroupSyncRead>  dxl_sync_read;
     dynamixel::PortHandler *dxl_port = nullptr;
-    dynamixel::PacketHandler *dxl_pkt = nullptr;
+    dynamixel::PacketHandler *dxl_packet = nullptr;
 
 private:
 

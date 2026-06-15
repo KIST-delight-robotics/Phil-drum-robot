@@ -23,7 +23,7 @@ public:
         bool success = false;   // 성공 여부
     };
 
-    IKResult ik_solve(
+    IKResult solve_ik(
         const std::array<double, 3>& pR,
         const std::array<double, 3>& pL,
         double theta0,
@@ -40,7 +40,7 @@ public:
         bool success = false;
     };
     
-    FKResult fk_solve(const std::array<double, 9>& q);
+    FKResult solve_fk(const std::array<double, 9>& q);
 
 private:
     struct JointLimit {
