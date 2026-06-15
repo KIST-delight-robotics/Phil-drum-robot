@@ -432,7 +432,7 @@ void MaxonMotorCodec::encodeFollowingErrorWindow(uint32_t can_send_id, struct ca
     frame->data[7] = 0x00;
 }
 
-void MaxonMotorCodec::encodeHomeoffsetDistance(uint32_t can_send_id, struct can_frame *frame, int degree) {
+void MaxonMotorCodec::encodeHomeOffsetDistance(uint32_t can_send_id, struct can_frame *frame, int degree) {
     // 1도당 값
     float value_per_degree = 398.22;
 

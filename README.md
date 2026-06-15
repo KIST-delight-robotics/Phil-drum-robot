@@ -84,7 +84,7 @@ CAN 통신 기반으로 TMotor / Maxon / Dynamixel 모터를 제어하며, LLM(T
 | `Controller` | `ControlQueue`에서 꺼내 CAN 프레임 송신 (1ms Maxon 보간 + 5ms 동시), 모터 상태 수신 및 안전 검사 |
 | `Robot` | 모터 객체들의 컨테이너. 초기화, socket 할당, Maxon/Dynamixel 설정 |
 | `CanInterface` | CAN 포트 활성화, 소켓 생성, 프레임 read/write, Non-block 설정 |
-| `MotorCodec` | TMotor / MaxonMotor 종류별 CAN 프레임 인코딩·디코딩 |
+| `MotorCodec` | TMotor / MaxonMotor 종류별 CAN 프레임 구성·해석. 명령 프레임 빌드는 `encode*`, 수신 프레임 파싱은 `decodeFeedback` |
 | `Logger` | 모터/궤적/명령 상태를 타임스탬프 기반 CSV 파일로 저장 |
 
 ### 연주 모션 서브 제너레이터 (`PlayMotionGenerator`)
@@ -414,7 +414,7 @@ end
 
 ### TMotor 전류 초과 차단
 
-- 수신된 `current_current`가 `current_limit`을 **연속 5회 초과**하면 시스템 정지
+- 수신된 `current_motor_current`가 `current_limit`을 **연속 5회 초과**하면 시스템 정지
 - 일시적 과전류(스파이크)는 카운터가 리셋되어 무시됨 (`Motor::cnt`)
 
 ### IK 실패 처리
@@ -432,7 +432,7 @@ end
 ### 수신 후 안전 검사
 
 - **TMotor 범위 초과** → 즉시 `running = false` (전체 정지)
-- **Maxon 범위 초과** → `getShutdown` PDO 송신 후 전체 정지
+- **Maxon 범위 초과** → `encodeShutdown` PDO 송신 후 전체 정지
 
 복구 절차:
 
@@ -492,9 +492,3 @@ python3 drumrobot_client/main.py
 |---|---|---|
 | nlohmann/json   | `drumrobot_server/lib/nlohmann/json.hpp` | MIT        |
 | Dynamixel SDK   | `drumrobot_server/lib/dynamixel_sdk/`    | Apache 2.0 |
-
----
-
-## TODO
-음악이랑 싱크 어떻게 맞추지?
-강화학습 적용 어떻게 하지?

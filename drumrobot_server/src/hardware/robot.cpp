@@ -247,7 +247,7 @@ void Robot::maxon_motor_setting() {
         m_codec.encodeHomingMethodRight(maxon->can_send_id, &frame);
         can.sendandReceiveFrame(maxon->socket, frame);
 
-        m_codec.encodeHomeoffsetDistance(maxon->can_send_id, &frame, 0);
+        m_codec.encodeHomeOffsetDistance(maxon->can_send_id, &frame, 0);
         can.sendandReceiveFrame(maxon->socket, frame);
 
         m_codec.encodeHomePosition(maxon->can_send_id, &frame, 0);

@@ -112,7 +112,7 @@ public:
     void encodeFollowingErrorWindow(uint32_t can_send_id, struct can_frame *frame);
 
     // can_send_id: motor.can_send_id
-    void encodeHomeoffsetDistance(uint32_t can_send_id, struct can_frame *frame, int degree);
+    void encodeHomeOffsetDistance(uint32_t can_send_id, struct can_frame *frame, int degree);
 
     // motor.can_send_id
     void encodeHomePosition(uint32_t can_send_id, struct can_frame *frame, int degree);
