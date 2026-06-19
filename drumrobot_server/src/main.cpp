@@ -5,7 +5,7 @@
 #include <string>
 #include <memory>
 
-// 오디오
+// 오디오 테스트
 #include "miniaudio/miniaudio.h"
 
 #include "common/app_context.hpp"
