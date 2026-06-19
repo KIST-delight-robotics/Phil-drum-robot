@@ -11,7 +11,7 @@ CanInterface::~CanInterface() {
 void CanInterface::resetCanPorts() {
     using json = nlohmann::json;
  
-    std::string hostname = getHostname();
+    std::string hostname = get_hostname();
     if (hostname.empty()) {
         std::cerr << "[CanInterface] Failed to get hostname, skip CAN reset\n";
         return;
@@ -380,14 +380,4 @@ void CanInterface::clearCanBuffer(int canSocket) {
             break;
         }
     }
-}
-
-std::string CanInterface::getHostname() {
-    char hostname[HOST_NAME_MAX + 1];
-    if (gethostname(hostname, sizeof(hostname)) != 0) {
-        perror("[CanInterface] gethostname");
-        return std::string{};
-    }
-    hostname[HOST_NAME_MAX] = '\0';
-    return std::string(hostname);
 }

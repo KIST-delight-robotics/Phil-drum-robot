@@ -8,7 +8,8 @@ CFLAGS = -Wall -O2 -g -std=c++17 -fPIC
 INCLUDE = -I./include -I./lib -I./lib/dynamixel_sdk/include
 
 # ===== 링크할 라이브러리 =====
-LDFLAGS = -lpthread
+# (멀티스레드) (수학) (동적 로딩)
+LDFLAGS = -lpthread -lm -ldl
 
 # ===== 경로 변수 =====
 SRCDIR = ./src

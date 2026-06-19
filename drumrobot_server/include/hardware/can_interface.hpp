@@ -8,7 +8,6 @@
 #include <cstring>
 #include <fstream>
 #include <cstdlib>
-#include <limits.h>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -23,6 +22,8 @@
 #include <linux/can/raw.h>
 
 #include "nlohmann/json.hpp"
+
+#include "util/hostname.hpp"
 
 class CanInterface {
 public:
@@ -62,6 +63,4 @@ private:
 
     int setSocketTimeout(int socket, int sec, int usec);
     void clearCanBuffer(int canSocket);
-
-    std::string getHostname();                                      // 현재 머신의 호스트네임 조회 (can_ports.json 키)
 };
