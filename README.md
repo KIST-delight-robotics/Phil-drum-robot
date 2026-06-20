@@ -1,5 +1,5 @@
 # Phil
-
+test
 > 개발 중인 드럼 연주 로봇 제어 시스템.
 
 CAN 통신 기반으로 TMotor / Maxon / Dynamixel 모터를 제어하며, LLM(TCP)을 통해 명령을 수신합니다. 이름은 드러머 Phil Collins에서 따왔습니다.
