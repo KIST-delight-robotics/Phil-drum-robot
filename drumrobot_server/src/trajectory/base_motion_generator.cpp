@@ -240,16 +240,16 @@ std::array<double, 3> BaseMotionGenerator::make_path(const std::array<double, 3>
     if (pi == pf) {
         ps = pi;
     } else {
-        double h1 = 0.2, h2 = 0.2;  // TODO: 조절해야 함
+        double h1 = 0.0, h2 = 0.08 + 0.6 * std::abs(pf[2] - pi[2]);     // 조절할 수 있음
         
         std::array<double, 3> pm1;
         std::array<double, 3> pm2;
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 2; i++) {
             pm1[i] = (2.0/3.0) * pi[i] + (1.0/3.0) * pf[i];
             pm2[i] = (1.0/3.0) * pi[i] + (2.0/3.0) * pf[i];
         }
-        pm1[2] += h1;
-        pm2[2] += h2;
+        pm1[2] = pi[2] + h1;
+        pm2[2] = pf[2] + h2;
 
         // 3차 Bézier curve
         double u = 1.0 - s;

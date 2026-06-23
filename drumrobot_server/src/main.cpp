@@ -29,34 +29,33 @@ void set_priority(std::thread& t, int priority) {
 }
 
 int main(int argc, char* argv[]) {
-    // test 2
-    ma_engine engine;
-    ma_context context;
+    // ma_engine engine;
+    // ma_context context;
 
-    ma_backend backends[] = { ma_backend_pulseaudio };   // pulse만
-    ma_context_config cfg = ma_context_config_init();
+    // ma_backend backends[] = { ma_backend_pulseaudio };   // pulse만
+    // ma_context_config cfg = ma_context_config_init();
 
-    if (ma_context_init(backends, 1, &cfg, &context) != MA_SUCCESS) {
-        std::cerr << "컨텍스트 초기화 실패\n";
-        return -1;
-    }
-    std::cout << "선택된 백엔드: " << ma_get_backend_name(context.backend) << "\n";
+    // if (ma_context_init(backends, 1, &cfg, &context) != MA_SUCCESS) {
+    //     std::cerr << "컨텍스트 초기화 실패\n";
+    //     return -1;
+    // }
+    // std::cout << "선택된 백엔드: " << ma_get_backend_name(context.backend) << "\n";
 
-    ma_engine_config ecfg = ma_engine_config_init();
-    ecfg.pContext = &context;
-    if (ma_engine_init(&ecfg, &engine) != MA_SUCCESS) {
-        std::cerr << "엔진 초기화 실패\n";
-        ma_context_uninit(&context);
-        return -1;
-    }
+    // ma_engine_config ecfg = ma_engine_config_init();
+    // ecfg.pContext = &context;
+    // if (ma_engine_init(&ecfg, &engine) != MA_SUCCESS) {
+    //     std::cerr << "엔진 초기화 실패\n";
+    //     ma_context_uninit(&context);
+    //     return -1;
+    // }
 
-    std::cout << "재생 시작. Enter로 종료...\n";
-    ma_engine_play_sound(&engine, "drumrobot_server/data/audio/TIM.wav", NULL);
-    std::cin.get();
+    // std::cout << "재생 시작. Enter로 종료...\n";
+    // ma_engine_play_sound(&engine, "drumrobot_server/data/audio/TIM.wav", NULL);
+    // std::cin.get();
 
-    ma_engine_uninit(&engine);
-    ma_context_uninit(&context);
-    return 0;
+    // ma_engine_uninit(&engine);
+    // ma_context_uninit(&context);
+    // return 0;
 
     AppContext ctx;
     CommandQueue command_queue;
