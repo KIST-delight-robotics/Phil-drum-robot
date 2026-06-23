@@ -170,7 +170,7 @@ void Controller::tmotor_send_task(const ControlSetPoint &point) {
             t_codec.encodePosition(tmotor->node_id, &frame, static_cast<float>(motor_position));
 
             std::vector<double> values = {(double)tmotor->id,
-                1.0,    // mode
+                1.0,    // position mode
                 motor_position,
                 tmotor->current_position,
                 motor_position - tmotor->current_position,
@@ -187,7 +187,7 @@ void Controller::tmotor_send_task(const ControlSetPoint &point) {
             t_codec.encodeVelocity(tmotor->node_id, &frame, static_cast<float>(control_input));
 
             std::vector<double> values = {(double)tmotor->id,
-                2.0,    // mode
+                2.0,    // velocity mode
                 motor_position,
                 tmotor->current_position,
                 motor_position - tmotor->current_position,
@@ -220,7 +220,7 @@ void Controller::maxon_motor_send_task(const ControlSetPoint &point) {
             m_codec.encodePosition(maxon->tx_pdo_ids[1], &frame, motor_position);
 
             std::vector<double> values = {(double)maxon->id,
-                1.0,    // mode
+                1.0,    // CSP mode
                 motor_position,
                 maxon->current_position,
                 motor_position - maxon->current_position,
@@ -234,7 +234,7 @@ void Controller::maxon_motor_send_task(const ControlSetPoint &point) {
             m_codec.encodeTorque(maxon->tx_pdo_ids[3], &frame, static_cast<int>(torque_mNm));
 
             std::vector<double> values = {(double)maxon->id,
-                0.0,    // mode
+                0.0,    // CST mode
                 motor_position,
                 maxon->current_position,
                 motor_position - maxon->current_position,
@@ -362,6 +362,7 @@ void Controller::dynamixel_send_task(const ControlSetPoint &point) {
         double motor_position = dxl->joint_angle_to_motor_position(point.q[id]);
         std::vector<double> values = {
             (double)dxl->id,
+            0.0,    // 모드 없음
             motor_position,
             dxl->current_position,
             motor_position - dxl->current_position
