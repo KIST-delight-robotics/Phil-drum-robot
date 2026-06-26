@@ -1,7 +1,7 @@
 #include "realtime/controller.hpp"
 
 Controller::Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot &robotRef)
-    : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef), motor_log("motor")
+    : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef), motor_log("motors")
 {
     for (auto &[id, motor] : robot.motors) {
         if (id < ROBOT::NUM_JOINT) {            
