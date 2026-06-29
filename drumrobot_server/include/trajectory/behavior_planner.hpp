@@ -51,6 +51,7 @@ private:
 
     // 헬퍼
     MotionPrimitive make_translate(const std::vector<double>& q_target, double t_total, TrajectoryProfile profile = TrajectoryProfile::COSINE);
+    void set_last_q_target(const std::vector<double>& q);
     MotionPrimitive make_drum_hit(double t, int note_num);
     std::string trim_whitespace(const std::string &str);
     bool make_drum_event(const std::vector<std::string>& items, double bpm, double last_t, DrumEvent& out);

@@ -29,6 +29,7 @@ enum class Opcode {
     // args 없음
     START,      // 시작
     READY,      // 상태 변경
+    GET_STATUS, // 로봇 상태 조회 (응답: STATUS|<state>)
     QUIT,       // 종료
     UNKNOWN
 };

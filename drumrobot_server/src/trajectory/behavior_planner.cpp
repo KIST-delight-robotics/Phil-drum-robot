@@ -111,7 +111,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_start() {
     }
 
     sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME));
-    last_q_target = it->second;
+    set_last_q_target(it->second);
 
     std::cout   << "\n========================================\n"
                 << " 모터 토크 ON\n"
@@ -148,7 +148,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_look(const std::vector<std:
         q_target[JointID::HEAD_PITCH] = deg_to_rad(tilt_deg);
 
         sequence.push_back(make_translate(q_target, LOOK_MOVE_TIME));
-        last_q_target = q_target;
+        set_last_q_target(q_target);
     } catch (const std::exception &e) {
         std::cerr << "[BehaviorPlanner] LOOK parsing error: " << e.what() << "\n";
     }
@@ -175,7 +175,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
         q[JointID::HEAD_PITCH] = 0.0;
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
-        last_q_target = q;
+        set_last_q_target(q);
     }
     else if (type == "shake") {
         // 도리도리: 좌 → 우 → 정면
@@ -186,7 +186,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
         q[JointID::HEAD_YAW] = 0.0;
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
-        last_q_target = q;
+        set_last_q_target(q);
     }
     else if (type == "wave" || type == "hi") {
         // 인사: 오른팔 들기 + 손목 흔들기
@@ -210,7 +210,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
         // 복귀
         q[JointID::R_WRIST] = 0.0;
         sequence.push_back(make_translate(q, 0.4));
-        last_q_target = q;
+        set_last_q_target(q);
     }
     else if (type == "hurray" || type == "happy") {
         // 환호: 양팔 들기
@@ -225,7 +225,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
         q[JointID::L_WRIST]      = 0.0;
         q[JointID::HEAD_PITCH]   = deg_to_rad(-15.0);
         sequence.push_back(make_translate(q, DEFAULT_MOVE_TIME));
-        last_q_target = q;
+        set_last_q_target(q);
     }
     else {
         std::cerr << "[BehaviorPlanner] Unknown gesture: " << type << "\n";
@@ -309,7 +309,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std:
         }
 
         sequence.push_back(make_translate(q_target, move_time));
-        last_q_target = q_target;
+        set_last_q_target(q_target);
     } catch (const std::exception &e) {
         std::cerr << "[BehaviorPlanner] MOVE parsing error: " << e.what() << "\n";
     }
@@ -334,7 +334,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_pose(const std::vector<std:
     }
 
     sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME, TrajectoryProfile::TRAPEZOIDAL));
-    last_q_target = it->second;
+    set_last_q_target(it->second);
 
     // shutdown 포즈로 이동하는 경우 종료 플래그 세팅
     if (pose_name == "shutdown") {
@@ -363,6 +363,17 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::
 
         MotionPrimitive end; end.type = MotionType::DRUM; end.flag = PlayFlag::END;
         sequence.push_back(end);
+
+        // 드럼 모션은 항상 ready 포즈에서 시작해 ready 포즈로 복귀한다.
+        // 따라서 타격 종료 후의 관절각은 ready 포즈와 같다.
+        // NOTE: 추후 드럼 모션의 종료 자세가 동적으로 바뀌면,
+        //       여기서 드럼 모션 생성기가 산출한 실제 마지막 q_target으로 갱신해야 함.
+        auto ready_it = poses.find("ready");
+        if (ready_it != poses.end()) {
+            set_last_q_target(ready_it->second);
+        } else {
+            std::cerr << "[BehaviorPlanner] HIT: 'ready' pose not found; last_q_target 미갱신\n";
+        }
     } else {
         std::cerr << "[BehaviorPlanner] Unknown target instrument: " << target << "\n";
         return sequence;
@@ -446,6 +457,17 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     MotionPrimitive end; end.type = MotionType::DRUM; end.flag = PlayFlag::END;
     sequence.push_back(end);
 
+    // 드럼 연주는 항상 ready 포즈에서 시작해 ready 포즈로 복귀한다.
+    // 따라서 연주 종료 후의 관절각은 ready 포즈와 같다.
+    // NOTE: 추후 연주 모션의 종료 자세가 동적으로 바뀌면,
+    //       여기서 드럼 모션 생성기가 산출한 실제 마지막 q_target으로 갱신해야 함.
+    auto ready_it = poses.find("ready");
+    if (ready_it != poses.end()) {
+        set_last_q_target(ready_it->second);
+    } else {
+        std::cerr << "[BehaviorPlanner] PLAY: 'ready' pose not found; last_q_target 미갱신\n";
+    }
+
     ctx.robot_state = RobotState::PLAYING;
     return sequence;
 }
@@ -461,7 +483,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_quit() {
     auto it = poses.find("shutdown");
     if (it != poses.end()) {
         sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME));
-        last_q_target = it->second;
+        set_last_q_target(it->second);
     }
     ctx.robot_state = RobotState::SHUTTINGDOWN;
     return sequence;
@@ -479,6 +501,12 @@ MotionPrimitive BehaviorPlanner::make_translate(const std::vector<double>& q_tar
     motion.q_target = q_target;
     motion.t_total  = t_total;
     return motion;
+}
+
+void BehaviorPlanner::set_last_q_target(const std::vector<double>& q) {
+    last_q_target = q;
+    std::lock_guard<std::mutex> lk(ctx.last_q_mutex);
+    ctx.last_q_target_snapshot = q;
 }
 
 MotionPrimitive BehaviorPlanner::make_drum_hit(double t, int note_num) {
