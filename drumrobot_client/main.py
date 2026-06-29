@@ -151,7 +151,7 @@ def test_mode(s):
 
 # 모드(메뉴) 정의 — 번호: (라벨, 보낼 OPCODE)
 MODES = {
-    "1": ("연주 모드 (악보)",      lambda: f"PLAY|{input('  악보 이름: ').strip()}"),
+    "1": ("연주 모드 (악보)",      lambda: f"PLAY|{input('  연주 ID: ').strip()}"),
     "2": ("제스처 모드",           lambda: f"GESTURE|{input('  종류(nod/shake/wave/hi/hurray/happy): ').strip()}"),
     "3": ("단일 드럼 타격",        lambda: f"HIT|{input('  타겟(snare/ride/bass...): ').strip()}"),
     "4": ("시선 제어",             lambda: f"LOOK|{input('  pan: ').strip()}|{input('  tilt: ').strip()}"),
