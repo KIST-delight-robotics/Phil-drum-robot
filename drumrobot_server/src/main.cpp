@@ -35,6 +35,7 @@ int main(int argc, char* argv[]) {
     robot.initialize();
 
     AudioPlayer audio_player;
+    audio_player.initialize();
     
     TcpServer server(ctx, PORT, command_queue);
     Controller controller(ctx, control_queue, robot, audio_player);

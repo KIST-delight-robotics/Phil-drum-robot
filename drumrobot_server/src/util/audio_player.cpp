@@ -55,6 +55,10 @@ void AudioPlayer::set_track(const std::string& name) {
     track_ = name;
 }
 
+void AudioPlayer::clear_track() {
+    track_.clear();
+}
+
 std::string AudioPlayer::make_path(const std::string& name) const {
     return base_dir_ + "/" + name + ".wav";
 }
@@ -65,7 +69,7 @@ bool AudioPlayer::play() {
         return false;
     }
     if (track_.empty()) {
-        std::cerr << "[AudioPlayer] 설정된 곡 없음 (set_track 먼저 호출)\n";
+        // 곡 미설정(솔로 등) = 정상적으로 아무것도 재생하지 않음
         return false;
     }
 

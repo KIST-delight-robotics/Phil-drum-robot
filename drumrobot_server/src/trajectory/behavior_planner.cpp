@@ -26,6 +26,8 @@ BehaviorPlanner::BehaviorPlanner(AppContext &ctxRef, Robot &robotRef, AudioPlaye
             last_q_target[id] = motor->initial_joint_angle;
         }
     }
+
+    init_play_list_from_json();
 }
 
 BehaviorPlanner::~BehaviorPlanner() {
@@ -93,6 +95,27 @@ void BehaviorPlanner::init_poses_from_json() {
         for (auto &a : angles) {
             poses[name].push_back(a.get<double>() * M_PI / 180.0);
         }
+    }
+}
+
+void BehaviorPlanner::init_play_list_from_json() {
+    using json = nlohmann::json;
+
+    std::ifstream f("drumrobot_server/config/play_list.json");
+    if (!f.is_open()) {
+        std::cerr << "[BehaviorPlanner] Failed to open config/play_list.json\n";
+        return;
+    }
+    json config = json::parse(f);
+
+    for (auto &[id, entry] : config["play_list"].items()) {
+        PlayEntry e;
+        e.score = entry.value("score", "");
+        e.audio = entry.value("audio", "");
+        e.init_note_r = entry.value("init_note_r", 1);
+        e.init_note_l = entry.value("init_note_l", 1);
+
+        play_list[id] = e;
     }
 }
 
@@ -360,16 +383,26 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
         return sequence;
     }
 
-    const std::string& score_name = args[0];
+    const std::string& id = args[0];
+
+    auto it = play_list.find(id);
+    if (it == play_list.end()) {
+        std::cerr << "[BehaviorPlanner] PLAY: 알 수 없는 id: " << id << "\n";
+        return sequence;
+    }
+    const std::string& score_name = it->second.score;
+    const std::string& audio_name = it->second.audio;
 
     std::ifstream inputFile;
     std::string score_path = "drumrobot_server/data/scores/" + score_name + ".txt";
-    inputFile.open(score_path); // 파일 열기
+    inputFile.open(score_path);
 
     if (!inputFile.is_open()) {
         std::cerr << "[BehaviorPlanner] PLAY: 악보 파일을 열 수 없습니다: " << score_path << "\n";
         return sequence;
     }
+
+    audio_player.set_track(audio_name);
 
     std::vector<DrumEvent> rds;
     DrumEvent Dummy;

@@ -62,4 +62,14 @@ private:
 
     // ===== audio =====
     AudioPlayer &audio_player;
+
+    // play_list.json 로부터 로드한 id -> (악보명, 음악명) 매핑
+    struct PlayEntry {
+        std::string score;
+        std::string audio;
+        int init_note_r, init_note_l;
+    };
+    std::map<std::string, PlayEntry> play_list;
+
+    void init_play_list_from_json();
 };

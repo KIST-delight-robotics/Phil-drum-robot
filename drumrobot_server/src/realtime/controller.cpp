@@ -1,7 +1,7 @@
 #include "realtime/controller.hpp"
 
 Controller::Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot &robotRef, AudioPlayer &audioRef)
-    : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef), audio_player(audioRef), motor_log("motors")
+    : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef), motor_log("motors"), audio_player(audioRef)
 {
     for (auto &[id, motor] : robot.motors) {
         if (id < ROBOT::NUM_JOINT) {            
