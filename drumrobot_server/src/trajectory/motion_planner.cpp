@@ -68,6 +68,8 @@ void MotionPlanner::plan_motions(const ParsedCommand& cmd) {
     std::vector<MotionPrimitive> motion_sequence = behavior_planner.generate_motion_sequence(cmd);
 
     int n = motion_sequence.size();
+    if (n >= 1) motion_done = false;
+
     for (int i = 0; i < n; i++) {
         motion_queue.push(motion_sequence[i]);
     }
@@ -79,12 +81,18 @@ void MotionPlanner::schedule_idle_motion() {
     if (ctx.robot_state.load() == RobotState::SHUTTINGDOWN) {
         return; // 종료 상태가 되면 추가 명령 안받음
     } else if (ctx.robot_state.load() == RobotState::INIT) {
-        // 키 제거하기 전 현재 위치 유지
+        // 키 제거하기 전 현재 위치 유지 (고정)
         MotionPrimitive standby_motion;
 
         standby_motion.type = MotionType::STANDBY;
         motion_queue.push(standby_motion);
     } else if (ctx.robot_state.load() == RobotState::IDLE) {
+        // 동작 종료
+        if (!motion_done) {
+            motion_done = true;
+            std::cerr << "[MotionPlanner] 동작을 마쳤습니다.\n";
+        }
+
         // 대기 동작
         MotionPrimitive idle_motion;
 
@@ -93,6 +101,9 @@ void MotionPlanner::schedule_idle_motion() {
     } else if (ctx.robot_state.load() == RobotState::PLAYING) {
         // 연주 종료
         std::cerr << "[MotionPlanner] 연주를 마쳤습니다.\n";
+        motion_done = true;
+
+        // 대기 동작
         ctx.robot_state = RobotState::IDLE;
         MotionPrimitive idle_motion;
 
@@ -104,7 +115,7 @@ void MotionPlanner::schedule_idle_motion() {
 void MotionPlanner::abort_play_motion() {
     motion_queue.clear();     // 남은 PLAYING 전부 폐기
     MotionPrimitive end; end.type = MotionType::DRUM; end.flag = PlayFlag::END;
-    motion_queue.push(end);   // END(home 복귀)만 남김
+    motion_queue.push(end);   // END(ready 복귀)만 남김
 
     ctx.play_abort = false;
     std::cerr << "[MotionPlanner] 연주가 비정상 종료됩니다.\n";

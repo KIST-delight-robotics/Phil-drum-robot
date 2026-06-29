@@ -42,6 +42,8 @@ private:
     void schedule_idle_motion();
     void abort_play_motion();
 
+    bool motion_done = true;
+
     // ===== log =====
     Logger motion_log;
 
