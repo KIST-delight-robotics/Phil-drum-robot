@@ -33,6 +33,8 @@ public:
     dynamixel::PortHandler *dxl_port = nullptr;
     dynamixel::PacketHandler *dxl_packet = nullptr;
 
+    std::map<int, std::string> joint_names;
+
 private:
 
     TMotorServoCodec t_codec;

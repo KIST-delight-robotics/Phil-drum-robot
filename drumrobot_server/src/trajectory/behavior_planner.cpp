@@ -573,8 +573,8 @@ MotionPrimitive BehaviorPlanner::make_drum_play(std::vector<DrumEvent> rds) {
 }
 
 int BehaviorPlanner::find_motor_id(const std::string& motor_name) const {
-    for (const auto &[id, motor] : robot.motors) {
-        if (motor->name == motor_name) return id;
+    for (const auto &[id, name] : robot.joint_names) {
+        if (name == motor_name) return id;
     }
     return -1;
 }
