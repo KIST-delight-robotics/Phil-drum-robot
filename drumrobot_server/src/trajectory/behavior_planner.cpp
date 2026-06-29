@@ -234,27 +234,79 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
     return sequence;
 }
 
-// MOVE motor_name angle_deg [move_time]
-std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std::string>& args) {   // TODO: 여러개의 관절 동시에 움직이기
+// MOVE: [motor_name, angle_deg] [move_time]
+// std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std::string>& args) {
+//     std::vector<MotionPrimitive> sequence;
+//     if (ctx.robot_state.load() != RobotState::IDLE) {
+//         std::cerr << "[BehaviorPlanner] MOVE rejected: only allowed in IDLE\n";
+//         return sequence;
+//     }
+
+//     const std::string& motor_name = args[0];
+//     int motor_id = find_motor_id(motor_name);
+//     if (motor_id < 0) {
+//         std::cerr << "[BehaviorPlanner] Unknown motor name: " << motor_name << "\n";
+//         return sequence;
+//     }
+
+//     try {
+//         double angle_deg = std::stod(args[1]);
+//         double move_time = (args.size() >= 3) ? std::stod(args[2]) : DEFAULT_MOVE_TIME;
+
+//         std::vector<double> q_target = last_q_target;
+//         q_target[motor_id] = deg_to_rad(angle_deg);
+
+//         sequence.push_back(make_translate(q_target, move_time));
+//         last_q_target = q_target;
+//     } catch (const std::exception &e) {
+//         std::cerr << "[BehaviorPlanner] MOVE parsing error: " << e.what() << "\n";
+//     }
+
+//     return sequence;
+// }
+
+std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
     if (ctx.robot_state.load() != RobotState::IDLE) {
         std::cerr << "[BehaviorPlanner] MOVE rejected: only allowed in IDLE\n";
         return sequence;
     }
 
-    const std::string& motor_name = args[0];
-    int motor_id = find_motor_id(motor_name);
-    if (motor_id < 0) {
-        std::cerr << "[BehaviorPlanner] Unknown motor name: " << motor_name << "\n";
+    if (args.empty()) {
+        std::cerr << "[BehaviorPlanner] MOVE rejected: no arguments\n";
         return sequence;
     }
 
     try {
-        double angle_deg = std::stod(args[1]);
-        double move_time = (args.size() >= 3) ? std::stod(args[2]) : DEFAULT_MOVE_TIME;
-
         std::vector<double> q_target = last_q_target;
-        q_target[motor_id] = deg_to_rad(angle_deg);
+        double move_time = DEFAULT_MOVE_TIME;
+        size_t i = 0;
+        bool any_applied = false;
+
+        // (motor_name, angle_deg) 쌍을 순회하며 적용
+        while (i + 1 < args.size()) {
+            const std::string& motor_name = args[i];
+            int motor_id = find_motor_id(motor_name);
+            if (motor_id < 0) {
+                std::cerr << "[BehaviorPlanner] Unknown motor name: " << motor_name << "\n";
+                return sequence;  // 하나라도 잘못되면 전체 취소
+            }
+
+            double angle_deg = std::stod(args[i + 1]);
+            q_target[motor_id] = deg_to_rad(angle_deg);
+            any_applied = true;
+            i += 2;
+        }
+
+        // 마지막에 홀수로 남은 인자가 있으면 move_time으로 해석
+        if (i < args.size()) {
+            move_time = std::stod(args[i]);
+        }
+
+        if (!any_applied) {
+            std::cerr << "[BehaviorPlanner] MOVE rejected: no valid motor/angle pairs\n";
+            return sequence;
+        }
 
         sequence.push_back(make_translate(q_target, move_time));
         last_q_target = q_target;
