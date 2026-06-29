@@ -1,8 +1,22 @@
 #pragma once
 
 #include <atomic>
+#include <mutex>
+#include <vector>
+#include <string>
 
 enum class RobotState { STANDBY, INIT, IDLE, PLAYING, SHUTTINGDOWN };
+
+inline const char* state_to_string(RobotState s) {
+    switch (s) {
+        case RobotState::STANDBY:      return "STANDBY";
+        case RobotState::INIT:         return "INIT";
+        case RobotState::IDLE:         return "IDLE";
+        case RobotState::PLAYING:      return "PLAYING";
+        case RobotState::SHUTTINGDOWN: return "SHUTTINGDOWN";
+        default:                       return "UNKNOWN";
+    }
+}
 
 struct AppContext {
     std::atomic<bool> running{true};                // 전체 종료 플래그 (false 되면 모든 스레드 루프 탈출)

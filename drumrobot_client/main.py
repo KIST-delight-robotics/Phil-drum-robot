@@ -7,6 +7,26 @@ PORT = 1951
 def send(s, packet):
     s.sendall((packet + "\n").encode())
 
+def request_status(s):
+    """GET_STATUS 전송 후 서버 응답(STATUS|state|q0|q1|...) 파싱.
+    q 값은 degree 단위의 '마지막으로 명령된 목표 자세'(실측값 아님)."""
+    send(s, "GET_STATUS")
+    data = s.recv(4096).decode().strip()
+    parts = data.split("|")
+    if not parts or parts[0] != "STATUS":
+        print(f"  예기치 않은 응답: {data}")
+        return data
+    print(f"  로봇 상태: {parts[1]}")
+    angles = parts[2:]
+    if angles:
+        print("  목표 관절각 (deg):")
+        for i, a in enumerate(angles):
+            try:
+                print(f"    q[{i:2d}] = {float(a):8.2f}")
+            except ValueError:
+                print(f"    q[{i:2d}] = {a}")
+    return data
+
 # 모드(메뉴) 정의 — 번호: (라벨, 보낼 OPCODE)
 MODES = {
     "1": ("연주 모드 (악보)",      lambda: f"PLAY|{input('  악보 이름: ').strip()}"),
@@ -37,12 +57,16 @@ def main():
             print("\n=== 모드 선택 ===")
             for k, (label, _) in MODES.items():
                 print(f"  {k}. {label}")
+            print("  6. 상태 조회")
             print("  q. 종료")
             choice = input("선택 > ").strip().lower()
 
             if choice in ("q", "quit"):
                 send(s, "QUIT")
                 break
+            if choice == "6":
+                request_status(s)   # 응답을 받아야 하므로 특수 처리
+                continue
             if choice in MODES:
                 send(s, MODES[choice][1]())   # 해당 OPCODE 생성 후 전송
             else:
