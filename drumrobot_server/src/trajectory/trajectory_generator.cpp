@@ -20,13 +20,13 @@ void TrajectoryGenerator::initialize(const std::map<std::string, std::vector<dou
     play_motion_generator.initialize();
 
     update_last_q(pose.at("init"));
-    home_pose = pose.at("home");
+    ready_pose = pose.at("ready");
 }
 
 void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
     switch (motion.type) {
     case MotionType::STANDBY:
-        generate_standby_trajectory();  // 키 제거하기 전 현재 위치 유지
+        generate_standby_trajectory();  // 키 제거하기 전 현재 위치 유지 (고정)
         break;
     case MotionType::TRANSLATE:
         if (motion.space == TrajectorySpace::JOINT) {
@@ -194,13 +194,13 @@ void TrajectoryGenerator::generate_play_start_trajectory(const MotionPrimitive& 
 }
 
 void TrajectoryGenerator::generate_play_end_trajectory() {
-    // 홈 위치로 이동
+    // play 후 레디 자세로 이동
     std::array<ControlMode, ROBOT::NUM_JOINT> modes = get_modes();
     double t_total = 4.0;
     int num_point = static_cast<int>(t_total / ROBOT::DT_SECOND);
 
     std::vector<double> q0(last_q.begin(), last_q.end());
-    std::vector<double> q1 = home_pose;
+    std::vector<double> q1 = ready_pose;
 
     for (int k = 1; k <= num_point; k++) {
         auto [q, qd] = sample(q0, q1, num_point, k, TrajectoryProfile::COSINE);
