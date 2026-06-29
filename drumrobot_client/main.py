@@ -63,6 +63,7 @@ def print_pending(pending):
 
 def test_mode(s):
     """관절 번호를 하나씩 입력받아 목표각을 누적하고, run 입력 시 MOVE로 일괄 전송."""
+    # TODO: 팁 목표 위치를 받아 전송하기
     state, angles = get_status(s)
     if state is None:
         return

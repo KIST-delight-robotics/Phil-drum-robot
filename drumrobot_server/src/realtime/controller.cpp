@@ -1,7 +1,7 @@
 #include "realtime/controller.hpp"
 
-Controller::Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot &robotRef)
-    : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef), motor_log("motors")
+Controller::Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot &robotRef, AudioPlayer &audioRef)
+    : ctx(ctxRef), control_queue(controlQueueRef), robot(robotRef), audio_player(audioRef), motor_log("motors")
 {
     for (auto &[id, motor] : robot.motors) {
         if (id < ROBOT::NUM_JOINT) {            
@@ -41,6 +41,7 @@ void Controller::send_loop() {
                 prev_point = curr_point;
                 if (auto sp = control_queue.try_pop()) {
                     curr_point = *sp;
+                    if (curr_point.audio_start) audio_player.play();
                 } else {
                     static int err_cnt = 0;
                     if (err_cnt++ % 100 == 0) std::cerr << "[Controller] control_queue underflow\n";

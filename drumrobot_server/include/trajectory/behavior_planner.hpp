@@ -14,10 +14,11 @@
 #include "common/command_queue.hpp"         // ParsedCommand, Opcode
 #include "common/motion_queue.hpp"          // MotionPrimitive
 #include "hardware/robot.hpp"
+#include "util/audio_player.hpp"
 
 class BehaviorPlanner {
 public:
-    BehaviorPlanner(AppContext &ctxRef, Robot &robotRef);
+    BehaviorPlanner(AppContext &ctxRef, Robot &robotRef, AudioPlayer &audioRef);
     ~BehaviorPlanner();
 
     std::vector<MotionPrimitive> generate_motion_sequence(const ParsedCommand& parsed);
@@ -58,4 +59,7 @@ private:
     MotionPrimitive make_drum_play(std::vector<DrumEvent> rds);
     int find_motor_id(const std::string& motor_name) const;
     double deg_to_rad(double deg) const { return deg * M_PI / 180.0; }
+
+    // ===== audio =====
+    AudioPlayer &audio_player;
 };

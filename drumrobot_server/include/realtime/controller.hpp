@@ -13,11 +13,12 @@
 #include "common/robot_config.hpp"
 #include "hardware/motor_codec.hpp"
 #include "hardware/robot.hpp"
+#include "util/audio_player.hpp"
 #include "util/logger.hpp"
  
 class Controller {
 public:
-    Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot &robotRef);
+    Controller(AppContext &ctxRef, ControlQueue &controlQueueRef, Robot &robotRef, AudioPlayer &audioRef);
     ~Controller();
  
     void send_loop();
@@ -64,4 +65,7 @@ private:
 
     // ===== log =====
     Logger motor_log;
+
+    // ===== audio =====
+    AudioPlayer &audio_player;
 };

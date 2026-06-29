@@ -90,4 +90,7 @@ private:
 
     // ===== log =====
     Logger trajectory_log;
+
+    // ===== audio =====
+    bool first_point = false;
 };

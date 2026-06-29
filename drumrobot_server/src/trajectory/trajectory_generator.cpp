@@ -188,6 +188,8 @@ void TrajectoryGenerator::generate_play_start_trajectory(const MotionPrimitive& 
         }
 
         update_last_q(q1);
+
+        first_point = true; // 음악 재생을 위함
     } else {
         ctx.play_abort = true;
     }
@@ -238,6 +240,12 @@ void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion
         for (int i = 0; i < ROBOT::NUM_JOINT; i++) {
             set_point.q[i] = q[i];
             set_point.qd[i] = (q[i] - prev_q[i]) / ROBOT::DT_SECOND;    // TODO: 수치 미분 스파이크 무서우면 필터 넣기
+        }
+
+        // 싱크 맞춰서 음악 재생
+        if (first_point) {
+            first_point = false;
+            set_point.audio_start = true;
         }
         
         set_point.mode = modes;

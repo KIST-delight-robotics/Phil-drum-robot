@@ -17,8 +17,8 @@ namespace JointID {
     constexpr int HEAD_PITCH       = 12;
 }
 
-BehaviorPlanner::BehaviorPlanner(AppContext &ctxRef, Robot &robotRef)
-    : ctx(ctxRef), robot(robotRef) {
+BehaviorPlanner::BehaviorPlanner(AppContext &ctxRef, Robot &robotRef, AudioPlayer &audioRef)
+    : ctx(ctxRef), robot(robotRef), audio_player(audioRef) {
     // 초기 자세를 last_q_target으로 설정 (모터의 initial_joint_angle 사용)
     last_q_target.resize(ROBOT::NUM_JOINT, 0.0);
     for (const auto &[id, motor] : robot.motors) {
@@ -235,36 +235,6 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
 }
 
 // MOVE: [motor_name, angle_deg] [move_time]
-// std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std::string>& args) {
-//     std::vector<MotionPrimitive> sequence;
-//     if (ctx.robot_state.load() != RobotState::IDLE) {
-//         std::cerr << "[BehaviorPlanner] MOVE rejected: only allowed in IDLE\n";
-//         return sequence;
-//     }
-
-//     const std::string& motor_name = args[0];
-//     int motor_id = find_motor_id(motor_name);
-//     if (motor_id < 0) {
-//         std::cerr << "[BehaviorPlanner] Unknown motor name: " << motor_name << "\n";
-//         return sequence;
-//     }
-
-//     try {
-//         double angle_deg = std::stod(args[1]);
-//         double move_time = (args.size() >= 3) ? std::stod(args[2]) : DEFAULT_MOVE_TIME;
-
-//         std::vector<double> q_target = last_q_target;
-//         q_target[motor_id] = deg_to_rad(angle_deg);
-
-//         sequence.push_back(make_translate(q_target, move_time));
-//         last_q_target = q_target;
-//     } catch (const std::exception &e) {
-//         std::cerr << "[BehaviorPlanner] MOVE parsing error: " << e.what() << "\n";
-//     }
-
-//     return sequence;
-// }
-
 std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
     if (ctx.robot_state.load() != RobotState::IDLE) {
@@ -412,6 +382,8 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     MotionPrimitive start; start.type = MotionType::DRUM; start.flag = PlayFlag::START;
     // start.init_note_r = 8; start.init_note_l = 1;    // TODO: 음악이랑 같이 json 파일로 저장
     sequence.push_back(start);
+
+    audio_player.set_track("TIM");
 
     std::string row;
     while (getline(inputFile, row)) {
