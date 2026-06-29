@@ -416,8 +416,6 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     // start.init_note_r = 8; start.init_note_l = 1;    // TODO: 음악이랑 같이 json 파일로 저장
     sequence.push_back(start);
 
-    audio_player.set_track("TIM");
-
     std::string row;
     while (getline(inputFile, row)) {
         istringstream iss(row);
