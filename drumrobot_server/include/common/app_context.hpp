@@ -29,4 +29,5 @@ struct AppContext {
     std::vector<double> last_q_target_snapshot;     // NOTE: 실측값이 아니라 "마지막으로 명령된 목표 자세"임
 
     std::atomic<bool> play_abort{false};            // play 중 중단 플래그
+    std::atomic<double> play_speed_scale{1.0};      // play 중 속도 스케일
 };

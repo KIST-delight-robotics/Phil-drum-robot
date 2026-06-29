@@ -478,7 +478,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
 std::vector<MotionPrimitive> BehaviorPlanner::handle_quit() {
     std::vector<MotionPrimitive> sequence;
     if (ctx.robot_state.load() != RobotState::IDLE) {
-        std::cerr << "[BehaviorPlanner] PLAY rejected: only allowed in IDLE\n";
+        std::cerr << "[BehaviorPlanner] QUIT rejected: only allowed in IDLE\n";
         return sequence;
     }
 
