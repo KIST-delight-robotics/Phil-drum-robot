@@ -34,7 +34,7 @@ public:
     void initialize(const std::map<int, InstrumentCoordinate>& coordinates);
 
     BaseMotionPoint reset(int note_r = 1, int note_l = 1);  // 초기 위치 기본값: 스네어
-    std::queue<BaseMotionPoint> generate_motion(const std::vector<DrumEvent>& rds, int num_point);
+    std::queue<BaseMotionPoint> generate_motion(const std::vector<DrumEvent>& rds, int num_point, double dt);
     bool get_error();
  
 private:

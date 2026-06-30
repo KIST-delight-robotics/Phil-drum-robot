@@ -30,7 +30,7 @@ StateMotionPoint StateMotionGenerator::reset() {
     return point;
 }
 
-std::queue<StateMotionPoint> StateMotionGenerator::generate_motion(const std::vector<DrumEvent> rds, int num_point) {
+std::queue<StateMotionPoint> StateMotionGenerator::generate_motion(const std::vector<DrumEvent> rds, int num_point, double dt) {
     std::queue<StateMotionPoint> out;
 
     if (rds.size() < 2 || num_point <= 0) {
@@ -90,7 +90,7 @@ std::queue<StateMotionPoint> StateMotionGenerator::generate_motion(const std::ve
 
         StateMotionPoint point;
 
-        double t_now = i * ROBOT::DT_SECOND + t0;
+        double t_now = i * dt + t0;
         double t_R = t_now - seg_R.start_time;
         double t_L = t_now - seg_L.start_time;
 

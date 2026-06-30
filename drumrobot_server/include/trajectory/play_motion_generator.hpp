@@ -37,7 +37,7 @@ private:
     PedalMotionGenerator pedal_motion_generator;
     StateMotionGenerator state_motion_generator;
 
-    int get_num_point(double t0, double t1);
+    std::pair<int, double> get_num_point(double t0, double t1);
 
     int round_sum = 0;      // 소수점 오차 보정
 };

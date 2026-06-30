@@ -123,12 +123,12 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
     // }
 
     std::queue<std::array<double, ROBOT::NUM_JOINT>> q_queue;
-    int n = get_num_point(rds[0].t, rds[1].t);
+    auto [n, dt] = get_num_point(rds[0].t, rds[1].t);
 
-    std::queue<BaseMotionPoint> base_motion = base_motion_generator.generate_motion(rds, n);
+    std::queue<BaseMotionPoint> base_motion = base_motion_generator.generate_motion(rds, n, dt);
     std::queue<HeadMotionPoint> head_motion = head_motion_generator.generate_motion(rds, n);
-    std::queue<PedalMotionPoint> pedal_motion = pedal_motion_generator.generate_motion(rds, n);
-    std::queue<StateMotionPoint> state_motion = state_motion_generator.generate_motion(rds, n);
+    std::queue<PedalMotionPoint> pedal_motion = pedal_motion_generator.generate_motion(rds, n, dt);
+    std::queue<StateMotionPoint> state_motion = state_motion_generator.generate_motion(rds, n, dt);
 
     if (base_motion_generator.get_error() || state_motion_generator.get_error()) {
         std::queue<std::array<double, ROBOT::NUM_JOINT>> empty_queue;
@@ -185,7 +185,7 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
     return q_queue;
 }
 
-int PlayMotionGenerator::get_num_point(double t0, double t1) {
+std::pair<int, double> PlayMotionGenerator::get_num_point(double t0, double t1) {
     double n;
 
     // 한 라인의 데이터 개수 (5ms 단위)
@@ -198,5 +198,7 @@ int PlayMotionGenerator::get_num_point(double t0, double t1) {
     }
     n = floor(n);
 
-    return (int)n;
+    double dt = ROBOT::DT_SECOND / ctx.play_speed_scale.load();
+
+    return std::make_pair((int)n, dt);
 }

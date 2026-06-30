@@ -17,7 +17,7 @@ public:
     ~PedalMotionGenerator();
 
     PedalMotionPoint reset();
-    std::queue<PedalMotionPoint> generate_motion(const std::vector<DrumEvent> rds, int num_point);
+    std::queue<PedalMotionPoint> generate_motion(const std::vector<DrumEvent> rds, int num_point, double dt);
 private:
     enum class State {
         REST_TO_REST,

@@ -21,7 +21,7 @@ public:
     ~StateMotionGenerator();
 
     StateMotionPoint reset();
-    std::queue<StateMotionPoint> generate_motion(const std::vector<DrumEvent> rds, int num_point);
+    std::queue<StateMotionPoint> generate_motion(const std::vector<DrumEvent> rds, int num_point, double dt);
     bool get_error();
 
 private:

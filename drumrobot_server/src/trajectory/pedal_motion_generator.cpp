@@ -16,7 +16,7 @@ PedalMotionPoint PedalMotionGenerator::reset() {
     return point;
 }
 
-std::queue<PedalMotionPoint> PedalMotionGenerator::generate_motion(const std::vector<DrumEvent> rds, int num_point) {
+std::queue<PedalMotionPoint> PedalMotionGenerator::generate_motion(const std::vector<DrumEvent> rds, int num_point, double dt) {
     std::queue<PedalMotionPoint> out;
  
     if (rds.size() < 2 || num_point <= 0) {
@@ -32,8 +32,8 @@ std::queue<PedalMotionPoint> PedalMotionGenerator::generate_motion(const std::ve
     for (int i = 0; i < num_point; i++) {
         PedalMotionPoint point;
 
-        point.right = get_bass_angle(i * ROBOT::DT_SECOND, bass_param, bass_state);
-        point.left = get_hihat_angle(i * ROBOT::DT_SECOND, hihat_param, hihat_state);
+        point.right = get_bass_angle(i * dt, bass_param, bass_state);
+        point.left = get_hihat_angle(i * dt, hihat_param, hihat_state);
 
         out.push(point);
     }

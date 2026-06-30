@@ -36,7 +36,7 @@ BaseMotionPoint BaseMotionGenerator::reset(int note_r, int note_l) {
     return point;
 }
 
-std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds, int num_point) {
+std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vector<DrumEvent>& rds, int num_point, double dt) {
     std::queue<BaseMotionPoint> out;
  
     if (rds.size() < 2 || num_point <= 0) {
@@ -66,8 +66,8 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
     for (int i = 0; i < num_point; i++) {
         BaseMotionPoint point;
 
-        double t_R = i * ROBOT::DT_SECOND + seg_R.t0 - seg_R.start_time;
-        double t_L = i * ROBOT::DT_SECOND + seg_L.t0 - seg_L.start_time;
+        double t_R = i * dt + seg_R.t0 - seg_R.start_time;
+        double t_L = i * dt + seg_L.t0 - seg_L.start_time;
 
         double s_R = time_scaling(0.0, seg_R.end_time - seg_R.start_time, t_R);
         double s_L = time_scaling(0.0, seg_L.end_time - seg_L.start_time, t_L);
@@ -78,7 +78,7 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
         point.right_wrist = s_R * (seg_R.end_wrist_angle - seg_R.start_wrist_angle) + seg_R.start_wrist_angle;
         point.left_wrist = s_L * (seg_L.end_wrist_angle - seg_L.start_wrist_angle) + seg_L.start_wrist_angle;
 
-        double t_w = i * ROBOT::DT_SECOND + seg_w.t0;
+        double t_w = i * dt + seg_w.t0;
         point.waist = cubic_hermite(seg_w.t0, seg_w.q0, seg_w.v0, seg_w.t1, seg_w.q1, seg_w.v1, t_w);
 
         out.push(point);
