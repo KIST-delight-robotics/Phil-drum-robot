@@ -79,6 +79,7 @@ Opcode CommandParser::to_opcode(const std::string& token) const {
     if (upper == "PLAY")    return Opcode::PLAY;
     if (upper == "START")   return Opcode::START;
     if (upper == "READY")   return Opcode::READY;
+    if (upper == "PLAY_CTRL") return Opcode::PLAY_CTRL;
     if (upper == "QUIT" || upper == "Q") return Opcode::QUIT;
 
     return Opcode::UNKNOWN;
@@ -92,6 +93,7 @@ bool CommandParser::validate_args(Opcode opcode, const std::vector<std::string>&
         case Opcode::POSE:      return args.size() >= 1;    // poseName
         case Opcode::HIT:       return args.size() >= 1;    // target
         case Opcode::PLAY:      return args.size() >= 1;    // scoreName
+        case Opcode::PLAY_CTRL: return args.size() >= 1;    // stop / speed
         case Opcode::START:     return true;                // 인자 없음
         case Opcode::READY:     return true;                // state
         case Opcode::QUIT:      return true;                // 인자 없음

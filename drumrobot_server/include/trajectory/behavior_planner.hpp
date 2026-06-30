@@ -48,6 +48,7 @@ private:
     std::vector<MotionPrimitive> handle_pose(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_hit(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_play(const std::vector<std::string>& args);
+    void handle_play_ctrl(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_quit();
 
     // 헬퍼

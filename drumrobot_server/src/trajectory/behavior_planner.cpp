@@ -71,6 +71,10 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
         case Opcode::POSE:    return handle_pose(parsed.args);
         case Opcode::HIT:     return handle_hit(parsed.args);
         case Opcode::PLAY:    return handle_play(parsed.args);
+        case Opcode::PLAY_CTRL: {
+            handle_play_ctrl(parsed.args);
+            return sequence;
+        }
         case Opcode::QUIT:    return handle_quit();
         case Opcode::START:
             std::cerr << "[BehaviorPlanner] 이미 시작된 상태\n";
@@ -472,7 +476,30 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     }
 
     ctx.robot_state = RobotState::PLAYING;
+    ctx.play_speed_scale = 1.0;
     return sequence;
+}
+
+// PLAY_CTRL 드럼 연주 제어
+void BehaviorPlanner::handle_play_ctrl(const std::vector<std::string>& args) {
+    if (ctx.robot_state.load() != RobotState::PLAYING) {
+        std::cerr << "[BehaviorPlanner] PLAY_CTRL rejected: only allowed in PLAYING\n";
+        return;
+    }
+    
+    const std::string& ctrl = args[0];
+
+    if (ctrl == "stop") {
+        std::cerr << "[BehaviorPlanner] 여기 채워줘\n";
+        ctx.play_abort = true;
+    }
+    else if (ctrl == "speed") {
+        std::cerr << "[BehaviorPlanner] 여기 채워줘\n";
+        ctx.play_speed_scale = std::stod(args[1]);;
+    }
+    else {
+        std::cerr << "[BehaviorPlanner] Unknown: " << ctrl << "\n";
+    }
 }
 
 std::vector<MotionPrimitive> BehaviorPlanner::handle_quit() {

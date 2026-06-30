@@ -25,11 +25,12 @@ enum class Opcode {
     POSE,       // 사전 정의 포즈   args: poseName (home / ready / shutdown)
     HIT,        // 드럼 타격       args: target (snare / ride / bass ...)
     PLAY,       // 악보 연주       args: scoreName
+    PLAY_CTRL,  // 연주 제어       args: stop / speed
     
     // args 없음
     START,      // 시작
     READY,      // 상태 변경
-    GET_STATUS, // 로봇 상태 조회 (응답: STATUS|<state>)
+    GET_STATUS, // 로봇 상태 조회 (응답: STATUS|<state>) 
     QUIT,       // 종료
     UNKNOWN
 };
