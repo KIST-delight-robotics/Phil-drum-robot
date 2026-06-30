@@ -198,7 +198,7 @@ std::pair<int, double> PlayMotionGenerator::get_num_point(double t0, double t1) 
     }
     n = floor(n);
 
-    double dt = ROBOT::DT_SECOND / ctx.play_speed_scale.load();
+    double dt = ROBOT::DT_SECOND * ctx.play_speed_scale.load();
 
     return std::make_pair((int)n, dt);
 }
