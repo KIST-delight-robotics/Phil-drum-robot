@@ -486,19 +486,35 @@ void BehaviorPlanner::handle_play_ctrl(const std::vector<std::string>& args) {
         std::cerr << "[BehaviorPlanner] PLAY_CTRL rejected: only allowed in PLAYING\n";
         return;
     }
-    
+
     const std::string& ctrl = args[0];
 
     if (ctrl == "stop") {
-        std::cerr << "[BehaviorPlanner] 여기 채워줘\n";
         ctx.play_abort = true;
+        std::cerr << "[BehaviorPlanner] 연주 중지 요청 -> 잔여 모션 폐기 후 ready 복귀\n";
     }
     else if (ctrl == "speed") {
-        std::cerr << "[BehaviorPlanner] 여기 채워줘\n";
-        ctx.play_speed_scale = std::stod(args[1]);;
+        if (args.size() < 2) {
+            std::cerr << "[BehaviorPlanner] PLAY_CTRL speed: 배율 인자가 없습니다\n";
+            return;
+        }
+        double scale;
+        try {
+            scale = std::stod(args[1]);
+        } catch (const std::exception& e) {
+            std::cerr << "[BehaviorPlanner] PLAY_CTRL speed: 잘못된 배율 값: " << args[1] << "\n";
+            return;
+        }
+        double clamped = std::clamp(scale, MIN_SCALE, MAX_SCALE);
+        ctx.play_speed_scale = clamped;
+        std::cerr << "[BehaviorPlanner] 연주 속도 배율: " << clamped << "x";
+        if (clamped != scale) {
+            std::cerr << " (요청 " << scale << " 가 [" << MIN_SCALE << ", " << MAX_SCALE << "] 로 제한됨)";
+        }
+        std::cerr << "\n";
     }
     else {
-        std::cerr << "[BehaviorPlanner] Unknown: " << ctrl << "\n";
+        std::cerr << "[BehaviorPlanner] Unknown PLAY_CTRL: " << ctrl << "\n";
     }
 }
 

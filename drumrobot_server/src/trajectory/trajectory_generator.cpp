@@ -1,7 +1,8 @@
 #include "trajectory/trajectory_generator.hpp"
 
 TrajectoryGenerator::TrajectoryGenerator(AppContext& ctxRef, ControlQueue &controlQueueRef)
-    : ctx(ctxRef), control_queue(controlQueueRef), trajectory_log("trajectory") {
+    : ctx(ctxRef), control_queue(controlQueueRef),
+      play_motion_generator(ctxRef), trajectory_log("trajectory") {
     
     std::vector<std::string> header = {
         "joint 0", "joint 1", "joint 2", "joint 3", "joint 4",

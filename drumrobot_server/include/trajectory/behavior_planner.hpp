@@ -7,6 +7,7 @@
 #include <memory>
 #include <cmath>
 #include <fstream>
+#include <algorithm>
 
 #include "nlohmann/json.hpp"
 
@@ -38,6 +39,10 @@ private:
     const double LOOK_MOVE_TIME    = 1.0;
     const double GESTURE_MOVE_TIME = 1.0;
     const double DEFAULT_HIT_TIME  = 1.0;
+
+    // 속도 배율 제한
+    const double MIN_SCALE = 0.5;
+    const double MAX_SCALE = 2.0;
 
     // Opcode별 핸들러
     std::vector<MotionPrimitive> handle_start();

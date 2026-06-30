@@ -64,6 +64,7 @@ void TcpServer::run() {
                         oss << "|" << (q_rad * 180.0 / M_PI);
                     }
                 }
+                oss << "|" << ctx.play_speed_scale;
                 oss << "\n";
                 std::string resp = oss.str();
                 send(client_fd, resp.c_str(), resp.size(), 0);

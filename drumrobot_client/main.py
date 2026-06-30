@@ -149,6 +149,58 @@ def test_mode(s):
         pending[idx] = val
         print(f"    설정: {name} -> {val:.2f} deg")
 
+def play_ctrl_mode(s):
+    """연주 중(PLAYING) 제어. stop / faster / slower / speed 를 PLAY_CTRL 로 전송.
+
+    서버는 PLAYING 상태에서만 PLAY_CTRL 을 수락한다. 그 외 상태에서 보낸 명령은
+    서버 측에서 거부되고 로그만 남는다(클라이언트로의 별도 응답은 없음).
+    """
+    state, _ = get_status(s)
+    print("\n--- 연주 제어 모드 ---")
+    print(f"  로봇 상태: {state}")
+    if state != "PLAYING":
+        print("  주의: 연주 제어는 PLAYING 상태에서만 동작합니다.")
+
+    # 속도 배율은 서버에서 [0.5, 2.0] 으로 제한된다.
+    step = 0.1
+    cur_scale = 1.0   # 클라이언트 추정값 (서버가 실제 제한값을 적용)
+
+    print("\n  명령: stop=연주 중지 / f=빠르게(+0.1) / d=느리게(-0.1)")
+    print("        s=배율 직접 입력 / q=메뉴로 복귀")
+
+    while True:
+        cmd = input("연주 제어 (stop / f / d / s / q) > ").strip().lower()
+
+        if cmd in ("q", "quit"):
+            return
+
+        if cmd == "stop":
+            send(s, "PLAY_CTRL|stop")
+            print("  연주 중지 요청을 보냈습니다.")
+            return   # 중지 후 곧 IDLE 로 돌아가므로 메뉴 복귀
+
+        if cmd in ("f", "d"):
+            cur_scale += step if cmd == "f" else -step
+            cur_scale = max(0.5, min(2.0, round(cur_scale, 2)))
+            send(s, f"PLAY_CTRL|speed|{cur_scale:.2f}")
+            print(f"  속도 배율 요청: {cur_scale:.2f}x")
+            continue
+
+        if cmd == "s":
+            raw = input("  배율(0.5~2.0) > ").strip()
+            try:
+                val = float(raw)
+            except ValueError:
+                print("    숫자를 입력하세요.")
+                continue
+            cur_scale = max(0.5, min(2.0, round(val, 2)))
+            send(s, f"PLAY_CTRL|speed|{cur_scale:.2f}")
+            print(f"  속도 배율 요청: {cur_scale:.2f}x")
+            continue
+
+        print("  stop / f / d / s / q 중 하나를 입력하세요.")
+
+
 # 모드(메뉴) 정의 — 번호: (라벨, 보낼 OPCODE)
 MODES = {
     "1": ("연주 모드 (악보)",      lambda: f"PLAY|{input('  연주 ID: ').strip()}"),
@@ -180,6 +232,7 @@ def main():
             for k, (label, _) in MODES.items():
                 print(f"  {k}. {label}")
             print("  6. 테스트 모드 (관절각 직접 입력)")
+            print("  7. 연주 제어 (중지 / 속도, PLAYING 중)")
             print("  q. 종료")
             choice = input("선택 > ").strip().lower()
 
@@ -188,6 +241,9 @@ def main():
                 break
             if choice == "6":
                 test_mode(s)
+                continue
+            if choice == "7":
+                play_ctrl_mode(s)
                 continue
             if choice in MODES:
                 send(s, MODES[choice][1]())   # 해당 OPCODE 생성 후 전송
