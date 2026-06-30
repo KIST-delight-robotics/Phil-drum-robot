@@ -28,24 +28,42 @@ def send(s, packet):
     s.sendall((packet + "\n").encode())
 
 def get_status(s):
-    """GET_STATUS 전송 후 (state, [angle_deg,...]) 반환. 실패 시 (None, [])."""
+    """GET_STATUS 전송 후 (state, [angle_deg,...], speed) 반환. 실패 시 (None, [], None).
+
+    서버 응답 형식: STATUS|<state>|<q0>|...|<q12>|<play_speed_scale>
+    마지막 필드가 속도 배율이다. (구버전 서버는 속도 필드가 없을 수 있어
+    필드 수로 판별한다.)
+    """
     send(s, "GET_STATUS")
     data = s.recv(4096).decode().strip()
     parts = data.split("|")
     if not parts or parts[0] != "STATUS":
         print(f"  예기치 않은 응답: {data}")
-        return None, []
+        return None, [], None
     state = parts[1] if len(parts) > 1 else "UNKNOWN"
+
+    fields = parts[2:]
+    speed = None
+    # 관절각 + 속도 1개가 모두 있으면 마지막을 속도로 분리
+    if len(fields) == len(JOINTS) + 1:
+        try:
+            speed = float(fields[-1])
+        except ValueError:
+            speed = None
+        fields = fields[:-1]
+
     angles = []
-    for a in parts[2:]:
+    for a in fields:
         try:
             angles.append(float(a))
         except ValueError:
             angles.append(None)
-    return state, angles
+    return state, angles, speed
 
-def print_status(state, angles):
+def print_status(state, angles, speed=None):
     print(f"  로봇 상태: {state}")
+    if speed is not None:
+        print(f"  연주 속도 배율: {speed:.2f}x")
     print("  현재 목표 관절각 (deg):")
     for i, (name, _, _) in enumerate(JOINTS):
         cur = angles[i] if i < len(angles) and angles[i] is not None else None
@@ -64,7 +82,7 @@ def print_pending(pending):
 def test_mode(s):
     """관절 번호를 하나씩 입력받아 목표각을 누적하고, run 입력 시 MOVE로 일괄 전송."""
     # TODO: 팁 목표 위치를 받아 전송하기
-    state, angles = get_status(s)
+    state, angles, _ = get_status(s)
     if state is None:
         return
     print("\n--- 테스트 모드 ---")
@@ -150,23 +168,38 @@ def test_mode(s):
         print(f"    설정: {name} -> {val:.2f} deg")
 
 def play_ctrl_mode(s):
-    """연주 중(PLAYING) 제어. stop / faster / slower / speed 를 PLAY_CTRL 로 전송.
+    """연주 중(PLAYING) 제어. stop / speed 를 PLAY_CTRL 로 전송.
 
-    서버는 PLAYING 상태에서만 PLAY_CTRL 을 수락한다. 그 외 상태에서 보낸 명령은
-    서버 측에서 거부되고 로그만 남는다(클라이언트로의 별도 응답은 없음).
+    서버는 PLAYING 상태에서만 PLAY_CTRL 을 수락하며, 속도 배율을 [0.5, 2.0] 로
+    제한한다. 명령 전송 후 GET_STATUS 로 서버가 적용한 실제 배율을 다시 읽어
+    표시하므로, 범위 밖 요청이 제한돼도 화면에 정확히 반영된다.
     """
-    state, _ = get_status(s)
+    state, _, speed = get_status(s)
     print("\n--- 연주 제어 모드 ---")
     print(f"  로봇 상태: {state}")
+    if speed is not None:
+        print(f"  현재 속도 배율: {speed:.2f}x")
     if state != "PLAYING":
         print("  주의: 연주 제어는 PLAYING 상태에서만 동작합니다.")
 
-    # 속도 배율은 서버에서 [0.5, 2.0] 으로 제한된다.
     step = 0.1
-    cur_scale = 1.0   # 클라이언트 추정값 (서버가 실제 제한값을 적용)
+    # 서버가 보고한 실제 배율을 기준으로 시작 (없으면 1.0 가정)
+    cur_scale = speed if speed is not None else 1.0
 
     print("\n  명령: stop=연주 중지 / f=빠르게(+0.1) / d=느리게(-0.1)")
     print("        s=배율 직접 입력 / q=메뉴로 복귀")
+
+    def send_speed(target):
+        """속도 요청 후 서버 실제값을 다시 읽어 표시."""
+        send(s, f"PLAY_CTRL|speed|{target:.2f}")
+        st, _, sp = get_status(s)
+        if sp is not None:
+            note = " (서버 제한 적용됨)" if abs(sp - target) > 1e-6 else ""
+            print(f"  속도 배율: {sp:.2f}x{note}")
+            return sp
+        # 속도 회신을 못 받은 경우 요청값을 그대로 사용
+        print(f"  속도 배율 요청: {target:.2f}x (서버 회신 없음)")
+        return target
 
     while True:
         cmd = input("연주 제어 (stop / f / d / s / q) > ").strip().lower()
@@ -180,10 +213,8 @@ def play_ctrl_mode(s):
             return   # 중지 후 곧 IDLE 로 돌아가므로 메뉴 복귀
 
         if cmd in ("f", "d"):
-            cur_scale += step if cmd == "f" else -step
-            cur_scale = max(0.5, min(2.0, round(cur_scale, 2)))
-            send(s, f"PLAY_CTRL|speed|{cur_scale:.2f}")
-            print(f"  속도 배율 요청: {cur_scale:.2f}x")
+            target = round(cur_scale + (step if cmd == "f" else -step), 2)
+            cur_scale = send_speed(target)
             continue
 
         if cmd == "s":
@@ -193,9 +224,7 @@ def play_ctrl_mode(s):
             except ValueError:
                 print("    숫자를 입력하세요.")
                 continue
-            cur_scale = max(0.5, min(2.0, round(val, 2)))
-            send(s, f"PLAY_CTRL|speed|{cur_scale:.2f}")
-            print(f"  속도 배율 요청: {cur_scale:.2f}x")
+            cur_scale = send_speed(round(val, 2))
             continue
 
         print("  stop / f / d / s / q 중 하나를 입력하세요.")
