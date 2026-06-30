@@ -26,6 +26,8 @@ struct ControlSetPoint {
     std::array<double, ROBOT::NUM_JOINT> q{};
     std::array<double, ROBOT::NUM_JOINT> qd{};
     std::array<ControlMode, ROBOT::NUM_JOINT> mode{};
+
+    bool audio_start = false;
 };
 
 class ControlQueue {

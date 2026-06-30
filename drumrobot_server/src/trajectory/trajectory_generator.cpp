@@ -1,7 +1,8 @@
 #include "trajectory/trajectory_generator.hpp"
 
 TrajectoryGenerator::TrajectoryGenerator(AppContext& ctxRef, ControlQueue &controlQueueRef)
-    : ctx(ctxRef), control_queue(controlQueueRef), trajectory_log("trajectory") {
+    : ctx(ctxRef), control_queue(controlQueueRef),
+      play_motion_generator(ctxRef), trajectory_log("trajectory") {
     
     std::vector<std::string> header = {
         "joint 0", "joint 1", "joint 2", "joint 3", "joint 4",
@@ -20,13 +21,13 @@ void TrajectoryGenerator::initialize(const std::map<std::string, std::vector<dou
     play_motion_generator.initialize();
 
     update_last_q(pose.at("init"));
-    home_pose = pose.at("home");
+    ready_pose = pose.at("ready");
 }
 
 void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
     switch (motion.type) {
     case MotionType::STANDBY:
-        generate_standby_trajectory();  // 키 제거하기 전 현재 위치 유지
+        generate_standby_trajectory();  // 키 제거하기 전 현재 위치 유지 (고정)
         break;
     case MotionType::TRANSLATE:
         if (motion.space == TrajectorySpace::JOINT) {
@@ -188,19 +189,21 @@ void TrajectoryGenerator::generate_play_start_trajectory(const MotionPrimitive& 
         }
 
         update_last_q(q1);
+
+        first_point = true; // 음악 재생을 위함
     } else {
         ctx.play_abort = true;
     }
 }
 
 void TrajectoryGenerator::generate_play_end_trajectory() {
-    // 홈 위치로 이동
+    // play 후 레디 자세로 이동
     std::array<ControlMode, ROBOT::NUM_JOINT> modes = get_modes();
     double t_total = 4.0;
     int num_point = static_cast<int>(t_total / ROBOT::DT_SECOND);
 
     std::vector<double> q0(last_q.begin(), last_q.end());
-    std::vector<double> q1 = home_pose;
+    std::vector<double> q1 = ready_pose;
 
     for (int k = 1; k <= num_point; k++) {
         auto [q, qd] = sample(q0, q1, num_point, k, TrajectoryProfile::COSINE);
@@ -238,6 +241,12 @@ void TrajectoryGenerator::generate_play_trajectory(const MotionPrimitive& motion
         for (int i = 0; i < ROBOT::NUM_JOINT; i++) {
             set_point.q[i] = q[i];
             set_point.qd[i] = (q[i] - prev_q[i]) / ROBOT::DT_SECOND;    // TODO: 수치 미분 스파이크 무서우면 필터 넣기
+        }
+
+        // 싱크 맞춰서 음악 재생
+        if (first_point) {
+            first_point = false;
+            set_point.audio_start = true;
         }
         
         set_point.mode = modes;

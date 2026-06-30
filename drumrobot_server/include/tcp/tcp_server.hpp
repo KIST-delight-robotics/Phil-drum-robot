@@ -9,6 +9,10 @@
 #include <sys/socket.h>
 #include <algorithm>
 #include <cctype>
+
+#include <cmath>
+#include <sstream>
+#include <iomanip>
  
 #include "common/app_context.hpp"
 #include "common/command_queue.hpp"

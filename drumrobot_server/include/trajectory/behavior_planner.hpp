@@ -7,6 +7,7 @@
 #include <memory>
 #include <cmath>
 #include <fstream>
+#include <algorithm>
 
 #include "nlohmann/json.hpp"
 
@@ -14,10 +15,11 @@
 #include "common/command_queue.hpp"         // ParsedCommand, Opcode
 #include "common/motion_queue.hpp"          // MotionPrimitive
 #include "hardware/robot.hpp"
+#include "util/audio_player.hpp"
 
 class BehaviorPlanner {
 public:
-    BehaviorPlanner(AppContext &ctxRef, Robot &robotRef);
+    BehaviorPlanner(AppContext &ctxRef, Robot &robotRef, AudioPlayer &audioRef);
     ~BehaviorPlanner();
 
     std::vector<MotionPrimitive> generate_motion_sequence(const ParsedCommand& parsed);
@@ -38,6 +40,10 @@ private:
     const double GESTURE_MOVE_TIME = 1.0;
     const double DEFAULT_HIT_TIME  = 1.0;
 
+    // 속도 배율 제한
+    const double MIN_SCALE = 0.5;
+    const double MAX_SCALE = 2.0;
+
     // Opcode별 핸들러
     std::vector<MotionPrimitive> handle_start();
     void handle_ready();
@@ -47,14 +53,29 @@ private:
     std::vector<MotionPrimitive> handle_pose(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_hit(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_play(const std::vector<std::string>& args);
+    void handle_play_ctrl(const std::vector<std::string>& args);
     std::vector<MotionPrimitive> handle_quit();
 
     // 헬퍼
     MotionPrimitive make_translate(const std::vector<double>& q_target, double t_total, TrajectoryProfile profile = TrajectoryProfile::COSINE);
+    void set_last_q_target(const std::vector<double>& q);
     MotionPrimitive make_drum_hit(double t, int note_num);
     std::string trim_whitespace(const std::string &str);
     bool make_drum_event(const std::vector<std::string>& items, double bpm, double last_t, DrumEvent& out);
     MotionPrimitive make_drum_play(std::vector<DrumEvent> rds);
     int find_motor_id(const std::string& motor_name) const;
     double deg_to_rad(double deg) const { return deg * M_PI / 180.0; }
+
+    // ===== audio =====
+    AudioPlayer &audio_player;
+
+    // play_list.json 로부터 로드한 id -> (악보명, 음악명) 매핑
+    struct PlayEntry {
+        std::string score;
+        std::string audio;
+        int init_note_r, init_note_l;
+    };
+    std::map<std::string, PlayEntry> play_list;
+
+    void init_play_list_from_json();
 };

@@ -50,7 +50,7 @@ private:
     void generate_play_trajectory(const MotionPrimitive& motion);
     void generate_idle_trajectory();
 
-    std::vector<double> home_pose;   // play 후 돌아오는 위치
+    std::vector<double> ready_pose;   // play 후 돌아오는 대기 자세 (다음 동작 준비 상태)
 
     std::array<ControlMode, ROBOT::NUM_JOINT> get_modes(bool is_play = false);
     std::pair<std::vector<double>, std::vector<double>> sample(
@@ -90,4 +90,7 @@ private:
 
     // ===== log =====
     Logger trajectory_log;
+
+    // ===== audio =====
+    bool first_point = false;
 };

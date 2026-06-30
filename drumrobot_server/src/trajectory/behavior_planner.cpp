@@ -17,8 +17,8 @@ namespace JointID {
     constexpr int HEAD_PITCH       = 12;
 }
 
-BehaviorPlanner::BehaviorPlanner(AppContext &ctxRef, Robot &robotRef)
-    : ctx(ctxRef), robot(robotRef) {
+BehaviorPlanner::BehaviorPlanner(AppContext &ctxRef, Robot &robotRef, AudioPlayer &audioRef)
+    : ctx(ctxRef), robot(robotRef), audio_player(audioRef) {
     // 초기 자세를 last_q_target으로 설정 (모터의 initial_joint_angle 사용)
     last_q_target.resize(ROBOT::NUM_JOINT, 0.0);
     for (const auto &[id, motor] : robot.motors) {
@@ -26,6 +26,8 @@ BehaviorPlanner::BehaviorPlanner(AppContext &ctxRef, Robot &robotRef)
             last_q_target[id] = motor->initial_joint_angle;
         }
     }
+
+    init_play_list_from_json();
 }
 
 BehaviorPlanner::~BehaviorPlanner() {
@@ -69,6 +71,10 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
         case Opcode::POSE:    return handle_pose(parsed.args);
         case Opcode::HIT:     return handle_hit(parsed.args);
         case Opcode::PLAY:    return handle_play(parsed.args);
+        case Opcode::PLAY_CTRL: {
+            handle_play_ctrl(parsed.args);
+            return sequence;
+        }
         case Opcode::QUIT:    return handle_quit();
         case Opcode::START:
             std::cerr << "[BehaviorPlanner] 이미 시작된 상태\n";
@@ -96,6 +102,27 @@ void BehaviorPlanner::init_poses_from_json() {
     }
 }
 
+void BehaviorPlanner::init_play_list_from_json() {
+    using json = nlohmann::json;
+
+    std::ifstream f("drumrobot_server/config/play_list.json");
+    if (!f.is_open()) {
+        std::cerr << "[BehaviorPlanner] Failed to open config/play_list.json\n";
+        return;
+    }
+    json config = json::parse(f);
+
+    for (auto &[id, entry] : config["play_list"].items()) {
+        PlayEntry e;
+        e.score = entry.value("score", "");
+        e.audio = entry.value("audio", "");
+        e.init_note_r = entry.value("init_note_r", 1);
+        e.init_note_l = entry.value("init_note_l", 1);
+
+        play_list[id] = e;
+    }
+}
+
 // =============================================================
 // Opcode별 핸들러
 // =============================================================
@@ -111,7 +138,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_start() {
     }
 
     sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME));
-    last_q_target = it->second;
+    set_last_q_target(it->second);
 
     std::cout   << "\n========================================\n"
                 << " 모터 토크 ON\n"
@@ -148,7 +175,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_look(const std::vector<std:
         q_target[JointID::HEAD_PITCH] = deg_to_rad(tilt_deg);
 
         sequence.push_back(make_translate(q_target, LOOK_MOVE_TIME));
-        last_q_target = q_target;
+        set_last_q_target(q_target);
     } catch (const std::exception &e) {
         std::cerr << "[BehaviorPlanner] LOOK parsing error: " << e.what() << "\n";
     }
@@ -175,7 +202,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
         q[JointID::HEAD_PITCH] = 0.0;
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
-        last_q_target = q;
+        set_last_q_target(q);
     }
     else if (type == "shake") {
         // 도리도리: 좌 → 우 → 정면
@@ -186,7 +213,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
         q[JointID::HEAD_YAW] = 0.0;
         sequence.push_back(make_translate(q, GESTURE_MOVE_TIME));
-        last_q_target = q;
+        set_last_q_target(q);
     }
     else if (type == "wave" || type == "hi") {
         // 인사: 오른팔 들기 + 손목 흔들기
@@ -210,7 +237,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
         // 복귀
         q[JointID::R_WRIST] = 0.0;
         sequence.push_back(make_translate(q, 0.4));
-        last_q_target = q;
+        set_last_q_target(q);
     }
     else if (type == "hurray" || type == "happy") {
         // 환호: 양팔 들기
@@ -225,7 +252,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
         q[JointID::L_WRIST]      = 0.0;
         q[JointID::HEAD_PITCH]   = deg_to_rad(-15.0);
         sequence.push_back(make_translate(q, DEFAULT_MOVE_TIME));
-        last_q_target = q;
+        set_last_q_target(q);
     }
     else {
         std::cerr << "[BehaviorPlanner] Unknown gesture: " << type << "\n";
@@ -234,30 +261,52 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_gesture(const std::vector<s
     return sequence;
 }
 
-// MOVE motor_name angle_deg [move_time]
-std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std::string>& args) {   // TODO: 여러개의 관절 동시에 움직이기
+// MOVE: [motor_name, angle_deg] [move_time]
+std::vector<MotionPrimitive> BehaviorPlanner::handle_move(const std::vector<std::string>& args) {
     std::vector<MotionPrimitive> sequence;
     if (ctx.robot_state.load() != RobotState::IDLE) {
         std::cerr << "[BehaviorPlanner] MOVE rejected: only allowed in IDLE\n";
         return sequence;
     }
 
-    const std::string& motor_name = args[0];
-    int motor_id = find_motor_id(motor_name);
-    if (motor_id < 0) {
-        std::cerr << "[BehaviorPlanner] Unknown motor name: " << motor_name << "\n";
+    if (args.empty()) {
+        std::cerr << "[BehaviorPlanner] MOVE rejected: no arguments\n";
         return sequence;
     }
 
     try {
-        double angle_deg = std::stod(args[1]);
-        double move_time = (args.size() >= 3) ? std::stod(args[2]) : DEFAULT_MOVE_TIME;
-
         std::vector<double> q_target = last_q_target;
-        q_target[motor_id] = deg_to_rad(angle_deg);
+        double move_time = DEFAULT_MOVE_TIME;
+        size_t i = 0;
+        bool any_applied = false;
+
+        // (motor_name, angle_deg) 쌍을 순회하며 적용
+        while (i + 1 < args.size()) {
+            const std::string& motor_name = args[i];
+            int motor_id = find_motor_id(motor_name);
+            if (motor_id < 0) {
+                std::cerr << "[BehaviorPlanner] Unknown motor name: " << motor_name << "\n";
+                return sequence;  // 하나라도 잘못되면 전체 취소
+            }
+
+            double angle_deg = std::stod(args[i + 1]);
+            q_target[motor_id] = deg_to_rad(angle_deg);
+            any_applied = true;
+            i += 2;
+        }
+
+        // 마지막에 홀수로 남은 인자가 있으면 move_time으로 해석
+        if (i < args.size()) {
+            move_time = std::stod(args[i]);
+        }
+
+        if (!any_applied) {
+            std::cerr << "[BehaviorPlanner] MOVE rejected: no valid motor/angle pairs\n";
+            return sequence;
+        }
 
         sequence.push_back(make_translate(q_target, move_time));
-        last_q_target = q_target;
+        set_last_q_target(q_target);
     } catch (const std::exception &e) {
         std::cerr << "[BehaviorPlanner] MOVE parsing error: " << e.what() << "\n";
     }
@@ -282,7 +331,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_pose(const std::vector<std:
     }
 
     sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME, TrajectoryProfile::TRAPEZOIDAL));
-    last_q_target = it->second;
+    set_last_q_target(it->second);
 
     // shutdown 포즈로 이동하는 경우 종료 플래그 세팅
     if (pose_name == "shutdown") {
@@ -311,6 +360,17 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::
 
         MotionPrimitive end; end.type = MotionType::DRUM; end.flag = PlayFlag::END;
         sequence.push_back(end);
+
+        // 드럼 모션은 항상 ready 포즈에서 시작해 ready 포즈로 복귀한다.
+        // 따라서 타격 종료 후의 관절각은 ready 포즈와 같다.
+        // NOTE: 추후 드럼 모션의 종료 자세가 동적으로 바뀌면,
+        //       여기서 드럼 모션 생성기가 산출한 실제 마지막 q_target으로 갱신해야 함.
+        auto ready_it = poses.find("ready");
+        if (ready_it != poses.end()) {
+            set_last_q_target(ready_it->second);
+        } else {
+            std::cerr << "[BehaviorPlanner] HIT: 'ready' pose not found; last_q_target 미갱신\n";
+        }
     } else {
         std::cerr << "[BehaviorPlanner] Unknown target instrument: " << target << "\n";
         return sequence;
@@ -327,16 +387,26 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
         return sequence;
     }
 
-    const std::string& score_name = args[0];
+    const std::string& id = args[0];
+
+    auto it = play_list.find(id);
+    if (it == play_list.end()) {
+        std::cerr << "[BehaviorPlanner] PLAY: 알 수 없는 id: " << id << "\n";
+        return sequence;
+    }
+    const std::string& score_name = it->second.score;
+    const std::string& audio_name = it->second.audio;
 
     std::ifstream inputFile;
     std::string score_path = "drumrobot_server/data/scores/" + score_name + ".txt";
-    inputFile.open(score_path); // 파일 열기
+    inputFile.open(score_path);
 
     if (!inputFile.is_open()) {
         std::cerr << "[BehaviorPlanner] PLAY: 악보 파일을 열 수 없습니다: " << score_path << "\n";
         return sequence;
     }
+
+    audio_player.set_track(audio_name);
 
     std::vector<DrumEvent> rds;
     DrumEvent Dummy;
@@ -347,7 +417,8 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     double last_t = 0.0;
 
     MotionPrimitive start; start.type = MotionType::DRUM; start.flag = PlayFlag::START;
-    // start.init_note_r = 8; start.init_note_l = 1;    // TODO: 음악이랑 같이 json 파일로 저장
+    start.init_note_r = it->second.init_note_r;
+    start.init_note_l = it->second.init_note_l;
     sequence.push_back(start);
 
     std::string row;
@@ -394,14 +465,64 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std:
     MotionPrimitive end; end.type = MotionType::DRUM; end.flag = PlayFlag::END;
     sequence.push_back(end);
 
+    // 드럼 연주는 항상 ready 포즈에서 시작해 ready 포즈로 복귀한다.
+    // 따라서 연주 종료 후의 관절각은 ready 포즈와 같다.
+    // NOTE: 추후 연주 모션의 종료 자세가 동적으로 바뀌면,
+    //       여기서 드럼 모션 생성기가 산출한 실제 마지막 q_target으로 갱신해야 함.
+    auto ready_it = poses.find("ready");
+    if (ready_it != poses.end()) {
+        set_last_q_target(ready_it->second);
+    } else {
+        std::cerr << "[BehaviorPlanner] PLAY: 'ready' pose not found; last_q_target 미갱신\n";
+    }
+
     ctx.robot_state = RobotState::PLAYING;
+    ctx.play_speed_scale = 1.0;
     return sequence;
+}
+
+// PLAY_CTRL 드럼 연주 제어
+void BehaviorPlanner::handle_play_ctrl(const std::vector<std::string>& args) {
+    if (ctx.robot_state.load() != RobotState::PLAYING) {
+        std::cerr << "[BehaviorPlanner] PLAY_CTRL rejected: only allowed in PLAYING\n";
+        return;
+    }
+
+    const std::string& ctrl = args[0];
+
+    if (ctrl == "stop") {
+        ctx.play_abort = true;
+        std::cerr << "[BehaviorPlanner] 연주 중지 요청 -> 잔여 모션 폐기 후 ready 복귀\n";
+    }
+    else if (ctrl == "speed") {
+        if (args.size() < 2) {
+            std::cerr << "[BehaviorPlanner] PLAY_CTRL speed: 배율 인자가 없습니다\n";
+            return;
+        }
+        double scale;
+        try {
+            scale = std::stod(args[1]);
+        } catch (const std::exception& e) {
+            std::cerr << "[BehaviorPlanner] PLAY_CTRL speed: 잘못된 배율 값: " << args[1] << "\n";
+            return;
+        }
+        double clamped = std::clamp(scale, MIN_SCALE, MAX_SCALE);
+        ctx.play_speed_scale = clamped;
+        std::cerr << "[BehaviorPlanner] 연주 속도 배율: " << clamped << "x";
+        if (clamped != scale) {
+            std::cerr << " (요청 " << scale << " 가 [" << MIN_SCALE << ", " << MAX_SCALE << "] 로 제한됨)";
+        }
+        std::cerr << "\n";
+    }
+    else {
+        std::cerr << "[BehaviorPlanner] Unknown PLAY_CTRL: " << ctrl << "\n";
+    }
 }
 
 std::vector<MotionPrimitive> BehaviorPlanner::handle_quit() {
     std::vector<MotionPrimitive> sequence;
     if (ctx.robot_state.load() != RobotState::IDLE) {
-        std::cerr << "[BehaviorPlanner] PLAY rejected: only allowed in IDLE\n";
+        std::cerr << "[BehaviorPlanner] QUIT rejected: only allowed in IDLE\n";
         return sequence;
     }
 
@@ -409,7 +530,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_quit() {
     auto it = poses.find("shutdown");
     if (it != poses.end()) {
         sequence.push_back(make_translate(it->second, DEFAULT_MOVE_TIME));
-        last_q_target = it->second;
+        set_last_q_target(it->second);
     }
     ctx.robot_state = RobotState::SHUTTINGDOWN;
     return sequence;
@@ -427,6 +548,12 @@ MotionPrimitive BehaviorPlanner::make_translate(const std::vector<double>& q_tar
     motion.q_target = q_target;
     motion.t_total  = t_total;
     return motion;
+}
+
+void BehaviorPlanner::set_last_q_target(const std::vector<double>& q) {
+    last_q_target = q;
+    std::lock_guard<std::mutex> lk(ctx.last_q_mutex);
+    ctx.last_q_target_snapshot = q;
 }
 
 MotionPrimitive BehaviorPlanner::make_drum_hit(double t, int note_num) {
@@ -493,8 +620,8 @@ MotionPrimitive BehaviorPlanner::make_drum_play(std::vector<DrumEvent> rds) {
 }
 
 int BehaviorPlanner::find_motor_id(const std::string& motor_name) const {
-    for (const auto &[id, motor] : robot.motors) {
-        if (motor->name == motor_name) return id;
+    for (const auto &[id, name] : robot.joint_names) {
+        if (name == motor_name) return id;
     }
     return -1;
 }

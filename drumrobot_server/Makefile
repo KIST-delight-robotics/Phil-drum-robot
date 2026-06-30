@@ -45,6 +45,19 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 $(OBJDIR)/dxl/%.o: ./lib/dynamixel_sdk/src/%.cpp
 	$(CC) $(CFLAGS) -c $< -o $@ $(INCLUDE)
 
+# ===== 실행 =====
+# config/log 경로가 모두 'drumrobot_server/...' 상대경로라, 그 경로가 보이는 위치에서 실행한다.
+# 1) 프로젝트 루트(Phil-drum-robot)에서 바로 보이면 그대로 실행
+# 2) 안 보이면 상위 디렉터리로 올라가 실행 (drumrobot_server 안에서 make run 한 경우)
+run: all
+	@if [ -f drumrobot_server/config/motors.json ]; then \
+		sudo ./drumrobot_server/bin/$(EXECUTABLE); \
+	elif [ -f ../drumrobot_server/config/motors.json ]; then \
+		cd .. && sudo ./drumrobot_server/bin/$(EXECUTABLE); \
+	else \
+		echo "[run] drumrobot_server/config/motors.json 를 찾을 수 없습니다"; exit 1; \
+	fi
+
 # ===== 청소 =====
 clean:
 	rm -rf $(OBJDIR) $(BINDIR)

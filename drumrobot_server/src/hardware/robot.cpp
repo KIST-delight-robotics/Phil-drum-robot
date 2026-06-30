@@ -41,6 +41,7 @@ void Robot::init_motor_from_json() {
     for (auto &m : config["motors"]) {
         std::string type = m["type"];
         int id = m["id"];
+        joint_names[id] = m["name"].get<std::string>();
 
         if (type == "TMotor") {
             auto motor = std::make_shared<TMotor>(id);

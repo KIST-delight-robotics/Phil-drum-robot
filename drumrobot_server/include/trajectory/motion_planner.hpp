@@ -14,11 +14,12 @@
 #include "hardware/robot.hpp"
 #include "trajectory/behavior_planner.hpp"
 #include "trajectory/trajectory_generator.hpp"
+#include "util/audio_player.hpp"
 #include "util/logger.hpp"
 
 class MotionPlanner {
 public:
-    MotionPlanner(AppContext &ctxRef, CommandQueue &commandQueueRef, ControlQueue &controlQueueRef, MotionQueue &motionQueueRef, Robot &robotRef);
+    MotionPlanner(AppContext &ctxRef, CommandQueue &commandQueueRef, ControlQueue &controlQueueRef, MotionQueue &motionQueueRef, Robot &robotRef, AudioPlayer &audioRef);
     ~MotionPlanner();
 
     void run();
@@ -41,6 +42,8 @@ private:
     void plan_motions(const ParsedCommand& cmd);
     void schedule_idle_motion();
     void abort_play_motion();
+
+    bool motion_done = true;
 
     // ===== log =====
     Logger motion_log;

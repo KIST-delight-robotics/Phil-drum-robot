@@ -47,15 +47,36 @@ void TcpServer::run() {
 
             std::cout << "[TcpServer] Received: " << input << "\n";
 
+            std::string upper = input;
+            std::transform(upper.begin(), upper.end(), upper.begin(),
+                        [](unsigned char c){ return std::toupper(c); });
+
+            // ===== 상태 조회: 큐에 넣지 않고 즉시 응답 =====
+            // 응답 형식: STATUS|<robot_state>|<q0_deg>|<q1_deg>|...  (단위: degree)
+            // q 값은 "마지막으로 명령된 목표 자세"이며 실측값이 아님.
+            if (upper == "GET_STATUS") {
+                std::ostringstream oss;
+                oss << "STATUS|" << state_to_string(ctx.robot_state.load());
+                {
+                    std::lock_guard<std::mutex> lk(ctx.last_q_mutex);
+                    oss << std::fixed << std::setprecision(2);
+                    for (double q_rad : ctx.last_q_target_snapshot) {
+                        oss << "|" << (q_rad * 180.0 / M_PI);
+                    }
+                }
+                oss << "|" << ctx.play_speed_scale;
+                oss << "\n";
+                std::string resp = oss.str();
+                send(client_fd, resp.c_str(), resp.size(), 0);
+                continue;   // 큐 push / QUIT 처리 건너뜀
+            }
+
             // 명령을 CommandQueue 에 push
             if (!input.empty()) {
                 ParsedCommand parsed = command_parser.parse(input);
                 command_queue.push(parsed);
             }
 
-            std::string upper = input;
-            std::transform(upper.begin(), upper.end(), upper.begin(),
-                        [](unsigned char c){ return std::toupper(c); });
             if (upper == "QUIT" || upper == "Q") {
                 quitting = true;
                 break;

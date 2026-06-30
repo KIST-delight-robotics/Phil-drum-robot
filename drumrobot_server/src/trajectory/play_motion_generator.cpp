@@ -1,14 +1,7 @@
 #include "trajectory/play_motion_generator.hpp"
 
-PlayMotionGenerator::PlayMotionGenerator() {
-    // : log("play") {
-    // std::vector<std::string> header = {
-    //     "XR", "YR", "ZR", "XL", "YL", "ZL",
-    //     "theta 0", "theta 7", "theta 8",
-    //     "elbow R", "elbow L", "wrist R", "wrist L",
-    //     "bass pedal", "hihat control", "head yaw", "head pitch"
-    // };
-    // log.set_header(header);
+PlayMotionGenerator::PlayMotionGenerator(AppContext &ctxRef)
+    : ctx(ctxRef) {
 }
 
 PlayMotionGenerator::~PlayMotionGenerator() {
@@ -187,16 +180,6 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
         q[12] = h.pitch;
 
         q_queue.push(q);
-
-        // std::vector<double> values = {
-        //     pR[0], pR[1], pR[2],
-        //     pL[0], pL[1], pL[2],
-        //     theta0, theta7, theta8,
-        //     s.right_elbow, s.left_elbow,
-        //     s.right_wrist, s.left_wrist,
-        //     p.right, p.left, h.yaw, h.pitch
-        // };
-        // log.record(values);
     }
 
     return q_queue;
@@ -206,7 +189,7 @@ int PlayMotionGenerator::get_num_point(double t0, double t1) {
     double n;
 
     // 한 라인의 데이터 개수 (5ms 단위)
-    n = (t1 - t0) / ROBOT::DT_SECOND;
+    n = (t1 - t0) / ROBOT::DT_SECOND / ctx.play_speed_scale.load();
     round_sum += (int)(n * 10000) % 10000;
     if (round_sum >= 10000)
     {

@@ -27,7 +27,7 @@ struct MotionPrimitive {
     // STANDBY
     // 키 제거하기 전 현재 위치 유지
 
-    // TRANSLATE용
+    // TRANSLATE
     TrajectorySpace space = TrajectorySpace::JOINT;
     TrajectoryProfile profile = TrajectoryProfile::COSINE;
     std::vector<double> q_target;       // joint space일 때
@@ -35,12 +35,12 @@ struct MotionPrimitive {
     std::vector<double> p_target_L;
     double t_total = 4.0;
 
-    // DRUM용
+    // DRUM
     std::vector<DrumEvent> robotic_drum_score;
     PlayFlag flag = PlayFlag::PLAYING;
     int init_note_r = 1, init_note_l = 1;    // 초기 위치 기본값: 스네어
 
-    // IDLE용
+    // IDLE
     // ... 별도 필드
 };
 

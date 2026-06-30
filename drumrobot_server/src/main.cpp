@@ -5,9 +5,6 @@
 #include <string>
 #include <memory>
 
-// 오디오
-#include "miniaudio/miniaudio.h"
-
 #include "common/app_context.hpp"
 #include "common/command_queue.hpp"
 #include "common/control_queue.hpp"
@@ -29,33 +26,33 @@ void set_priority(std::thread& t, int priority) {
 }
 
 int main(int argc, char* argv[]) {
-    // ma_engine engine;
-    // ma_context context;
+    ma_engine engine;
+    ma_context context;
 
-    // ma_backend backends[] = { ma_backend_pulseaudio };   // pulse만
-    // ma_context_config cfg = ma_context_config_init();
+    ma_backend backends[] = { ma_backend_pulseaudio };   // pulse만
+    ma_context_config cfg = ma_context_config_init();
 
-    // if (ma_context_init(backends, 1, &cfg, &context) != MA_SUCCESS) {
-    //     std::cerr << "컨텍스트 초기화 실패\n";
-    //     return -1;
-    // }
-    // std::cout << "선택된 백엔드: " << ma_get_backend_name(context.backend) << "\n";
+    if (ma_context_init(backends, 1, &cfg, &context) != MA_SUCCESS) {
+        std::cerr << "컨텍스트 초기화 실패\n";
+        return -1;
+    }
+    std::cout << "선택된 백엔드: " << ma_get_backend_name(context.backend) << "\n";
 
-    // ma_engine_config ecfg = ma_engine_config_init();
-    // ecfg.pContext = &context;
-    // if (ma_engine_init(&ecfg, &engine) != MA_SUCCESS) {
-    //     std::cerr << "엔진 초기화 실패\n";
-    //     ma_context_uninit(&context);
-    //     return -1;
-    // }
+    ma_engine_config ecfg = ma_engine_config_init();
+    ecfg.pContext = &context;
+    if (ma_engine_init(&ecfg, &engine) != MA_SUCCESS) {
+        std::cerr << "엔진 초기화 실패\n";
+        ma_context_uninit(&context);
+        return -1;
+    }
 
-    // std::cout << "재생 시작. Enter로 종료...\n";
-    // ma_engine_play_sound(&engine, "drumrobot_server/data/audio/TIM.wav", NULL);
-    // std::cin.get();
+    std::cout << "재생 시작. Enter로 종료...\n";
+    ma_engine_play_sound(&engine, "drumrobot_server/data/audio/TIM.wav", NULL);
+    std::cin.get();
 
-    // ma_engine_uninit(&engine);
-    // ma_context_uninit(&context);
-    // return 0;
+    ma_engine_uninit(&engine);
+    ma_context_uninit(&context);
+    return 0;
 
     AppContext ctx;
     CommandQueue command_queue;
@@ -64,10 +61,13 @@ int main(int argc, char* argv[]) {
 
     Robot robot;
     robot.initialize();
+
+    AudioPlayer audio_player;
+    audio_player.initialize();
     
     TcpServer server(ctx, PORT, command_queue);
-    Controller controller(ctx, control_queue, robot);
-    MotionPlanner motion_planner(ctx, command_queue, control_queue, motion_queue, robot);
+    Controller controller(ctx, control_queue, robot, audio_player);
+    MotionPlanner motion_planner(ctx, command_queue, control_queue, motion_queue, robot, audio_player);
 
     std::thread send_thread(&Controller::send_loop, &controller);
     std::thread recv_thread(&Controller::recv_loop, &controller);
