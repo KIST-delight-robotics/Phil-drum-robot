@@ -35,6 +35,168 @@
         "audio": "",
         "init_note_r": 5,
         "init_note_l": 1
+      },
+      "R1": {
+        "score": "1_rock_70_beat_6-8",
+        "audio": "",
+        "init_note_r": 6,
+        "init_note_l": 1
+      },
+      "R2": {
+        "score": "1_rock_87_beat_4-4",
+        "audio": "",
+        "init_note_r": 5,
+        "init_note_l": 1
+      },
+      "R3": {
+        "score": "1_rock_100_beat_4-4",
+        "audio": "",
+        "init_note_r": 3,
+        "init_note_l": 1
+      },
+      "R4": {
+        "score": "1_rock_105_beat_4-4",
+        "audio": "",
+        "init_note_r": 5,
+        "init_note_l": 5
+      },
+      "R5": {
+        "score": "1_rock_110_beat_4-4",
+        "audio": "",
+        "init_note_r": 4,
+        "init_note_l": 1
+      },
+      "R6": {
+        "score": "2_rock_70_beat_6-8",
+        "audio": "",
+        "init_note_r": 6,
+        "init_note_l": 5
+      },
+      "R7": {
+        "score": "2_rock_100_beat_4-4",
+        "audio": "",
+        "init_note_r": 3,
+        "init_note_l": 3
+      },
+      "R8": {
+        "score": "2_rock_102_beat_4-4",
+        "audio": "",
+        "init_note_r": 6,
+        "init_note_l": 4
+      },
+      "R9": {
+        "score": "2_rock_105_beat_4-4",
+        "audio": "",
+        "init_note_r": 5,
+        "init_note_l": 5
+      },
+      "R10": {
+        "score": "3_rock_80_beat_6-8",
+        "audio": "",
+        "init_note_r": 5,
+        "init_note_l": 1
+      },
+      "R11": {
+        "score": "3_rock_100_beat_6-8",
+        "audio": "",
+        "init_note_r": 4,
+        "init_note_l": 4
+      },
+      "R12": {
+        "score": "8_rock_100_beat_4-4",
+        "audio": "",
+        "init_note_r": 5,
+        "init_note_l": 1
+      },
+      "J1": {
+        "score": "17_jazz_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 5,
+        "init_note_l": 1
+      },
+      "J2": {
+        "score": "19_jazz_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "R13": {
+        "score": "26_rock_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "R14": {
+        "score": "27_rock_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "R15": {
+        "score": "28_rock_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "R16": {
+        "score": "29_rock_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "R17": {
+        "score": "30_rock_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "J3": {
+        "score": "31_jazz_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "H1": {
+        "score": "32_hiphop_92_beat_4-4",
+        "audio": "",
+        "init_note_r": 5,
+        "init_note_l": 5
+      },
+      "R18": {
+        "score": "36_rock_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "J4": {
+        "score": "39_jazz_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "R19": {
+        "score": "40_rock_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "R20": {
+        "score": "41_rock_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "R21": {
+        "score": "42_rock_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "R22": {
+        "score": "47_rock_120_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
       }
     }
   }
