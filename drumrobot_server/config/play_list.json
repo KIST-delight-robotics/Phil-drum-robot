@@ -197,6 +197,18 @@
         "audio": "",
         "init_note_r": 1,
         "init_note_l": 1
+      },
+      "F1": {
+        "score": "1_funk_80_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
+      },
+      "F1e": {
+        "score": "1_funk_80_beat_4-4",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
       }
     }
   }
