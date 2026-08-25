@@ -2,3 +2,5 @@
 drumrobot_server/log/
 drumrobot_server/obj/
 drumrobot_server/bin/*.out
+__pycache__/
+*.pyc
