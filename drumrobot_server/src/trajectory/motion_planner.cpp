@@ -1,5 +1,7 @@
 #include "trajectory/motion_planner.hpp"
 
+#include "vision/drum_detector.hpp"
+
 MotionPlanner::MotionPlanner(AppContext &ctxRef, CommandQueue &commandQueueRef, ControlQueue &controlQueueRef, MotionQueue &motionQueueRef, Robot &robotRef, AudioPlayer &audioRef)
     : ctx(ctxRef), command_queue(commandQueueRef), control_queue(controlQueueRef), motion_queue(motionQueueRef), robot(robotRef),
     behavior_planner(ctxRef, robotRef, audioRef), trajectory_generator(ctxRef, control_queue), motion_log("motion_command") {}
@@ -65,6 +67,13 @@ void MotionPlanner::initialize() {
 void MotionPlanner::plan_motions(const ParsedCommand& cmd) {
     if (ctx.robot_state.load() == RobotState::SHUTTINGDOWN) return; // 종료 상태가 되면 추가 명령 안받음
 
+    // SCAN은 모션 시퀀스가 아니라 이 스레드에서 동기 수행하는 작업이므로 BehaviorPlanner를 거치지 않는다
+    if (cmd.valid && cmd.opcode == Opcode::SCAN) {
+        record_command(cmd);
+        run_drum_scan();
+        return;
+    }
+
     std::vector<MotionPrimitive> motion_sequence = behavior_planner.generate_motion_sequence(cmd);
 
     int n = motion_sequence.size();
@@ -114,6 +123,52 @@ void MotionPlanner::schedule_idle_motion() {
 
         idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능
         motion_queue.push(idle_motion);
+    }
+}
+
+// 드럼 스캔: 이 스레드(MotionPlanner)에서 동기 실행한다.
+// 스캔 동안 run() 루프가 정지하므로 idle 재충전이 없고, DrumDetector가
+// trajectory_generator를 직접 호출해 허리를 움직인다 (send/recv/TcpServer 스레드는 병행).
+// GET_STATUS는 TcpServer가 직접 응답하므로 클라이언트는 SCANNING 해제로 완료를 감지한다.
+void MotionPlanner::run_drum_scan() {
+    if (ctx.robot_state.load() != RobotState::IDLE) {
+        std::cerr << "[MotionPlanner] SCAN rejected: only allowed in IDLE\n";
+        return;
+    }
+    ctx.robot_state = RobotState::SCANNING;
+    std::cerr << "[MotionPlanner] 드럼 스캔 시작 (완료까지 다른 명령은 무시됨, "
+              << "처리 구간의 control_queue underflow 경고는 정상)\n";
+
+    bool ok = false;
+    {
+        DrumDetector detector(ctx, robot, trajectory_generator, control_queue);
+        ok = detector.run_scan();
+    }   // 소멸 → 카메라 닫힘
+
+    if (ok) {
+        trajectory_generator.reload_drum_coordinates();   // 같은 스레드 → 안전
+        std::cerr << "[MotionPlanner] 스캔 완료: drum_coordinate.json 갱신 및 핫 리로드\n";
+    } else {
+        std::cerr << "[MotionPlanner] 스캔 실패: 드럼 좌표 미변경\n";
+    }
+
+    // 스캔 중 쌓인 명령 폐기 (QUIT만 예외 — 폐기하면 TcpServer가 quitting 상태로 고착됨)
+    bool quit_seen = false;
+    int discarded = 0;
+    while (auto cmd = command_queue.try_pop()) {
+        if (cmd->valid && cmd->opcode == Opcode::QUIT) quit_seen = true;
+        else discarded++;
+    }
+    if (discarded > 0) {
+        std::cerr << "[MotionPlanner] 스캔 중 수신된 명령 " << discarded << "개 폐기\n";
+    }
+
+    ctx.robot_state = RobotState::IDLE;
+    if (quit_seen) {
+        ParsedCommand quit_cmd;
+        quit_cmd.valid = true;
+        quit_cmd.opcode = Opcode::QUIT;
+        plan_motions(quit_cmd);   // IDLE 복귀 후 정상 종료 경로로 처리
     }
 }
 
@@ -173,12 +228,14 @@ void MotionPlanner::record_command(const ParsedCommand& cmd) {
             case Opcode::MOVE:    return "MOVE";
             case Opcode::POSE:    return "POSE";
             case Opcode::HIT:     return "HIT";
+            case Opcode::POINT:   return "POINT";
             case Opcode::PLAY:    return "PLAY";
             case Opcode::PLAY_CTRL: return "PLAY_CTRL";
             case Opcode::START:   return "START";
             case Opcode::READY:   return "READY";
             case Opcode::PAUSE:   return "PAUSE";
             case Opcode::RESUME:  return "RESUME";
+            case Opcode::SCAN:    return "SCAN";
             case Opcode::GET_STATUS: return "GET_STATUS";
             case Opcode::QUIT:    return "QUIT";
             case Opcode::UNKNOWN: return "UNKNOWN";

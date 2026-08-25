@@ -24,6 +24,11 @@ void TrajectoryGenerator::initialize(const std::map<std::string, std::vector<dou
     ready_pose = pose.at("ready");
 }
 
+void TrajectoryGenerator::reload_drum_coordinates() {
+    // initialize()와 달리 last_q/ready_pose는 건드리지 않는다 (동작 연속성 유지)
+    play_motion_generator.initialize();
+}
+
 void TrajectoryGenerator::generate_trajectory(const MotionPrimitive& motion) {
     switch (motion.type) {
     case MotionType::STANDBY:

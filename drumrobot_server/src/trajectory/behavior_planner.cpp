@@ -28,6 +28,7 @@ BehaviorPlanner::BehaviorPlanner(AppContext &ctxRef, Robot &robotRef, AudioPlaye
     }
 
     init_play_list_from_json();
+    solver.initialize();
 }
 
 BehaviorPlanner::~BehaviorPlanner() {
@@ -70,6 +71,7 @@ std::vector<MotionPrimitive> BehaviorPlanner::generate_motion_sequence(const Par
         case Opcode::MOVE:    return handle_move(parsed.args);
         case Opcode::POSE:    return handle_pose(parsed.args);
         case Opcode::HIT:     return handle_hit(parsed.args);
+        case Opcode::POINT:   return handle_point(parsed.args);
         case Opcode::PLAY:    return handle_play(parsed.args);
         case Opcode::PAUSE: {
             handle_pause();
@@ -384,6 +386,190 @@ std::vector<MotionPrimitive> BehaviorPlanner::handle_hit(const std::vector<std::
     return sequence;
 }
 
+// POINT R|L x y z [z_offset_cm] : 스틱끝을 지정 좌표 위로 이동 (스캔 좌표 검증용)
+// 활성팔 손목각은 POINT_WRIST_DEG(10도) 고정 (본 이동 중 현재값에서 10도로 함께 변경)
+// 궤적: [수직 상승 +5cm] -> 목표점 상공 10cm까지 관절 이동 -> 수직 직선 하강 -> 유지
+std::vector<MotionPrimitive> BehaviorPlanner::handle_point(const std::vector<std::string>& args) {
+    std::vector<MotionPrimitive> sequence;
+    if (ctx.robot_state.load() != RobotState::IDLE) {
+        std::cerr << "[BehaviorPlanner] POINT rejected: only allowed in IDLE\n";
+        return sequence;
+    }
+
+    // ---- 인자 파싱 ----
+    bool active_is_right = true;
+    std::array<double, 3> p{};
+    double offset_cm = POINT_DEFAULT_OFFSET_CM;
+    try {
+        std::string arm = args[0];
+        std::transform(arm.begin(), arm.end(), arm.begin(), ::toupper);
+        if      (arm == "R" || arm == "r") active_is_right = true;
+        else if (arm == "L" || arm == "l")  active_is_right = false;
+        else {
+            std::cerr << "[BehaviorPlanner] POINT: 팔 지정은 R/L(right/left)이어야 합니다: " << args[0] << "\n";
+            return sequence;
+        }
+
+        for (int i = 0; i < 3; i++) {
+            p[i] = std::stod(args[1 + i]);
+        }
+        if (args.size() >= 5) {
+            offset_cm = std::stod(args[4]);
+        }
+        if (offset_cm < 0.0 || offset_cm > POINT_MAX_OFFSET_CM) {
+            std::cerr << "[BehaviorPlanner] POINT: z 오프셋은 0~" << POINT_MAX_OFFSET_CM
+                      << "cm 범위여야 합니다: " << offset_cm << "\n";
+            return sequence;
+        }
+    } catch (const std::exception &e) {
+        std::cerr << "[BehaviorPlanner] POINT parsing error: " << e.what() << "\n";
+        return sequence;
+    }
+    const double z_offset = offset_cm * 0.01;
+
+    // ---- 활성팔 손목각: 고정값 ----
+    const double wrist_active = deg_to_rad(POINT_WRIST_DEG);
+
+    // ---- 현재 자세의 스틱끝 위치 (FK) ----
+    std::array<double, 9> q_cur9;
+    std::copy(last_q_target.begin(), last_q_target.begin() + 9, q_cur9.begin());
+    KinematicsSolver::FKResult fk_cur = solver.solve_fk(q_cur9);
+    if (!fk_cur.success) {
+        std::cerr << "[BehaviorPlanner] POINT: 현재 자세 FK 실패 — 명령 취소\n";
+        return sequence;
+    }
+
+    // ---- 목표점 구성 ----
+    // 오프셋이 접근 높이 이상이면 하강 구간이 불필요하므로 본 이동이 바로 최종점을 겨냥한다.
+    std::array<double, 3> p_final = p; p_final[2] += z_offset;
+    const bool skip_descent = (z_offset >= POINT_APPROACH_H - 1e-3);
+    std::array<double, 3> p_above = p; p_above[2] += skip_descent ? z_offset : POINT_APPROACH_H;
+
+    // ---- 허리각 선정 (도달 가능성 사전 검증 포함) ----
+    // 스윕 결과는 활성팔 목표·손목각에만 의존하므로 상승 전 관절각 기준으로 먼저 결정해도 동일하다.
+    double theta0_star = 0.0;
+    if (!select_point_waist(active_is_right, p_above, p_final, skip_descent, q_cur9, wrist_active, theta0_star)) {
+        std::cerr << "[BehaviorPlanner] POINT: 허리 -90~90도 전 범위에서 도달 불가 — 팔="
+                  << (active_is_right ? "R" : "L")
+                  << ", 목표=(" << p[0] << ", " << p[1] << ", " << p[2] << ")+" << offset_cm
+                  << "cm. 좌표와 팔 지정을 확인하세요\n";
+        return sequence;
+    }
+    const bool waist_moves = std::abs(theta0_star - q_cur9[0]) > 1e-6;
+
+    // ---- 구간 1: 수직 상승 ----
+    // 활성팔은 항상 상승: 직전 POINT가 팁을 드럼헤드 위(접촉 포함)에 남겼을 수 있다.
+    // 유휴팔은 허리가 회전할 때만 함께 상승(회전 중 드럼 긁힘 방지). 회전이 없으면 유휴팔은
+    // 명령 내내 제자리 — 한 팔로만 연속 테스트할 때 반대팔이 매번 5cm씩 누적 상승하는 것을 막는다.
+    std::array<double, 9> q_asc9 = q_cur9;
+    bool did_ascend = false;
+    bool idle_ascended = false;
+    {
+        std::array<double, 3> pR_asc = fk_cur.pR;
+        std::array<double, 3> pL_asc = fk_cur.pL;
+        (active_is_right ? pR_asc : pL_asc)[2] += POINT_ASCEND_H;
+        if (waist_moves) {
+            (active_is_right ? pL_asc : pR_asc)[2] += POINT_ASCEND_H;
+        }
+
+        KinematicsSolver::IKResult asc = solver.solve_ik(pR_asc, pL_asc, q_cur9[0], q_cur9[7], q_cur9[8], false);
+        idle_ascended = asc.success && waist_moves;
+        if (!asc.success && waist_moves) {
+            // 양팔 상승 불가 -> 활성팔만 상승
+            pR_asc = fk_cur.pR;
+            pL_asc = fk_cur.pL;
+            (active_is_right ? pR_asc : pL_asc)[2] += POINT_ASCEND_H;
+            asc = solver.solve_ik(pR_asc, pL_asc, q_cur9[0], q_cur9[7], q_cur9[8], false);
+            if (asc.success) {
+                std::cerr << "[BehaviorPlanner] POINT: 양팔 상승 불가 -> 활성팔만 상승\n";
+            }
+        }
+
+        if (asc.success) {
+            q_asc9 = asc.q;
+            sequence.push_back(make_task_translate(pR_asc, pL_asc, last_q_target, POINT_ASCEND_TIME));
+            did_ascend = true;
+        } else {
+            std::cerr << "[BehaviorPlanner] POINT: 상승 구간 생략 (현재 자세에서 +"
+                      << POINT_ASCEND_H << "m 상승 불가 — 이미 높은 자세)\n";
+        }
+    }
+
+    // ---- 확정 허리각으로 최종 IK ----
+    // 유휴팔 이동 중 목표 = 상승 후 관절각을 유지한 채 허리만 theta0*로 돌린 위치 (몸통과 함께 회전)
+    std::array<double, 9> q_carry = q_asc9; q_carry[0] = theta0_star;
+    KinematicsSolver::FKResult fk_carry = solver.solve_fk(q_carry);
+    if (!fk_carry.success) {
+        std::cerr << "[BehaviorPlanner] POINT: 유휴팔 FK 실패 — 명령 취소\n";
+        sequence.clear();
+        return sequence;
+    }
+    const std::array<double, 3> p_idle = active_is_right ? fk_carry.pL : fk_carry.pR;
+
+    // 유휴팔 최종 목표: 회전 보호로 올렸던 경우 하강 구간에서 원래 높이(회전된 방위)로 복귀시켜
+    // 명령이 반복돼도 유휴팔이 누적 상승하지 않게 한다. 단, 원래 팁이 낮았다면(악기 근처)
+    // 회전된 방위에서 내려앉을 때 다른 드럼과 닿을 수 있으므로 상승 상태를 유지한다.
+    std::array<double, 3> p_idle_final = p_idle;
+    const double idle_z_before = (active_is_right ? fk_cur.pL : fk_cur.pR)[2];
+    if (idle_ascended) {
+        if (!skip_descent && idle_z_before >= POINT_IDLE_RESTORE_Z) {
+            std::array<double, 9> q_carry0 = q_cur9; q_carry0[0] = theta0_star;
+            KinematicsSolver::FKResult fk_carry0 = solver.solve_fk(q_carry0);
+            if (fk_carry0.success) {
+                p_idle_final = active_is_right ? fk_carry0.pL : fk_carry0.pR;
+            }
+        } else {
+            std::cerr << "[BehaviorPlanner] POINT: 유휴팔은 상승 상태 유지 (POSE|ready로 복귀 가능)\n";
+        }
+    }
+
+    // 활성팔 손목은 고정 손목각(POINT_WRIST_DEG)으로, 유휴팔 손목은 현재 값 유지
+    const double the7 = active_is_right ? wrist_active : q_asc9[7];
+    const double the8 = active_is_right ? q_asc9[8]    : wrist_active;
+    auto ik_at = [&](const std::array<double, 3>& p_active, const std::array<double, 3>& p_idle_sel) {
+        std::array<double, 3> pR = active_is_right ? p_active : p_idle_sel;
+        std::array<double, 3> pL = active_is_right ? p_idle_sel : p_active;
+        return solver.solve_ik(pR, pL, theta0_star, the7, the8, true);
+    };
+    KinematicsSolver::IKResult ik_above = ik_at(p_above, p_idle);
+    KinematicsSolver::IKResult ik_final = skip_descent ? ik_above : ik_at(p_final, p_idle_final);
+    if (!ik_above.success || !ik_final.success) {
+        // 스윕이 보장하므로 도달하지 않아야 하는 방어적 경로
+        std::cerr << "[BehaviorPlanner] POINT: 최종 IK 실패 — 명령 취소\n";
+        sequence.clear();
+        return sequence;
+    }
+
+    std::vector<double> q_above13 = last_q_target;
+    std::vector<double> q_final13 = last_q_target;
+    for (int i = 0; i < 9; i++) {
+        q_above13[i] = ik_above.q[i];
+        q_final13[i] = ik_final.q[i];
+    }
+
+    // ---- 구간 2: 본 이동 (관절 공간, 중간 실패 없음) ----
+    sequence.push_back(make_translate(q_above13, POINT_TRAVEL_TIME));
+
+    // ---- 구간 3: 수직 하강 (태스크 공간, 팁 직선 보장) ----
+    // 회전 보호로 올렸던 유휴팔도 이 구간에서 원래 높이로 함께 내려온다 (p_idle_final).
+    if (!skip_descent) {
+        std::array<double, 3> pR_end = active_is_right ? p_final : p_idle_final;
+        std::array<double, 3> pL_end = active_is_right ? p_idle_final : p_final;
+        sequence.push_back(make_task_translate(pR_end, pL_end, q_above13, POINT_DESCEND_TIME));
+    }
+
+    set_last_q_target(q_final13);
+
+    const double total_time = (did_ascend ? POINT_ASCEND_TIME : 0.0)
+                            + POINT_TRAVEL_TIME
+                            + (skip_descent ? 0.0 : POINT_DESCEND_TIME);
+    std::cerr << "[BehaviorPlanner] POINT: 팔=" << (active_is_right ? "R" : "L")
+              << " 목표=(" << p[0] << ", " << p[1] << ", " << p[2] << ")+" << offset_cm
+              << "cm, 허리=" << theta0_star * 180.0 / M_PI << "도, 약 " << total_time
+              << "초. 확인 후 다음 POINT 또는 POSE|ready\n";
+    return sequence;
+}
+
 // PLAY score_name : 드럼 연주
 std::vector<MotionPrimitive> BehaviorPlanner::handle_play(const std::vector<std::string>& args) {
     return make_play_sequence(args[0], 0);
@@ -636,6 +822,93 @@ MotionPrimitive BehaviorPlanner::make_translate(const std::vector<double>& q_tar
     motion.q_target = q_target;
     motion.t_total  = t_total;
     return motion;
+}
+
+// 태스크 공간 TRANSLATE 프리미티브 생성 (스틱끝 직선 이동)
+// q_target은 반드시 13개: 허리(0)·손목(7,8)·페달/머리(9~12)는 관절 보간, 팔(1~6)은 틱마다 IK가 덮어씀
+MotionPrimitive BehaviorPlanner::make_task_translate(const std::array<double, 3>& pR, const std::array<double, 3>& pL,
+                                                     const std::vector<double>& q_target, double t_total,
+                                                     TrajectoryProfile profile) {
+    MotionPrimitive motion;
+    motion.type       = MotionType::TRANSLATE;
+    motion.space      = TrajectorySpace::TASK;
+    motion.profile    = profile;
+    motion.q_target   = q_target;
+    motion.p_target_R = {pR[0], pR[1], pR[2]};
+    motion.p_target_L = {pL[0], pL[1], pL[2]};
+    motion.t_total    = t_total;
+    return motion;
+}
+
+// POINT용 허리각 선정: 활성 팁이 p_above·p_final 두 끝점 모두에 도달 가능한 허리각을 찾는다.
+// 유휴팔은 q_base의 관절각을 유지한 채 몸통과 함께 회전한 위치를 목표로 삼으므로 항상 도달 가능.
+// 선정 규칙: 현재 허리각이 밴드 안이고 경계까지 여유가 있으면 무이동, 아니면 가장 가까운
+// 밴드에서 여유만큼 클램프(밴드가 좁으면 중앙). compute_waist_range와 동일 해상도(0.1도) 스윕.
+bool BehaviorPlanner::select_point_waist(bool active_is_right, const std::array<double, 3>& p_above,
+                                         const std::array<double, 3>& p_final, bool skip_descent,
+                                         const std::array<double, 9>& q_base, double wrist_active,
+                                         double& out_theta0) {
+    constexpr int N = 1801;                          
+    const double step = M_PI / 1800.0;
+    std::vector<bool> feasible(N, false);
+    bool any = false;
+
+    // 활성팔 손목은 악기 손목각, 유휴팔 손목은 현재 값
+    const double the7 = active_is_right ? wrist_active : q_base[7];
+    const double the8 = active_is_right ? q_base[8]    : wrist_active;
+
+    std::array<double, 9> q_tmp = q_base;
+    for (int i = 0; i < N; i++) {
+        const double the0 = -0.5 * M_PI + step * i;     // -90 ~ +90도, 0.1도 간격
+        q_tmp[0] = the0;
+        KinematicsSolver::FKResult fk = solver.solve_fk(q_tmp);     // 유휴팔의 목표 위치를 계산하기 위함
+        if (!fk.success) continue;
+        const std::array<double, 3>& p_idle = active_is_right ? fk.pL : fk.pR;
+
+        std::array<double, 3> pR = active_is_right ? p_above : p_idle;
+        std::array<double, 3> pL = active_is_right ? p_idle  : p_above;
+        if (!solver.solve_ik(pR, pL, the0, the7, the8, false).success) continue;
+
+        if (!skip_descent) {
+            (active_is_right ? pR : pL) = p_final;
+            if (!solver.solve_ik(pR, pL, the0, the7, the8, false).success) continue;
+        }
+        feasible[i] = true;     // i번째 허리각에서 ik가 모두 풀림
+        any = true;             // ik가 하나도 안풀리면 false 유지
+    }
+    if (!any) return false;
+
+    const int margin = static_cast<int>(std::round(POINT_WAIST_MARGIN / step));
+    int i_cur = static_cast<int>(std::lround((q_base[0] + 0.5 * M_PI) / step));
+    i_cur = std::clamp(i_cur, 0, N - 1);
+
+    // 현재 허리각 주변으로 margin 이내가 전부 도달 가능하면 허리 무이동
+    auto ok_with_margin = [&](int idx) {
+        for (int d = -margin; d <= margin; d++) {
+            int k = idx + d;
+            if (k < 0 || k >= N || !feasible[k]) return false;
+        }
+        return true;
+    };
+    if (ok_with_margin(i_cur)) {
+        out_theta0 = q_base[0];
+        return true;
+    }
+
+    // 가장 가까운 도달 가능 인덱스 -> 그 인덱스가 속한 연속 밴드 [lo, hi]
+    int nearest = -1;
+    for (int d = 0; d < N; d++) {
+        if (i_cur - d >= 0 && feasible[i_cur - d]) { nearest = i_cur - d; break; }
+        if (i_cur + d < N  && feasible[i_cur + d]) { nearest = i_cur + d; break; }
+    }
+    int lo = nearest, hi = nearest;
+    while (lo - 1 >= 0 && feasible[lo - 1]) lo--;
+    while (hi + 1 < N && feasible[hi + 1]) hi++;
+
+    const int pick = (hi - lo < 2 * margin) ? (lo + hi) / 2
+                                            : std::clamp(i_cur, lo + margin, hi - margin);
+    out_theta0 = -0.5 * M_PI + step * pick;
+    return true;
 }
 
 void BehaviorPlanner::set_last_q_target(const std::vector<double>& q) {

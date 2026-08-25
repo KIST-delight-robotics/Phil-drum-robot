@@ -24,6 +24,7 @@ public:
 
     void initialize(const std::map<std::string, std::vector<double>>& pose);
     void generate_trajectory(const MotionPrimitive& motion);
+    void reload_drum_coordinates();    // 스캔 후 드럼 좌표 핫 리로드 (last_q 등 다른 상태는 유지)
  
 private:
     AppContext &ctx;

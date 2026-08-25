@@ -7,7 +7,7 @@
 
 #include "common/play_session.hpp"
 
-enum class RobotState { STANDBY, INIT, IDLE, PLAYING, SHUTTINGDOWN };
+enum class RobotState { STANDBY, INIT, IDLE, PLAYING, SCANNING, SHUTTINGDOWN };
 
 inline const char* state_to_string(RobotState s) {
     switch (s) {
@@ -15,6 +15,7 @@ inline const char* state_to_string(RobotState s) {
         case RobotState::INIT:         return "INIT";
         case RobotState::IDLE:         return "IDLE";
         case RobotState::PLAYING:      return "PLAYING";
+        case RobotState::SCANNING:     return "SCANNING";
         case RobotState::SHUTTINGDOWN: return "SHUTTINGDOWN";
         default:                       return "UNKNOWN";
     }

@@ -2,14 +2,20 @@
 CC = g++
 
 # ===== 컴파일 옵션 =====
-CFLAGS = -Wall -O2 -g -std=c++17 -fPIC
+CFLAGS = -Wall -O2 -g -std=c++17 -fPIC -MMD -MP
 
 # ===== 헤더 파일 경로 =====
 INCLUDE = -I./include -I./lib -I./lib/dynamixel_sdk/include
+INCLUDE += -I/usr/include/pcl-1.10 -I/usr/include/eigen3 -I/usr/include/vtk-7.1
 
 # ===== 링크할 라이브러리 =====
 # (멀티스레드) (수학) (동적 로딩)
 LDFLAGS = -lpthread -lm -ldl
+
+# ===== 드럼 스캔 (RealSense + PCL + VTK) =====
+LDFLAGS += -lrealsense2
+LDFLAGS += -lpcl_common -lpcl_filters -lpcl_segmentation -lpcl_sample_consensus -lpcl_search -lpcl_kdtree -lpcl_visualization
+LDFLAGS += -lvtkRenderingLOD-7.1 -lvtkRenderingCore-7.1 -lvtkFiltersSources-7.1 -lvtkCommonExecutionModel-7.1 -lvtkCommonDataModel-7.1 -lvtkCommonMath-7.1 -lvtkCommonCore-7.1
 
 # ===== 경로 변수 =====
 SRCDIR = ./src
@@ -30,7 +36,7 @@ all: directories $(BINDIR)/$(EXECUTABLE)
 # ===== 폴더 생성 =====
 directories:
 	mkdir -p $(BINDIR)
-	mkdir -p $(OBJDIR)/common $(OBJDIR)/hardware $(OBJDIR)/kinematics $(OBJDIR)/tcp $(OBJDIR)/realtime $(OBJDIR)/trajectory $(OBJDIR)/util
+	mkdir -p $(OBJDIR)/common $(OBJDIR)/hardware $(OBJDIR)/kinematics $(OBJDIR)/tcp $(OBJDIR)/realtime $(OBJDIR)/trajectory $(OBJDIR)/util $(OBJDIR)/vision
 	mkdir -p $(OBJDIR)/dxl
 
 # ===== 링크: .o 파일들 → 실행파일 =====
@@ -61,3 +67,6 @@ run: all
 # ===== 청소 =====
 clean:
 	rm -rf $(OBJDIR) $(BINDIR)
+
+# ===== 헤더 의존성 자동 추적 (-MMD가 생성한 .d 파일) =====
+-include $(OBJFILES:.o=.d) $(DXL_OBJECTS:.o=.d)

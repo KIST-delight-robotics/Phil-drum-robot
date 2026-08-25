@@ -76,12 +76,14 @@ Opcode CommandParser::to_opcode(const std::string& token) const {
     if (upper == "MOVE")    return Opcode::MOVE;
     if (upper == "POSE")    return Opcode::POSE;
     if (upper == "HIT")     return Opcode::HIT;
+    if (upper == "POINT")   return Opcode::POINT;
     if (upper == "PLAY")    return Opcode::PLAY;
     if (upper == "START")   return Opcode::START;
     if (upper == "READY")   return Opcode::READY;
     if (upper == "PAUSE")   return Opcode::PAUSE;
     if (upper == "RESUME")  return Opcode::RESUME;
     if (upper == "PLAY_CTRL") return Opcode::PLAY_CTRL;
+    if (upper == "SCAN")    return Opcode::SCAN;
     if (upper == "QUIT" || upper == "Q") return Opcode::QUIT;
 
     return Opcode::UNKNOWN;
@@ -94,12 +96,14 @@ bool CommandParser::validate_args(Opcode opcode, const std::vector<std::string>&
         case Opcode::MOVE:      return args.size() >= 2;    // motorName, angleDeg, [moveTime]
         case Opcode::POSE:      return args.size() >= 1;    // poseName
         case Opcode::HIT:       return args.size() >= 1;    // target
+        case Opcode::POINT:     return args.size() >= 4;    // R|L, x, y, z, [zOffsetCm]
         case Opcode::PLAY:      return args.size() >= 1;    // scoreName
         case Opcode::PLAY_CTRL: return args.size() >= 1;    // stop / speed
         case Opcode::START:     return true;                // 인자 없음
         case Opcode::READY:     return true;                // state
         case Opcode::PAUSE:     return true;                // 인자 없음
         case Opcode::RESUME:    return true;                // 인자 없음
+        case Opcode::SCAN:      return true;                // 인자 없음
         case Opcode::QUIT:      return true;                // 인자 없음
         default:                return false;
     }

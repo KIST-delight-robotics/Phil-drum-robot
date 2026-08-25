@@ -1,5 +1,6 @@
 # python3 drumrobot_client/main.py
 import socket
+import time
 
 HOST = '127.0.0.1'
 PORT = 1951
@@ -250,6 +251,35 @@ def play_ctrl_mode(s):
         print("  stop / f / d / s / q 중 하나를 입력하세요.")
 
 
+def point_mode(s):
+    """POINT — 스틱 팁을 지정 좌표 위로 이동 (스캔 좌표 검증용)"""
+    state, _, _, _ = get_status(s)
+    if state != "IDLE":
+        print(f"  현재 상태({state})에서는 이동할 수 없습니다. (IDLE 전용)")
+        return
+    print("  좌표는 drumrobot_server/config/drum_coordinate.json 또는")
+    print("  data/scan/scan_*_candidates.csv 에서 복사 (서버 좌표계, 단위 m). 손목각은 10도 고정.")
+    print("  스틱 팁은 입력한 점 위 z오프셋(기본 2cm)에 정지 후 유지됩니다. (0 = 점에 접촉)")
+    print("  복귀는 메뉴 5의 POSE|ready. x 입력에서 엔터만 치면 메뉴로 돌아갑니다.")
+    while True:
+        arm = input("  팔 (R/L, 엔터=R): ").strip().upper() or "R"
+        if arm not in ("R", "L", "RIGHT", "LEFT"):
+            print("  팔은 R 또는 L로 입력하세요.")
+            continue
+        x = input("  x [m] (엔터=종료): ").strip()
+        if not x:
+            return
+        y = input("  y [m]: ").strip()
+        z = input("  z [m]: ").strip()
+        off = input("  z 오프셋 [cm] (엔터=2, 0=접촉): ").strip() or "2"
+        try:
+            float(x), float(y), float(z), float(off)
+        except ValueError:
+            print("  숫자 형식이 잘못되었습니다. 다시 입력하세요.")
+            continue
+        send(s, f"POINT|{arm}|{x}|{y}|{z}|{off}")
+        print("  이동 약 5초 소요. 스틱 위치 확인 후 다음 점을 입력하세요. (성공/거부는 서버 로그 확인)")
+
 # 모드(메뉴) 정의 — 번호: (라벨, 보낼 OPCODE)
 MODES = {
     "1": ("연주 모드 (악보)",      lambda: f"PLAY|{input('  연주 ID: ').strip()}"),
@@ -283,10 +313,15 @@ def main():
             print("  6. 테스트 모드 (관절각 직접 입력)")
             print("  7. 연주 제어 (일시정지 / 중지 / 속도, PLAYING 중)")
             print("  8. 연주 재개 (일시정지한 곡을 멈춘 마디부터)")
+            print("  9. 드럼 스캔 (드럼 위치 자동 인식, IDLE 전용)")
+            print("  10. 지점 이동 (POINT — 스틱 팁을 좌표 위로 이동, IDLE 전용)")
             print("  q. 종료")
             choice = input("선택 > ").strip().lower()
 
             if choice in ("q", "quit"):
+                state, _, _, _ = get_status(s)
+                if state == "SCANNING":
+                    print("  스캔 진행 중입니다. QUIT은 스캔 종료 후 서버가 처리합니다.")
                 send(s, "QUIT")
                 break
             if choice == "6":
@@ -306,6 +341,28 @@ def main():
                     continue
                 send(s, "RESUME")
                 print(f"  재개 요청: 곡 {pause['id']}, 마디 {pause['bar']}부터 이어서 연주합니다.")
+                continue
+            if choice == "9":
+                state, _, _, _ = get_status(s)
+                if state != "IDLE":
+                    print(f"  현재 상태({state})에서는 스캔할 수 없습니다. (IDLE 전용)")
+                    continue
+                send(s, "SCAN")
+                print("  스캔 시작. 완료까지 대기합니다... (Ctrl+C는 대기만 중단, 스캔은 계속됨)")
+                print("  성공 시 드럼 좌표가 자동 갱신·리로드됩니다. 스캔 중 보낸 다른 명령은 무시됩니다.")
+                try:
+                    while True:
+                        time.sleep(2)
+                        state, _, _, _ = get_status(s)
+                        print(f"  ... 상태: {state}")
+                        if state != "SCANNING":
+                            break
+                    print("  스캔 종료. (성공/실패 여부는 서버 로그 확인)")
+                except KeyboardInterrupt:
+                    print("\n  대기를 중단했습니다. 스캔은 서버에서 계속 진행됩니다.")
+                continue
+            if choice == "10":
+                point_mode(s)
                 continue
             if choice in MODES:
                 send(s, MODES[choice][1]())   # 해당 OPCODE 생성 후 전송

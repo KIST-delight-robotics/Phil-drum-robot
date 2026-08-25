@@ -250,10 +250,12 @@ OPCODE|arg1|arg2\n
 | `MOVE`      | `motor_name`, `angle_deg`, `[move_time=3.0]`   | 개별 관절 이동 | Idle |
 | `POSE`      | `pose_name`                                     | 사전 정의 포즈로 이동 (`home` / `ready` / `shutdown`) | Idle |
 | `HIT`       | `target`                                        | 단일 드럼 타격 | Idle |
+| `POINT`     | `R\|L`, `x`, `y`, `z` [m], `[z_offset_cm=2]`   | 스틱 팁을 좌표 위(기본 +2cm)로 이동해 유지 — 스캔 좌표 검증용. 좌표계는 `drum_coordinate.json`과 동일, 손목각 10도 고정 | Idle |
 | `PLAY`      | `id`                                            | 악보 연주. `config/play_list.json`의 id로 악보/음원 선택 | Idle |
 | `PAUSE`     | 없음                                            | 연주 일시정지. **재개 지점(마디) 저장** 후 ready 복귀 → `RESUME` 가능 | Playing |
 | `RESUME`    | 없음                                            | 일시정지한 곡을 저장된 마디부터 재개 (음악 없이 무음 재개) | Idle |
 | `PLAY_CTRL` | `stop` 또는 `speed`, `scale`                    | 연주 제어. `stop`=완전 중지(재개 지점 폐기), `speed`=속도 배율(0.5~2.0) | Playing |
+| `SCAN`      | 없음                                            | 드럼 스캔. RealSense로 드럼 위치 자동 인식 후 `drum_coordinate.json` 갱신·리로드 | Idle |
 | `GET_STATUS`| 없음                                            | 상태 조회. 응답: `STATUS\|<state>\|<q0..q12>\|<speed>\|<pause_valid>\|<pause_id>\|<pause_bar>` (`pause_valid=1`이면 RESUME 가능) | 모든 상태 |
 | `QUIT` / `Q`| 없음                                            | shutdown 포즈 이동 후 시스템 종료 | 모든 상태 |
 
@@ -280,6 +282,8 @@ MOVE|right_wrist|45|1.0     # right_wrist를 45도로 1.0초에 이동
 MOVE|waist|-30|2.0          # 허리를 -30도로 2초에 이동
 HIT|snare                   # 스네어 1회 타격
 HIT|closed hihat            # 클로즈드 하이햇 1회 타격 (타깃 문자열에 공백 포함)
+POINT|R|-0.061|0.363|-0.443 # 오른 스틱 팁을 좌표 위 2cm로 이동 (손목각 10도 고정)
+POINT|L|-0.139|0.358|-0.427|0 # 왼 스틱 팁을 좌표에 접촉할 때까지 이동 (오프셋 0)
 PLAY|BF                     # play_list.json의 BF(BasicFillin) 연주
 PAUSE                       # 연주 일시정지 (재개 지점 저장, PLAYING 중)
 RESUME                      # 멈춘 마디부터 이어서 연주 (IDLE 중)

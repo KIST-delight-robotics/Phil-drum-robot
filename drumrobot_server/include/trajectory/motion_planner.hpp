@@ -43,6 +43,7 @@ private:
     void schedule_idle_motion();
     void abort_play_motion();
     void save_pause_point();
+    void run_drum_scan();   // 드럼 스캔 (이 스레드에서 동기 실행, vision/drum_detector 사용)
 
     bool motion_done = true;
 
