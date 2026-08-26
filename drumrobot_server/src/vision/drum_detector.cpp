@@ -32,8 +32,6 @@ DrumDetector::~DrumDetector() {
 // =============================================================
 bool DrumDetector::run_scan() {
     try {
-        load_scan_config();
-
         // 스캔 전 자세 스냅샷 (허리 이동의 기준이자 종료 시 복귀 목표)
         std::vector<double> base_q;
         {
@@ -150,23 +148,6 @@ bool DrumDetector::run_scan() {
 // =============================================================
 // 스캔 단계
 // =============================================================
-void DrumDetector::load_scan_config() {
-    using json = nlohmann::json;
-
-    std::ifstream f("drumrobot_server/config/drum_scan.json");
-    if (!f.is_open()) {
-        std::cerr << "[DrumDetector] config/drum_scan.json 열기 실패 — visualize=false로 진행\n";
-        return;
-    }
-    try {
-        json config = json::parse(f);
-        visualize = config.value("visualize", false);
-    } catch (const std::exception &e) {
-        std::cerr << "[DrumDetector] drum_scan.json 파싱 실패 (" << e.what() << ") — visualize=false로 진행\n";
-        visualize = false;
-    }
-}
-
 bool DrumDetector::init_camera() {
     try {
         int width = 848; int height = 480; int fps = 30;
@@ -492,6 +473,7 @@ std::vector<int> DrumDetector::index_circles(std::vector<pcl::ModelCoefficients:
     return drum_ids;
 }
 
+/*이전 후보점 선정 알고리즘*/
 std::vector<Eigen::VectorXd> DrumDetector::select_candidates_for_circle(const pcl::ModelCoefficients::Ptr &coeffs, char DB) {
     std::vector<Eigen::VectorXd> candidate;
 
@@ -575,7 +557,98 @@ std::vector<std::vector<Eigen::VectorXd>> DrumDetector::select_candidates(const 
 
     return all_candidates;
 }
+/*
+std::vector<Eigen::VectorXd> DrumDetector::select_candidates_for_circle(const pcl::ModelCoefficients::Ptr &coeffs, char DB) {
+    std::vector<Eigen::VectorXd> candidate;
 
+    Eigen::Vector3f center(coeffs->values[0], coeffs->values[1], coeffs->values[2]);
+    float radius = coeffs->values[3];
+    Eigen::Vector3f normal(coeffs->values[4], coeffs->values[5], coeffs->values[6]);
+    normal.normalize();
+
+    Eigen::Vector3f seed(1.0f, 0.0f, 0.0f);
+    if (std::abs(normal.dot(seed)) > 0.9f)
+        seed = Eigen::Vector3f(0.0f, 1.0f, 0.0f);
+
+    Eigen::Vector3f u = seed.cross(normal).normalized();
+    Eigen::Vector3f v = normal.cross(u).normalized();
+
+    if (DB == 'CD') {  // 가까운 드럼 악기(snare, low): 
+        
+    }
+    else (DB == 'FD') {  // 드럼 악기(mid, high): 중심 + 링(0.4r, 0.8r) x 4방향 = 9개 후보
+        int numRings = 2;
+        int numAngles = 4;
+        candidate.reserve(1 + numRings * numAngles);
+
+        candidate.push_back(center.cast<double>());
+
+        for (int k = 1; k <= numRings; ++k) {
+            float rk = radius * 0.4f * static_cast<float>(k);
+            for (int j = 0; j < numAngles; ++j) {
+                float theta = 2.0f * M_PI * static_cast<float>(j) / static_cast<float>(numAngles);
+                Eigen::Vector3f point = center + rk * (std::cos(theta) * u + std::sin(theta) * v);
+                candidate.push_back(point.cast<double>());
+            }
+        }
+    }
+    else {          // 심벌류: 로봇 방향 에지(0.8r) ±45° = 3개 후보
+        float rk = radius * 0.8f;
+
+        Eigen::Vector3f toRobot = -center;
+        float projU = toRobot.dot(u);
+        float projV = toRobot.dot(v);
+        float baseAngle = std::atan2(projV, projU);
+
+        int numCandidates = 3;
+        candidate.reserve(numCandidates);
+
+        for (int j = -1; j <= 1; ++j) {
+            float theta = baseAngle + static_cast<float>(j) * (M_PI / 4.0f);
+            Eigen::Vector3f point = center + rk * (std::cos(theta) * u + std::sin(theta) * v);
+            candidate.push_back(point.cast<double>());
+        }
+    }
+
+    // 좌->우(x 오름차순) 정렬. 단, x가 거의 같은(= 같은 좌우 라인) 점들은 한 묶음으로 보고,
+    // 그 안에서는 y가 클수록(앞/드럼쪽일수록) 앞 번호를 부여한다.
+    // x를 xLineEps 격자로 양자화해 '같은 라인' 판정을 안정적으로 처리한다
+    // (부동소수점 == 비교를 피하고, std::sort의 strict weak ordering도 보장).
+    const double xLineEps = 0.03; // [m] 좌우 라인 동일 판정 허용오차 (필요시 조정)
+    std::sort(candidate.begin(), candidate.end(),
+        [xLineEps](const Eigen::VectorXd &a, const Eigen::VectorXd &b) {
+            double ax = std::round(a(0) / xLineEps);
+            double bx = std::round(b(0) / xLineEps);
+            if (ax != bx) return ax < bx;          // 왼쪽(-x) -> 오른쪽(+x)
+            if (a(1) != b(1)) return a(1) > b(1);  // 같은 라인: y 큰 값이 앞 번호
+            return a(2) > b(2);                    // 최종 동률 안정화(결정적)
+        });
+
+    std::cout << "[DrumDetector] select_candidates_for_circle: " << DB << " " << candidate.size() << "개 후보 생성\n";
+    for (size_t idx = 0; idx < candidate.size(); ++idx) {
+        std::cout << "  cand " << idx << ": x=" << candidate[idx](0)
+                  << " y=" << candidate[idx](1) << " z=" << candidate[idx](2) << "\n";
+    }
+
+    return candidate;
+}
+
+std::vector<std::vector<Eigen::VectorXd>> DrumDetector::select_candidates(const std::vector<pcl::ModelCoefficients::Ptr> &drum_coeffs) {
+    std::vector<std::vector<Eigen::VectorXd>> all_candidates;
+    all_candidates.reserve(drum_coeffs.size());
+
+    for (size_t i = 0; i < drum_coeffs.size(); ++i) {
+        char DB;
+        if (i < 2) {DB = 'CD'}
+        else if(i < 4) {DB = 'FD'}
+        else {DB = 'B'}
+        std::vector<Eigen::VectorXd> candidates = select_candidates_for_circle(drum_coeffs[i], DB);
+        all_candidates.push_back(candidates);
+    }
+
+    return all_candidates;
+}
+*/
 void DrumDetector::visualize_drums(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &drum_clouds,
                                    const std::vector<std::vector<Eigen::VectorXd>> &drum_candidates) {
     if (!visualize) return;

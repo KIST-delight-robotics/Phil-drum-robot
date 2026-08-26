@@ -842,8 +842,8 @@ MotionPrimitive BehaviorPlanner::make_task_translate(const std::array<double, 3>
 
 // POINT용 허리각 선정: 활성 팁이 p_above·p_final 두 끝점 모두에 도달 가능한 허리각을 찾는다.
 // 유휴팔은 q_base의 관절각을 유지한 채 몸통과 함께 회전한 위치를 목표로 삼으므로 항상 도달 가능.
-// 선정 규칙: 현재 허리각이 밴드 안이고 경계까지 여유가 있으면 무이동, 아니면 가장 가까운
-// 밴드에서 여유만큼 클램프(밴드가 좁으면 중앙). compute_waist_range와 동일 해상도(0.1도) 스윕.
+// 선정 규칙: 현재 허리각에서 가장 가까운 도달 가능 밴드의 중앙값 (경계에서 최대한 먼 각).
+// compute_waist_range와 동일 해상도(0.1도) 스윕.
 bool BehaviorPlanner::select_point_waist(bool active_is_right, const std::array<double, 3>& p_above,
                                          const std::array<double, 3>& p_final, bool skip_descent,
                                          const std::array<double, 9>& q_base, double wrist_active,
@@ -878,22 +878,22 @@ bool BehaviorPlanner::select_point_waist(bool active_is_right, const std::array<
     }
     if (!any) return false;
 
-    const int margin = static_cast<int>(std::round(POINT_WAIST_MARGIN / step));
+    // const int margin = static_cast<int>(std::round(POINT_WAIST_MARGIN / step));
     int i_cur = static_cast<int>(std::lround((q_base[0] + 0.5 * M_PI) / step));
     i_cur = std::clamp(i_cur, 0, N - 1);
 
-    // 현재 허리각 주변으로 margin 이내가 전부 도달 가능하면 허리 무이동
-    auto ok_with_margin = [&](int idx) {
-        for (int d = -margin; d <= margin; d++) {
-            int k = idx + d;
-            if (k < 0 || k >= N || !feasible[k]) return false;
-        }
-        return true;
-    };
-    if (ok_with_margin(i_cur)) {
-        out_theta0 = q_base[0];
-        return true;
-    }
+    // // 현재 허리각 주변으로 margin 이내가 전부 도달 가능하면 허리 무이동
+    // auto ok_with_margin = [&](int idx) {
+    //     for (int d = -margin; d <= margin; d++) {
+    //         int k = idx + d;
+    //         if (k < 0 || k >= N || !feasible[k]) return false;
+    //     }
+    //     return true;
+    // };
+    // if (ok_with_margin(i_cur)) {
+    //     out_theta0 = q_base[0];
+    //     return true;
+    // }
 
     // 가장 가까운 도달 가능 인덱스 -> 그 인덱스가 속한 연속 밴드 [lo, hi]
     int nearest = -1;
@@ -905,8 +905,9 @@ bool BehaviorPlanner::select_point_waist(bool active_is_right, const std::array<
     while (lo - 1 >= 0 && feasible[lo - 1]) lo--;
     while (hi + 1 < N && feasible[hi + 1]) hi++;
 
-    const int pick = (hi - lo < 2 * margin) ? (lo + hi) / 2
-                                            : std::clamp(i_cur, lo + margin, hi - margin);
+    // const int pick = (hi - lo < 2 * margin) ? (lo + hi) / 2
+    //                                         : std::clamp(i_cur, lo + margin, hi - margin);
+    const int pick = (lo + hi) / 2;
     out_theta0 = -0.5 * M_PI + step * pick;
     return true;
 }

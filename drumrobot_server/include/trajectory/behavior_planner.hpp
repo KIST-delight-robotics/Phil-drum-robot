@@ -55,7 +55,7 @@ private:
     const double POINT_MAX_OFFSET_CM     = 20.0;    // 최대 z 오프셋 [cm]
     const double POINT_WRIST_DEG         = 10.0;    // 활성팔 손목각 고정값 [deg]
     const double POINT_IDLE_RESTORE_Z    = 0.0;     // 회전 후 유휴팔 높이 복귀를 허용하는 최저 팁 z [m] (전 악기 표면보다 위)
-    const double POINT_WAIST_MARGIN      = 2.0 * M_PI / 180.0;  // 허리각 밴드 경계 여유 [rad]
+    const double POINT_WAIST_MARGIN      = 20.0 * M_PI / 180.0;  // 허리각 밴드 경계 여유 [rad]
 
     // 속도 배율 제한
     const double MIN_SCALE = 0.5;

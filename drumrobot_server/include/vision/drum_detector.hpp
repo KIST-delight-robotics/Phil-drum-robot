@@ -76,7 +76,7 @@ private:
     // const std::vector<float> scan_angles_deg = {0.0f};
     const std::vector<float> scan_angles_deg = {30.0f, 20.0f, 10.0f, 0.0f, -10.0f, -20.0f, -30.0f};
 
-    bool visualize = false;         // config/drum_scan.json
+    bool visualize = true;
     bool camera_started = false;
 
     // ===== RealSense 멤버 (레거시 동일) =====
@@ -90,7 +90,6 @@ private:
     rs2::disparity_transform disparity_to_depth;  // 생성자에서 false로 초기화
 
     // ===== 스캔 단계 =====
-    void load_scan_config();
     bool init_camera();
     bool move_waist_and_wait(double target_rad, const std::vector<double> &base_q);
     pcl::PointCloud<pcl::PointXYZ>::Ptr capture_cloud();
