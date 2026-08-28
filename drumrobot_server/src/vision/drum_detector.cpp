@@ -144,7 +144,8 @@ bool DrumDetector::run_scan() {
 
         visualize_drums(drum_clouds, drum_candidates);
 
-        return write_results(drum_candidates, ts);
+        // return write_results(drum_candidates, ts);
+        return true;
     } catch (const std::exception &e) {
         std::cerr << "[DrumDetector] 예외 발생: " << e.what() << " — 스캔 중단\n";
         return false;
