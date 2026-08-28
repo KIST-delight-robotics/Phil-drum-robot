@@ -1,0 +1,13 @@
+{
+  "instruments": [
+    { "name": "snare",        "right": {"position": [-0.053, 0.279, -0.428], "wrist_angle_deg": 10.0}, "left": {"position": [-0.156, 0.280, -0.429], "wrist_angle_deg": 10.0} },
+    { "name": "floor",        "right": {"position": [0.295, 0.281, -0.428], "wrist_angle_deg": 10.0}, "left": {"position": [0.185, 0.280, -0.428], "wrist_angle_deg": 10.0} },
+    { "name": "mid",          "right": {"position": [0.252, 0.630, -0.226], "wrist_angle_deg": 5.0}, "left": {"position": [0.166, 0.643, -0.251], "wrist_angle_deg": 5.0} },
+    { "name": "top",          "right": {"position": [-0.031, 0.594, -0.272], "wrist_angle_deg": 5.0}, "left": {"position": [-0.111, 0.589, -0.261], "wrist_angle_deg": 5.0} },
+    { "name": "closed hihat", "right": {"position": [-0.265, 0.464, -0.167], "wrist_angle_deg": 10.0}, "left": {"position": [-0.364, 0.405, -0.174], "wrist_angle_deg": 10.0} },
+    { "name": "ride",         "right": {"position": [0.374, 0.630, -0.094], "wrist_angle_deg": 15.0}, "left": {"position": [0.236, 0.688, -0.089], "wrist_angle_deg": 15.0} },
+    { "name": "right crash",  "right": {"position": [0.470, 0.414, -0.187], "wrist_angle_deg": 10.0}, "left": {"position": [0.381, 0.500, -0.188], "wrist_angle_deg": 10.0} },
+    { "name": "left crash",   "right": {"position": [-0.249, 0.685, -0.097], "wrist_angle_deg": 10.0}, "left": {"position": [-0.358, 0.647, -0.105], "wrist_angle_deg": 10.0} },
+    { "name": "open hihat",   "right": {"position": [-0.265, 0.464, -0.137], "wrist_angle_deg": 10.0}, "left": {"position": [-0.364, 0.405, -0.144], "wrist_angle_deg": 10.0} }
+  ]
+}

@@ -74,7 +74,7 @@ private:
 
     // 스캔 허리 각도 목록 [deg] — 레거시처럼 코드에 하드코딩
     // const std::vector<float> scan_angles_deg = {0.0f};
-    const std::vector<float> scan_angles_deg = {30.0f, 20.0f, 10.0f, 0.0f, -10.0f, -20.0f, -30.0f};
+    const std::vector<float> scan_angles_deg = {40.0f, 30.0f, 20.0f, 10.0f, 0.0f, -10.0f, -20.0f, -30.0f, -40.0f, -50.0f};
 
     bool visualize = true;
     bool camera_started = false;

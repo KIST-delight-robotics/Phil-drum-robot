@@ -1,6 +1,7 @@
 #include "vision/drum_detector.hpp"
 
 #include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
 #include <vtkSmartPointer.h>
 
 #include <algorithm>
@@ -93,6 +94,16 @@ bool DrumDetector::run_scan() {
             *full_cloud += *c;
         }
 
+        const std::string ts = timestamp_suffix();
+        std::filesystem::create_directories("drumrobot_server/data/scan");
+        pcl::PointCloud<pcl::PointXYZ>::Ptr indiv_sor_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        for (const auto &c : accumulated_clouds) {
+            *indiv_sor_cloud += *c;
+        }
+        dump_cloud_csv("drumrobot_server/data/scan/scan_" + ts + "_cloud_no_sor.csv", indiv_sor_cloud);
+        indiv_sor_cloud = down_sampling(indiv_sor_cloud);
+        dump_cloud_csv("drumrobot_server/data/scan/scan_" + ts + "_cloud_no_sor_no_ds.csv", indiv_sor_cloud);
+
         if (aborted()) return false;
 
         full_cloud = remove_outliers(full_cloud);
@@ -102,8 +113,6 @@ bool DrumDetector::run_scan() {
             return false;
         }
 
-        const std::string ts = timestamp_suffix();
-        std::filesystem::create_directories("drumrobot_server/data/scan");
         dump_cloud_csv("drumrobot_server/data/scan/scan_" + ts + "_cloud.csv", full_cloud);
         visualize_drums({full_cloud});
 
@@ -192,6 +201,14 @@ bool DrumDetector::init_camera() {
 }
 
 bool DrumDetector::move_waist_and_wait(double target_rad, const std::vector<double> &base_q) {
+    // (추가) 허리 모터 미연결(무하드웨어 테스트) 시: send_loop가 control_queue를
+    // 소비하지 않아 큐가 영원히 비지 않고 대기 타임아웃이 난다.
+    // 캡처 루프의 미연결 판정과 동일하게 motors 맵 부재로 판단해 이동을 생략한다.
+    if (robot.motors.find(WAIST_JOINT) == robot.motors.end()) {
+        std::cout << "[DrumDetector] 허리 모터 미연결 — 허리 이동 생략\n";
+        return !aborted();
+    }
+
     MotionPrimitive m;
     m.type    = MotionType::TRANSLATE;
     m.space   = TrajectorySpace::JOINT;
@@ -281,7 +298,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr DrumDetector::remove_outliers(pcl::PointClou
     pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
     sor.setInputCloud(pointcloud);
     sor.setMeanK(50);
-    sor.setStddevMulThresh(1.0);
+    sor.setStddevMulThresh(3.0);    // 1 agressive, 2~3해보기
     sor.filter(*filtered);
 
     return filtered;
@@ -720,7 +737,21 @@ void DrumDetector::visualize_drums(const std::vector<pcl::PointCloud<pcl::PointX
     // 호출해야 태스크바에 'vtk' 좀비 창이 남지 않는다.
     viewer->close();
     if (viewer->getRenderWindow()) {
+        // PCL 1.10 버그 대응(추가): PCLVisualizer 소멸자는 인터랙터에 등록해 둔
+        // ExitCallback 등 옵저버를 제거하지 않는다. 인터랙터는 렌더윈도우와의
+        // 참조 순환 때문에 뷰어보다 오래 살아남을 수 있고, X 서버가 창 ID를
+        // 재사용하면 다음 뷰어 창의 이벤트가 죽은 뷰어의 콜백으로 배달되어
+        // use-after-free(segfault)가 난다. 파괴 전에 옵저버를 전부 끊는다.
+        if (vtkRenderWindowInteractor *interactor = viewer->getRenderWindow()->GetInteractor()) {
+            interactor->RemoveAllObservers();
+        }
         viewer->getRenderWindow()->Finalize();
+        // (추가) X 창의 실소유자는 렌더윈도우가 아니라 인터랙터의 Xt 위젯이라
+        // Finalize()로는 창이 사라지지 않는다 (파괴 요청 자체가 발생 안 함).
+        // 렌더윈도우<->인터랙터 참조 순환을 끊어야 viewer.reset() 시 인터랙터가
+        // 실제로 파괴되며 XtDestroyWidget으로 창이 닫힌다. 인터랙터 누수가
+        // 사라지므로 낡은 콜백에 의한 use-after-free도 원천 차단된다.
+        viewer->getRenderWindow()->SetInteractor(nullptr);
     }
     viewer.reset();
 }
