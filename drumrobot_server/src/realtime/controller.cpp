@@ -180,9 +180,9 @@ void Controller::tmotor_send_task(const ControlSetPoint &point) {
             motor_log.record(values);
         } else if (mode == ControlMode::VEL) {
             double err = motor_position - tmotor->current_position;
-            double ermp = motor_velocity * tmotor->pole * tmotor->gear_ratio * 60.0 / 2.0 / M_PI;
+            double erpm = motor_velocity * tmotor->pole * tmotor->gear_ratio * 60.0 / 2.0 / M_PI;
 
-            double control_input = ermp + tmotor->control_gain * err;
+            double control_input = erpm + tmotor->control_gain * err;
             control_input = std::clamp(control_input, -100000.0, 100000.0);
 
             t_codec.encodeVelocity(tmotor->node_id, &frame, static_cast<float>(control_input));

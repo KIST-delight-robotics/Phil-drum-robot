@@ -1,5 +1,16 @@
 #include "trajectory/play_motion_generator.hpp"
 
+// ceiling은 recv hard limit(motors.json max_angle 140.1deg) 안쪽이어야 한다.
+static double elbow_soft_limit(double angle) {
+    const double linear_max = 120.0 * M_PI / 180.0;
+    const double ceiling = 140.0 * M_PI / 180.0;
+    const double decay = ceiling - linear_max;    // 이 값이어야 linear_max에서 기울기 1
+    if (angle < linear_max) {
+        return angle;
+    }
+    return ceiling - decay * std::exp(-(angle - linear_max) / decay);
+}
+
 PlayMotionGenerator::PlayMotionGenerator(AppContext &ctxRef)
     : ctx(ctxRef) {
 }
@@ -90,8 +101,8 @@ bool PlayMotionGenerator::reset(std::array<double, ROBOT::NUM_JOINT>& q, int not
         q[i] = result.q[i];   // 관절 0~8 (팔)
     }
 
-    q[4] += s.right_elbow;
-    q[6] += s.left_elbow;
+    q[4] = elbow_soft_limit(q[4] + s.right_elbow);
+    q[6] = elbow_soft_limit(q[6] + s.left_elbow);
 
     q[7] += s.right_wrist;
     q[8] += s.left_wrist;
@@ -167,8 +178,8 @@ std::queue<std::array<double, ROBOT::NUM_JOINT>> PlayMotionGenerator::generate_m
             q[i] = result.q[i];   // 관절 0~8 (팔)
         }
 
-        q[4] += s.right_elbow;
-        q[6] += s.left_elbow;
+        q[4] = elbow_soft_limit(q[4] + s.right_elbow);
+        q[6] = elbow_soft_limit(q[6] + s.left_elbow);
 
         q[7] += s.right_wrist;
         q[8] += s.left_wrist;

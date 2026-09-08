@@ -43,8 +43,14 @@ private:
     void schedule_idle_motion();
     void abort_play_motion();
     void save_pause_point();
+    void do_switch();
+    void track_parked_notes(const MotionPrimitive& motion);
 
     bool motion_done = true;
+
+    // 이어치기 절단용 양손 파킹 악기 (DRUM window pop 시점마다 갱신)
+    int parked_note_r = 1;
+    int parked_note_l = 1;
 
     // ===== log =====
     Logger motion_log;

@@ -5,7 +5,7 @@ CC = g++
 CFLAGS = -Wall -O2 -g -std=c++17 -fPIC
 
 # ===== 헤더 파일 경로 =====
-INCLUDE = -I./include -I./lib -I./lib/dynamixel_sdk/include
+INCLUDE = -I./include -I./lib -I./lib/eigen -I./lib/dynamixel_sdk/include
 
 # ===== 링크할 라이브러리 =====
 # (멀티스레드) (수학) (동적 로딩)

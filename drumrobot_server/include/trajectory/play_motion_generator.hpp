@@ -4,6 +4,7 @@
 #include <vector>
 #include <array>
 #include <map>
+#include <cmath>
 
 #include "common/app_context.hpp"
 #include "common/motion_queue.hpp"

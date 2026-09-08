@@ -19,6 +19,7 @@ struct DrumEvent {
     bool is_kick = false;           // bass drum
     bool is_closed_hihat = false;   // closed hi-hat
     double t = 0.0;                 // 누적 시간
+    int row = 0;                    // 악보 파일 내 데이터 행 순번 (1부터, 0 = 합성/시드 이벤트)
 };
 
 struct MotionPrimitive {

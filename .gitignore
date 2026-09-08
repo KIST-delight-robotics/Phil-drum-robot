@@ -1,4 +1,20 @@
 # 런타임 생성물
+__pycache__/
 drumrobot_server/log/
 drumrobot_server/obj/
 drumrobot_server/bin/*.out
+
+# Dynamixel SDK 빌드 트리 — Makefile은 lib/dynamixel_sdk/src, include만 사용
+drumrobot_server/lib/dynamixel_sdk/build/
+
+# 외부 header-only 라이브러리 (수동 배치, 커밋 제외)
+drumrobot_server/lib/eigen/
+
+# 대용량 기구학 룩업테이블 (사용자 수동 배치, 157MB)
+drumrobot_server/include/table/
+
+# IDE 로컬 설정
+.vscode/
+.vs/
+*.suo
+*.vcxproj.user

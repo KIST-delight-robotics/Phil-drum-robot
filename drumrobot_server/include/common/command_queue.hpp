@@ -25,7 +25,7 @@ enum class Opcode {
     POSE,       // 사전 정의 포즈   args: poseName (home / ready / shutdown)
     HIT,        // 드럼 타격       args: target (snare / ride / bass ...)
     PLAY,       // 악보 연주       args: scoreName
-    PLAY_CTRL,  // 연주 제어       args: stop / speed
+    PLAY_CTRL,  // 연주 제어       args: stop / speed / switch
     
     // args 없음
     START,      // 시작

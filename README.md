@@ -250,7 +250,8 @@ OPCODE|arg1|arg2\n
 | `MOVE`      | `motor_name`, `angle_deg`, `[move_time=3.0]`   | 개별 관절 이동 | Idle |
 | `POSE`      | `pose_name`                                     | 사전 정의 포즈로 이동 (`home` / `ready` / `shutdown`) | Idle |
 | `HIT`       | `target`                                        | 단일 드럼 타격 | Idle |
-| `PLAY`      | `id`                                            | 악보 연주. `config/play_list.json`의 id로 악보/음원 선택 | Idle |
+| `PLAY`      | `id`                                            | 악보 연주. `config/play_list.json`의 id로 악보/음원 선택 (악보는 `data/scores/` 바로 아래 → 장르 하위 폴더 순으로 검색). id는 곡 전용 — 장르명 입력의 즉흥 변환은 클라이언트가 담당 | Idle |
+| `PLAY`      | `improv`, `[genre]`, `[bpm]`                    | **즉흥 연주**. `data/scores/<genre>/`의 악보를 이름순 순환하며 끊김 없이 무한 연주 (정지는 `PAUSE`/`PLAY_CTRL\|stop`). `genre` 생략=전체 장르, `bpm`(20~300) 지정=모든 파일 템포 override, 생략=각 파일의 bpm | Idle |
 | `PAUSE`     | 없음                                            | 연주 일시정지. **재개 지점(마디) 저장** 후 ready 복귀 → `RESUME` 가능 | Playing |
 | `RESUME`    | 없음                                            | 일시정지한 곡을 저장된 마디부터 재개 (음악 없이 무음 재개) | Idle |
 | `PLAY_CTRL` | `stop` 또는 `speed`, `scale`                    | 연주 제어. `stop`=완전 중지(재개 지점 폐기), `speed`=속도 배율(0.5~2.0) | Playing |
@@ -281,8 +282,11 @@ MOVE|waist|-30|2.0          # 허리를 -30도로 2초에 이동
 HIT|snare                   # 스네어 1회 타격
 HIT|closed hihat            # 클로즈드 하이햇 1회 타격 (타깃 문자열에 공백 포함)
 PLAY|BF                     # play_list.json의 BF(BasicFillin) 연주
-PAUSE                       # 연주 일시정지 (재개 지점 저장, PLAYING 중)
-RESUME                      # 멈춘 마디부터 이어서 연주 (IDLE 중)
+PLAY|improv|funk|100        # 즉흥 연주: funk 폴더 악보를 100bpm으로 순환 (클라이언트에선 funk_100 입력)
+PLAY|improv|rock            # 즉흥 연주: rock 폴더, 각 파일의 bpm 그대로 (클라이언트에선 rock 입력)
+PLAY|improv                 # 즉흥 연주: 전체 장르, 각 파일의 bpm 그대로
+PAUSE                       # 연주 일시정지 (재개 지점 저장, PLAYING 중. 즉흥 연주는 멈춘 파일/마디 저장)
+RESUME                      # 멈춘 마디부터 이어서 연주 (IDLE 중, 즉흥 연주도 동일)
 PLAY_CTRL|stop              # 연주 완전 중지 (재개 지점 폐기)
 PLAY_CTRL|speed|1.2         # 연주 속도 1.2배
 QUIT                        # shutdown 포즈 이동 후 종료

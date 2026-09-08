@@ -1,5 +1,7 @@
 #include "trajectory/motion_planner.hpp"
 
+#include "util/score_row.hpp"
+
 MotionPlanner::MotionPlanner(AppContext &ctxRef, CommandQueue &commandQueueRef, ControlQueue &controlQueueRef, MotionQueue &motionQueueRef, Robot &robotRef, AudioPlayer &audioRef)
     : ctx(ctxRef), command_queue(commandQueueRef), control_queue(controlQueueRef), motion_queue(motionQueueRef), robot(robotRef),
     behavior_planner(ctxRef, robotRef, audioRef), trajectory_generator(ctxRef, control_queue), motion_log("motion_command") {}
@@ -15,6 +17,10 @@ void MotionPlanner::run() {
             plan_motions(*cmd);
         }
 
+        if (ctx.switch_pending) {
+            do_switch();    // 이어치기 전환 (성공 시 motion_queue를 새 스트림으로 교체)
+        }
+
         // control_queue 잔량이 임계값 이하면 다음 모션 생성
         if (control_queue.size() < threshold) {
             // send_active 이 후 motion_queue가 없으면 모션 채우기
@@ -24,6 +30,7 @@ void MotionPlanner::run() {
 
             if (auto motion = motion_queue.try_pop()) {
                 trajectory_generator.generate_trajectory(*motion);
+                track_parked_notes(*motion);
 
                 if (!ctx.recv_active.load()) ctx.recv_active = true;
                 if (!ctx.send_active.load()) ctx.send_active = true;
@@ -96,9 +103,19 @@ void MotionPlanner::schedule_idle_motion() {
         // 대기 동작
         MotionPrimitive idle_motion;
 
-        idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능
+        idle_motion.type = MotionType::IDLE;    // TODO: IDLE은 TRANSLATE 반복으로 대체 가능
         motion_queue.push(idle_motion);
     } else if (ctx.robot_state.load() == RobotState::PLAYING) {
+        // 즉흥 연주 중이면 다음 악보로 이어붙임 (START/END 없이 체이닝)
+        std::vector<MotionPrimitive> improv_chunk = behavior_planner.make_improv_chunk();
+        if (!improv_chunk.empty()) {
+            int chunk_size = static_cast<int>(improv_chunk.size());
+            for (int i = 0; i < chunk_size; i++) {
+                motion_queue.push(improv_chunk[i]);
+            }
+            return;     // 연주 계속 (play_id/state 유지)
+        }
+
         // 연주 종료
         std::cerr << "[MotionPlanner] 연주를 마쳤습니다.\n";
         motion_done = true;
@@ -112,19 +129,87 @@ void MotionPlanner::schedule_idle_motion() {
         ctx.robot_state = RobotState::IDLE;
         MotionPrimitive idle_motion;
 
-        idle_motion.type = MotionType::IDLE;    // IDLE을 MotionType에서 없애고 TRANSLATE(목표 관절각으로 이동)의 반복으로 구현 가능
+        idle_motion.type = MotionType::IDLE;    // TODO: IDLE은 TRANSLATE 반복으로 대체 가능
         motion_queue.push(idle_motion);
     }
 }
 
+// 이어치기 전환: front window 절단 -> 커밋 구간 + 새 악보 window로 큐 교체.
+// 실패하면 아무것도 바꾸지 않고 기존 연주를 계속한다.
+void MotionPlanner::do_switch() {
+    std::vector<std::string> switch_args = ctx.switch_args;
+    ctx.switch_pending = false;
+    ctx.switch_args.clear();
+
+    if (ctx.robot_state.load() != RobotState::PLAYING) {
+        std::cerr << "[MotionPlanner] 전환 불가: PLAYING 상태가 아닙니다\n";
+        return;
+    }
+    if (ctx.play_abort.load()) {
+        std::cerr << "[MotionPlanner] 전환 불가: 중단 처리 중입니다\n";
+        return;
+    }
+
+    std::optional<MotionPrimitive> front_motion = motion_queue.try_peek();
+    if (!front_motion.has_value() || front_motion.value().type != MotionType::DRUM ||
+        front_motion.value().flag != PlayFlag::PLAYING || front_motion.value().robotic_drum_score.size() < 2) {
+        std::cerr << "[MotionPlanner] 전환 불가: 절단할 연주 window가 없습니다 (잠시 후 재시도 가능)\n";
+        return;
+    }
+
+    std::vector<MotionPrimitive> new_windows = behavior_planner.make_switch_windows(
+        front_motion.value().robotic_drum_score, switch_args, parked_note_r, parked_note_l);
+    if (new_windows.empty()) {
+        std::cerr << "[MotionPlanner] 전환 실패: 기존 연주를 계속합니다\n";
+        return;
+    }
+
+    motion_queue.clear();
+    int window_count = static_cast<int>(new_windows.size());
+    for (int i = 0; i < window_count; i++) {
+        motion_queue.push(new_windows[i]);
+    }
+    std::cerr << "[MotionPlanner] 이어치기 전환 완료 (window " << window_count << "개)\n";
+}
+
+// 절단 시점의 손 위치 근거: 각 DRUM window의 rds[0]은 방금 확정된 타격이다.
+void MotionPlanner::track_parked_notes(const MotionPrimitive& motion) {
+    if (motion.type != MotionType::DRUM) {
+        return;
+    }
+    if (motion.flag == PlayFlag::START) {
+        parked_note_r = motion.init_note_r;
+        parked_note_l = motion.init_note_l;
+        return;
+    }
+    if (motion.flag != PlayFlag::PLAYING || motion.robotic_drum_score.empty()) {
+        return;
+    }
+    const DrumEvent& front_event = motion.robotic_drum_score[0];
+    int coord_r = open_hihat_note(front_event.note_num_R, front_event.is_closed_hihat);
+    int coord_l = open_hihat_note(front_event.note_num_L, front_event.is_closed_hihat);
+    if (coord_r != 0) {
+        parked_note_r = coord_r;
+    }
+    if (coord_l != 0) {
+        parked_note_l = coord_l;
+    }
+}
+
 void MotionPlanner::abort_play_motion() {
-    if (ctx.pause_requested.load()) {
+    bool pause_requested = ctx.pause_requested.load();
+
+    if (pause_requested) {
         save_pause_point();   // PAUSE: 잔여 모션 폐기 전에 재개 지점 저장
     } else {
         // stop / 내부 에러: 재개 지점 폐기 (RESUME 거부)
         std::lock_guard<std::mutex> lock(ctx.play_mutex);
-        ctx.pause_point.valid = false;
+        ctx.pause_point.clear();
     }
+
+    // 즉흥 연주 PAUSE면 재개 지점을 improv 기준으로 다시 저장.
+    behavior_planner.on_play_abort(pause_requested);
+
     ctx.pause_requested = false;
 
     motion_queue.clear();     // 남은 PLAYING 전부 폐기
@@ -135,15 +220,13 @@ void MotionPlanner::abort_play_motion() {
     std::cerr << "[MotionPlanner] 연주가 비정상 종료됩니다.\n";
 }
 
-// 중단 시점의 재개 지점 저장.
-// MotionQueue 맨 앞은 아직 궤적을 생성하지 않은 primitive이므로,
-// 그 안의 "다음에 칠 이벤트"의 마디 번호가 곧 재개 지점이다.
-// 반드시 motion_queue.clear() 전에 불러야 한다.
+// 재개 지점 저장. motion_queue.clear() 전에 불러야 한다.
+// 큐 맨 앞 window에서 아직 안 친 첫 이벤트의 마디가 재개 지점이다.
 void MotionPlanner::save_pause_point() {
     std::optional<MotionPrimitive> front_motion = motion_queue.try_peek();
 
     std::lock_guard<std::mutex> lock(ctx.play_mutex);
-    ctx.pause_point.valid = false;
+    ctx.pause_point.clear();
 
     if (!front_motion.has_value()) return;      // 큐가 비어 있음 (곡이 사실상 끝난 상태)
     if (ctx.play_id.empty()) return;            // 연주 중인 곡을 모름
@@ -153,11 +236,11 @@ void MotionPlanner::save_pause_point() {
     if (motion.flag != PlayFlag::PLAYING) return;           // START/END는 재개 지점이 없음
     if (motion.robotic_drum_score.size() < 2) return;
 
-    // robotic_drum_score는 악보 줄(DrumEvent) window:
-    // [0]은 직전 이벤트(이미 타격 완료), [1]이 아직 안 친 첫 이벤트
-    ctx.pause_point.play_id = ctx.play_id;
-    ctx.pause_point.bar = static_cast<int>(motion.robotic_drum_score[1].bar);
-    ctx.pause_point.valid = true;
+    // [0]은 이미 친 이벤트, [1]이 아직 안 친 첫 이벤트.
+    // improv면 on_play_abort()가 improv 기준으로 다시 저장한다.
+    ctx.pause_point.save(ctx.play_id,
+                         static_cast<int>(motion.robotic_drum_score[1].bar),
+                         motion.robotic_drum_score[0].row);
 
     std::cerr << "[MotionPlanner] 재개 지점 저장: id=" << ctx.pause_point.play_id
               << ", bar=" << ctx.pause_point.bar << "\n";

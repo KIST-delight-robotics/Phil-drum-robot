@@ -37,4 +37,8 @@ struct AppContext {
     std::mutex play_mutex;                          // 아래 두 필드 보호 (MotionPlanner가 갱신, 추후 TcpServer가 조회)
     std::string play_id;                            // 연주 중인 곡 id (빈 문자열 = 연주 아님)
     PausePoint pause_point;                         // 중단 시 저장, resume 시 소비
+
+    // 이어치기 전환 요청. planner 스레드 전용(BehaviorPlanner 적재, MotionPlanner 소비)이라 뮤텍스 불필요.
+    bool switch_pending = false;
+    std::vector<std::string> switch_args;           // 전환 대상 (play_id 또는 improv [genre [bpm]])
 };

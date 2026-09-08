@@ -1,4 +1,5 @@
 # python3 drumrobot_client/main.py
+import os
 import socket
 
 HOST = '127.0.0.1'
@@ -26,6 +27,26 @@ DEFAULT_MOVE_TIME = 3.0
 
 def send(s, packet):
     s.sendall((packet + "\n").encode())
+
+# 장르 폴더 위치 (client/server 동일 레포·머신 전제, 실행 위치 무관하게 스크립트 기준)
+SCORES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "..", "drumrobot_server", "data", "scores")
+
+def build_play_packet(raw_id):
+    """연주 ID 입력을 PLAY 패킷으로 변환. 즉흥 여부 판단은 클라이언트 책임 —
+    서버의 PLAY|<id>는 play_list 단일 곡 전용이다.
+
+    - "<이름>_<숫자>" (예: funk_100)   -> PLAY|improv|<이름>|<숫자>  (bpm override)
+    - 장르 폴더명 단독 (예: funk)       -> PLAY|improv|<이름>          (각 파일의 bpm)
+    - 그 외 (곡 id, improv 직접 입력)   -> PLAY|<입력 그대로>
+    """
+    head, sep, tail = raw_id.rpartition("_")
+    if sep and head and tail and tail.replace(".", "", 1).isdigit():
+        return f"PLAY|improv|{head}|{tail}"
+    if raw_id and "|" not in raw_id and "/" not in raw_id and ".." not in raw_id \
+            and os.path.isdir(os.path.join(SCORES_DIR, raw_id)):
+        return f"PLAY|improv|{raw_id}"
+    return f"PLAY|{raw_id}"
 
 def get_status(s):
     """GET_STATUS 전송 후 (state, [angle_deg,...], speed, pause) 반환. 실패 시 (None, [], None, None).
@@ -183,11 +204,9 @@ def test_mode(s):
         print(f"    설정: {name} -> {val:.2f} deg")
 
 def play_ctrl_mode(s):
-    """연주 중(PLAYING) 제어. stop / speed 를 PLAY_CTRL 로 전송.
+    """연주 중(PLAYING) 제어. pause / stop / speed 전송.
 
-    서버는 PLAYING 상태에서만 PLAY_CTRL 을 수락하며, 속도 배율을 [0.5, 2.0] 로
-    제한한다. 명령 전송 후 GET_STATUS 로 서버가 적용한 실제 배율을 다시 읽어
-    표시하므로, 범위 밖 요청이 제한돼도 화면에 정확히 반영된다.
+    속도는 서버가 [0.5, 2.0]로 제한하므로, 전송 후 GET_STATUS로 실제 배율을 다시 읽어 표시한다.
     """
     state, _, speed, _ = get_status(s)
     print("\n--- 연주 제어 모드 ---")
@@ -202,6 +221,7 @@ def play_ctrl_mode(s):
     cur_scale = speed if speed is not None else 1.0
 
     print("\n  명령: pause=일시정지(재개 가능) / stop=연주 중지(재개 불가)")
+    print("        switch=무정지 곡/즉흥 전환 (곡은 북마크 일치 시 이어치기)")
     print("        f=빠르게(+0.1) / d=느리게(-0.1) / s=배율 직접 입력 / q=메뉴로 복귀")
 
     def send_speed(target):
@@ -217,7 +237,7 @@ def play_ctrl_mode(s):
         return target
 
     while True:
-        cmd = input("연주 제어 (pause / stop / f / d / s / q) > ").strip().lower()
+        cmd = input("연주 제어 (pause / stop / switch / f / d / s / q) > ").strip().lower()
 
         if cmd in ("q", "quit"):
             return
@@ -231,6 +251,15 @@ def play_ctrl_mode(s):
             send(s, "PLAY_CTRL|stop")
             print("  연주 중지 요청을 보냈습니다. (재개 지점은 폐기됩니다)")
             return   # 중지 후 곧 IDLE 로 돌아가므로 메뉴 복귀
+
+        if cmd == "switch":
+            print("  improv는 bpm 생략 시 현재 곡의 bpm을 따라갑니다. 장르명만 치면 improv로 해석합니다.")
+            raw = input("  전환 대상 (곡 id / 장르명 / improv [장르] [bpm]) > ").strip()
+            if not raw:
+                continue
+            send(s, "PLAY_CTRL|switch|" + "|".join(raw.split()))
+            print("  전환 요청을 보냈습니다. (서버 로그에서 성공 여부 확인)")
+            continue
 
         if cmd in ("f", "d"):
             target = round(cur_scale + (step if cmd == "f" else -step), 2)
@@ -247,12 +276,12 @@ def play_ctrl_mode(s):
             cur_scale = send_speed(round(val, 2))
             continue
 
-        print("  stop / f / d / s / q 중 하나를 입력하세요.")
+        print("  pause / stop / switch / f / d / s / q 중 하나를 입력하세요.")
 
 
 # 모드(메뉴) 정의 — 번호: (라벨, 보낼 OPCODE)
 MODES = {
-    "1": ("연주 모드 (악보)",      lambda: f"PLAY|{input('  연주 ID: ').strip()}"),
+    "1": ("연주 모드 (악보)",      lambda: build_play_packet(input('  연주 ID: ').strip())),
     "2": ("제스처 모드",           lambda: f"GESTURE|{input('  종류(nod/shake/wave/hi/hurray/happy): ').strip()}"),
     "3": ("단일 드럼 타격",        lambda: f"HIT|{input('  타겟(snare/ride/bass...): ').strip()}"),
     "4": ("시선 제어",             lambda: f"LOOK|{input('  pan: ').strip()}|{input('  tilt: ').strip()}"),
