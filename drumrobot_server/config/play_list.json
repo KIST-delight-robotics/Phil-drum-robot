@@ -41,6 +41,12 @@
         "audio": "",
         "init_note_r": 1,
         "init_note_l": 1
+      },
+      "TJ": {
+        "score": "test_jump",
+        "audio": "",
+        "init_note_r": 1,
+        "init_note_l": 1
       }
     }
   }

@@ -47,84 +47,87 @@ KinematicsSolver::IKResult KinematicsSolver::solve_ik(
     IKResult result;
     result.q.fill(0.0);
 
-    const double L1   = link_length.upper_arm;
-    const double S    = link_length.waist;
+    // 양팔 각각 해석 (팔별 어깨·팔꿈치·손목 한계 포함) 후 허리(θ0) 한계 검사
+    ArmIKResult right = solve_arm_ik(pR, theta0, theta7, ArmSide::RIGHT, print_err);
+    if (!right.success) return result;
 
-    const double L2_R = get_effective_length(theta7);
-    const double L2_L = get_effective_length(theta8);
+    ArmIKResult left = solve_arm_ik(pL, theta0, theta8, ArmSide::LEFT, print_err);
+    if (!left.success) return result;
 
-    // ----- 어깨 위치 -----
-    const double shoulderXR =  0.5 * S * std::cos(theta0);
-    const double shoulderYR =  0.5 * S * std::sin(theta0);
-    const double shoulderXL = -0.5 * S * std::cos(theta0);
-    const double shoulderYL = -0.5 * S * std::sin(theta0);
-
-    // ----- θ1 : right_shoulder_1 (수평) -----
-    double theta1 = std::atan2(pR[1] - shoulderYR, pR[0] - shoulderXR) - theta0;
-
-    // ----- θ2 : left_shoulder_1 (수평) -----
-    double theta2 = std::atan2(pL[1] - shoulderYL, pL[0] - shoulderXL) - theta0;
-
-    // ----- 오른팔 수직 평면 (θ3, θ4) -----
-    double zeta_r = -pR[2];
-    double r2_r   = (pR[1] - shoulderYR) * (pR[1] - shoulderYR)
-                  + (pR[0] - shoulderXR) * (pR[0] - shoulderXR);
-
-    double x_r   = zeta_r * zeta_r + r2_r - L1 * L1 - L2_R * L2_R;
-    double rad_r  = 4.0 * L1 * L1 * L2_R * L2_R - x_r * x_r;
-
-    if (rad_r < 0.0) {
-        if (print_err) std::cerr << "[KinematicsSolver] Right arm unreachable (rad < 0)\n";
-        return result;
-    }
-
-    double theta4  = std::atan2(std::sqrt(rad_r), x_r);
-    double theta34 = std::atan2(std::sqrt(std::max(r2_r, 0.0)), zeta_r);
-    double theta3  = theta34
-                   - std::atan2(L2_R * std::sin(theta4),
-                                L1   + L2_R * std::cos(theta4));
-
-    // ----- 왼팔 수직 평면 (θ5, θ6) -----
-    double zeta_l = -pL[2];
-    double r2_l   = (pL[1] - shoulderYL) * (pL[1] - shoulderYL)
-                  + (pL[0] - shoulderXL) * (pL[0] - shoulderXL);
-
-    double x_l   = zeta_l * zeta_l + r2_l - L1 * L1 - L2_L * L2_L;
-    double rad_l  = 4.0 * L1 * L1 * L2_L * L2_L - x_l * x_l;
-
-    if (rad_l < 0.0) {
-        if (print_err) std::cerr << "[KinematicsSolver] Left arm unreachable (rad < 0)\n";
-        return result;
-    }
-
-    double theta6  = std::atan2(std::sqrt(rad_l), x_l);
-    double theta56 = std::atan2(std::sqrt(std::max(r2_l, 0.0)), zeta_l);
-    double theta5  = theta56
-                   - std::atan2(L2_L * std::sin(theta6),
-                                L1   + L2_L * std::cos(theta6));
-
-    // 스틱 방향각 보정
-    theta4 -= get_effective_theta(theta7);
-    theta6 -= get_effective_theta(theta8);
+    if (!check_joint_limit(0, theta0, print_err)) return result;
 
     // ----- 결과 적재 -----
-    result.q = { theta0, theta1, theta2, theta3, theta4,
-                 theta5, theta6, theta7, theta8 };
+    result.q = { theta0, right.shoulder1, left.shoulder1, right.shoulder2, right.elbow,
+                 left.shoulder2, left.elbow, theta7, theta8 };
+    result.success = true;
+    return result;
+}
+
+KinematicsSolver::ArmIKResult KinematicsSolver::solve_arm_ik(
+    const std::array<double, 3>& p,
+    double theta0,
+    double theta_wrist,
+    ArmSide side,
+    bool print_err
+) const {
+    ArmIKResult result;
+
+    const bool   is_right = (side == ArmSide::RIGHT);
+    const char*  label    = is_right ? "Right" : "Left";
+    const double L1 = link_length.upper_arm;
+    const double S  = link_length.waist;
+    const double L2 = get_effective_length(theta_wrist);
+
+    // ----- 어깨 위치 (오른팔 +0.5S, 왼팔 -0.5S) -----
+    const double half_S    = is_right ? 0.5 * S : -0.5 * S;
+    const double shoulderX = half_S * std::cos(theta0);
+    const double shoulderY = half_S * std::sin(theta0);
+
+    // ----- 수평 회전 (θ1 / θ2) -----
+    double shoulder1 = std::atan2(p[1] - shoulderY, p[0] - shoulderX) - theta0;
+
+    // ----- 수직 평면 (θ3,θ4 / θ5,θ6) -----
+    double zeta = -p[2];
+    double r2   = (p[1] - shoulderY) * (p[1] - shoulderY)
+                + (p[0] - shoulderX) * (p[0] - shoulderX);
+
+    double x   = zeta * zeta + r2 - L1 * L1 - L2 * L2;
+    double rad = 4.0 * L1 * L1 * L2 * L2 - x * x;
+
+    if (rad < 0.0) {
+        if (print_err) std::cerr << "[KinematicsSolver] " << label << " arm unreachable (rad < 0)\n";
+        return result;
+    }
+
+    double elbow      = std::atan2(std::sqrt(rad), x);
+    double shoulder12 = std::atan2(std::sqrt(std::max(r2, 0.0)), zeta);
+    double shoulder2  = shoulder12
+                      - std::atan2(L2 * std::sin(elbow),
+                                   L1 + L2 * std::cos(elbow));
+
+    // 스틱 방향각 보정
+    elbow -= get_effective_theta(theta_wrist);
 
     // NaN / Inf 체크
-    for (double v : result.q) {
+    for (double v : {shoulder1, shoulder2, elbow}) {
         if (std::isnan(v) || std::isinf(v)) {
-            if (print_err) std::cerr << "[KinematicsSolver] NaN/Inf in result\n";
+            if (print_err) std::cerr << "[KinematicsSolver] NaN/Inf in " << label << " arm result\n";
             return result;
         }
     }
 
-    // 관절 한계 검사
-    if (!check_joint_limits(result.q, print_err)) {
+    // 관절 한계 검사 (어깨1, 어깨2, 팔꿈치, 손목). 허리(0)는 호출 측에서 검사
+    if (!check_joint_limit(is_right ? 1 : 2, shoulder1,   print_err) ||
+        !check_joint_limit(is_right ? 3 : 5, shoulder2,   print_err) ||
+        !check_joint_limit(is_right ? 4 : 6, elbow,       print_err) ||
+        !check_joint_limit(is_right ? 7 : 8, theta_wrist, print_err)) {
         return result;
     }
 
-    result.success = true;
+    result.shoulder1 = shoulder1;
+    result.shoulder2 = shoulder2;
+    result.elbow     = elbow;
+    result.success   = true;
     return result;
 }
 
@@ -412,19 +415,24 @@ void KinematicsSolver::verify_fk_ik(int num_tests, double tolerance_deg) {
 
 bool KinematicsSolver::check_joint_limits(const std::array<double, 9>& q, bool print_err) const {
     for (int i = 0; i < static_cast<int>(q.size()); ++i) {
-        auto it = joint_limits.find(i);
-        if (it == joint_limits.end()) continue;
+        if (!check_joint_limit(i, q[i], print_err)) return false;
+    }
+    return true;
+}
 
-        if (q[i] < it->second.min_angle || q[i] > it->second.max_angle) {
-            if (print_err) {
-                std::cerr << "[KinematicsSolver] Joint " << i
-                          << " out of range: " << q[i] * 180.0 / M_PI << " deg"
-                          << "  (limit: "
-                          << it->second.min_angle * 180.0 / M_PI << " ~ "
-                          << it->second.max_angle * 180.0 / M_PI << " deg)\n";
-            }
-            return false;
+bool KinematicsSolver::check_joint_limit(int joint, double value, bool print_err) const {
+    auto it = joint_limits.find(joint);
+    if (it == joint_limits.end()) return true;   // 한계 미정의 관절은 통과
+
+    if (value < it->second.min_angle || value > it->second.max_angle) {
+        if (print_err) {
+            std::cerr << "[KinematicsSolver] Joint " << joint
+                      << " out of range: " << value * 180.0 / M_PI << " deg"
+                      << "  (limit: "
+                      << it->second.min_angle * 180.0 / M_PI << " ~ "
+                      << it->second.max_angle * 180.0 / M_PI << " deg)\n";
         }
+        return false;
     }
     return true;
 }

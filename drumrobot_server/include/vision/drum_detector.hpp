@@ -47,8 +47,8 @@
 //   적재하고, 큐 소진(= send_loop가 전부 전송)으로 이동 완료를 감지한다.
 // - 카메라는 스캔 동안에만 열린다 (생성 시 시작, 소멸 시 정지).
 // - 예외를 밖으로 던지지 않는다: run_scan()은 성공/실패만 반환.
-// - 성공 시 config/drum_coordinate.json을 백업 후 갱신한다.
-//   (핫 리로드는 MotionPlanner가 수행)
+// - 성공 시 config/drum_candidates.json(악기별 후보점)을 생성한다.
+//   drum_coordinate.json(대표점·손목각)은 건드리지 않는다. (핫 리로드는 MotionPlanner가 수행)
 // =============================================================
 class DrumDetector {
 public:
@@ -56,7 +56,7 @@ public:
                  TrajectoryGenerator &trajectoryGeneratorRef, ControlQueue &controlQueueRef);
     ~DrumDetector();    // 카메라 정지
 
-    bool run_scan();    // 전체 스캔. true = drum_coordinate.json 갱신 완료
+    bool run_scan();    // 전체 스캔. true = drum_candidates.json 생성 완료
 
 private:
     AppContext          &ctx;

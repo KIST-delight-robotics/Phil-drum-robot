@@ -100,9 +100,9 @@ bool DrumDetector::run_scan() {
         for (const auto &c : accumulated_clouds) {
             *indiv_sor_cloud += *c;
         }
-        dump_cloud_csv("drumrobot_server/data/scan/scan_" + ts + "_cloud_no_sor.csv", indiv_sor_cloud);
+        // dump_cloud_csv("drumrobot_server/data/scan/scan_" + ts + "_cloud_no_sor_no_ds.csv", indiv_sor_cloud);
         indiv_sor_cloud = down_sampling(indiv_sor_cloud);
-        dump_cloud_csv("drumrobot_server/data/scan/scan_" + ts + "_cloud_no_sor_no_ds.csv", indiv_sor_cloud);
+        // dump_cloud_csv("drumrobot_server/data/scan/scan_" + ts + "_cloud_no_sor.csv", indiv_sor_cloud);
 
         if (aborted()) return false;
 
@@ -113,7 +113,7 @@ bool DrumDetector::run_scan() {
             return false;
         }
 
-        dump_cloud_csv("drumrobot_server/data/scan/scan_" + ts + "_cloud.csv", full_cloud);
+        dump_cloud_csv("drumrobot_server/data/scan/scan_" + ts + "_final_cloud.csv", full_cloud);
         visualize_drums({full_cloud});
 
         // ===== 클러스터 → 원 검출 =====
@@ -142,10 +142,10 @@ bool DrumDetector::run_scan() {
         index_circles(drum_coeffs, drum_clouds);
         std::vector<std::vector<Eigen::VectorXd>> drum_candidates = select_candidates(drum_coeffs);
 
+        dump_candidates_csv("drumrobot_server/data/scan/scan_" + ts + "_drum_candidates.csv", drum_candidates);
         visualize_drums(drum_clouds, drum_candidates);
 
-        // return write_results(drum_candidates, ts);
-        return true;
+        return write_results(drum_candidates, ts);
     } catch (const std::exception &e) {
         std::cerr << "[DrumDetector] 예외 발생: " << e.what() << " — 스캔 중단\n";
         return false;
@@ -762,171 +762,67 @@ void DrumDetector::visualize_drums(const std::vector<pcl::PointCloud<pcl::PointX
 // =============================================================
 bool DrumDetector::write_results(const std::vector<std::vector<Eigen::VectorXd>> &drum_candidates, const std::string &ts) {
     namespace fs = std::filesystem;
-    using json = nlohmann::json;
 
-    const std::string config_path = "drumrobot_server/config/drum_coordinate.json";
+    // 스캔 산출물은 이 파일 하나. drum_coordinate.json(대표점·손목각)은 읽지도 쓰지도 않는다.
+    const std::string candidates_path = "drumrobot_server/config/drum_candidates.json";
 
-    // 1) 기존 파일 파싱 (악기 순서·wrist_angle_deg 보존, open hihat 오프셋 계산에 필요)
-    json root;
-    {
-        std::ifstream ifs(config_path);
-        if (!ifs.is_open()) {
-            std::cerr << "[DrumDetector] " << config_path << " 열기 실패 — 결과 반영 중단\n";
-            return false;
-        }
-        try {
-            ifs >> root;
-        } catch (const std::exception &e) {
-            std::cerr << "[DrumDetector] " << config_path << " 파싱 실패: " << e.what() << " — 결과 반영 중단\n";
-            return false;
-        }
-    }
-
-    // 파일 순서 그대로 악기 항목 추출
-    struct InstEntry {
-        std::string name;
-        int id = -1;
-        std::array<double, 3> right_pos{}, left_pos{};
-        double right_wrist = 0.0, left_wrist = 0.0;
-    };
-    std::vector<InstEntry> entries;
-
-    try {
-        for (const auto &inst : root.at("instruments")) {
-            InstEntry e;
-            e.name = inst.at("name").get<std::string>();
-            auto it = instrument_name_to_id.find(e.name);
-            if (it != instrument_name_to_id.end()) e.id = it->second;
-
-            const auto &right = inst.at("right");
-            const auto &left  = inst.at("left");
-            for (int i = 0; i < 3; i++) {
-                e.right_pos[i] = right.at("position").at(i).get<double>();
-                e.left_pos[i]  = left.at("position").at(i).get<double>();
-            }
-            e.right_wrist = right.at("wrist_angle_deg").get<double>();
-            e.left_wrist  = left.at("wrist_angle_deg").get<double>();
-            entries.push_back(e);
-        }
-    } catch (const std::exception &e) {
-        std::cerr << "[DrumDetector] " << config_path << " 형식 이상: " << e.what() << " — 결과 반영 중단\n";
+    if (drum_candidates.size() != static_cast<size_t>(NUM_CIRCLES)) {
+        std::cerr << "[DrumDetector] 후보 목록이 " << NUM_CIRCLES << "개 악기가 아님 (n="
+                  << drum_candidates.size() << ") — 저장 중단\n";
         return false;
     }
 
-    std::map<int, const InstEntry *> by_id;
-    for (const auto &e : entries) {
-        if (e.id >= 0) by_id[e.id] = &e;
-    }
-
-    // 2) 새 좌표 계산 — 검출 결과(레거시 좌표계)를 서버 좌표계로 변환하며 후보 선택
+    // 검출 결과(레거시 좌표계)를 서버 좌표계로 변환
     auto round3 = [](double v) { return std::round(v * 1000.0) / 1000.0; };
     auto to_server = [&](const Eigen::VectorXd &p) {
         return std::array<double, 3>{round3(p(0)), round3(p(1)), round3(p(2) - LEGACY_TO_SERVER_Z)};
     };
-
-    std::map<int, std::array<double, 3>> new_right, new_left;
-    for (int id = 1; id <= NUM_CIRCLES; id++) {
-        const auto &cand = drum_candidates[id - 1];
-        // 드럼(1~4): 후보 9점 x정렬 기준 right=+0.4r(7번), left=-0.4r(1번)
-        // 심벌(5~8): 로봇 방향 에지 3점 기준 right=우측(2번), left=좌측(0번)
-        //            (하이햇 우손 강제 index 2였던 레거시 selectHitTarget 규칙과 일치)
-        const size_t r_idx = (id <= 4) ? 7 : 2;
-        const size_t l_idx = (id <= 4) ? 1 : 0;
-        if (cand.size() <= r_idx) {
-            std::cerr << "[DrumDetector] drum_id " << id << " 후보점 부족 (" << cand.size() << "개) — 결과 반영 중단\n";
-            return false;
-        }
-        new_right[id] = to_server(cand[r_idx]);
-        new_left[id]  = to_server(cand[l_idx]);
-    }
-    // open hihat(9)은 closed hihat(5)과 동일 물리 심벌:
-    // 새 closed 좌표 + 기존 파일의 (open - closed) 오프셋을 성분별로 보존
-    if (by_id.count(5) && by_id.count(9)) {
-        std::array<double, 3> r{}, l{};
-        for (int i = 0; i < 3; i++) {
-            r[i] = round3(new_right.at(5)[i] + (by_id.at(9)->right_pos[i] - by_id.at(5)->right_pos[i]));
-            l[i] = round3(new_left.at(5)[i]  + (by_id.at(9)->left_pos[i]  - by_id.at(5)->left_pos[i]));
-        }
-        new_right[9] = r;
-        new_left[9]  = l;
-    }
-
-    // 3) 백업 후 원자적 교체 (.tmp에 쓰고 rename — 중간 크래시에도 원본 보존)
-    const std::string backup_path = "drumrobot_server/config/drum_coordinate_backup_" + ts + ".json";
-    try {
-        fs::copy_file(config_path, backup_path, fs::copy_options::overwrite_existing);
-    } catch (const std::exception &e) {
-        std::cerr << "[DrumDetector] 백업 실패: " << e.what() << " — 결과 반영 중단\n";
-        return false;
-    }
-
-    // 기존 파일 스타일(악기당 한 줄) 유지 — git diff 가독성
     auto fmt_pos = [](const std::array<double, 3> &p) {
         std::ostringstream oss;
         oss << std::fixed << std::setprecision(3)
             << "[" << p[0] << ", " << p[1] << ", " << p[2] << "]";
         return oss.str();
     };
-    auto fmt_wrist = [](double v) {
-        std::ostringstream oss;
-        oss << std::fixed << std::setprecision(1) << v;
-        return oss.str();
+    auto instrument_name_of_id = [](int id) {
+        for (const auto &[name, i] : instrument_name_to_id) if (i == id) return name;
+        return std::string("unknown");
     };
 
-    size_t name_width = 0;
-    for (const auto &e : entries) name_width = std::max(name_width, e.name.size());
-
-    const std::string tmp_path = config_path + ".tmp";
+    // .tmp에 쓰고 rename — 중간 크래시에도 반쯤 쓰인 파일이 남지 않음
+    const std::string tmp_path = candidates_path + ".tmp";
     {
         std::ofstream ofs(tmp_path);
         if (!ofs.is_open()) {
-            std::cerr << "[DrumDetector] " << tmp_path << " 쓰기 실패 — 결과 반영 중단\n";
+            std::cerr << "[DrumDetector] " << tmp_path << " 쓰기 실패 — 저장 중단\n";
             return false;
         }
-        ofs << "{\n  \"instruments\": [\n";
-        for (size_t i = 0; i < entries.size(); i++) {
-            const auto &e = entries[i];
-            const bool detected = (e.id >= 1 && new_right.count(e.id) > 0);
-            const auto &rp = detected ? new_right.at(e.id) : e.right_pos;
-            const auto &lp = detected ? new_left.at(e.id)  : e.left_pos;
+        // 악기 한 줄: 후보를 서버 좌표계로 변환하고 z_shift(open hihat용)를 더해 기록
+        auto write_instrument = [&](int id, const std::vector<Eigen::VectorXd> &cand, double z_shift, bool last) {
+            ofs << "    { \"name\": \"" << instrument_name_of_id(id) << "\", \"candidates\": [";
+            for (size_t j = 0; j < cand.size(); j++) {
+                std::array<double, 3> p = to_server(cand[j]);
+                p[2] = round3(p[2] + z_shift);
+                ofs << (j > 0 ? ", " : "") << fmt_pos(p);
+            }
+            ofs << "] }" << (last ? "" : ",") << "\n";
+        };
 
-            std::string padded_name = "\"" + e.name + "\"," + std::string(name_width - e.name.size(), ' ');
-
-            ofs << "    { \"name\": " << padded_name
-                << " \"right\": {\"position\": " << fmt_pos(rp)
-                << ", \"wrist_angle_deg\": " << fmt_wrist(e.right_wrist) << "},"
-                << " \"left\": {\"position\": " << fmt_pos(lp)
-                << ", \"wrist_angle_deg\": " << fmt_wrist(e.left_wrist) << "} }"
-                << (i + 1 < entries.size() ? "," : "") << "\n";
+        ofs << "{\n  \"scan_timestamp\": \"" << ts << "\",\n  \"instruments\": [\n";
+        for (int id = 1; id <= NUM_CIRCLES; id++) {       // drum_id 1..8 == 악기 id (index_circles가 정렬)
+            write_instrument(id, drum_candidates[id - 1], 0.0, false);
         }
+        // open hihat(9) = closed hihat(5) 후보에서 z만 +OPEN_HIHAT_Z_OFFSET (같은 물리 심벌)
+        write_instrument(9, drum_candidates[5 - 1], ROBOT::OPEN_HIHAT_Z_OFFSET, true);
         ofs << "  ]\n}\n";
     }
     try {
-        fs::rename(tmp_path, config_path);
+        fs::rename(tmp_path, candidates_path);
     } catch (const std::exception &e) {
-        std::cerr << "[DrumDetector] " << config_path << " 교체 실패: " << e.what() << "\n";
+        std::cerr << "[DrumDetector] " << candidates_path << " 교체 실패: " << e.what() << "\n";
         return false;
     }
 
-    // 4) 전체 후보점 덤프 (서버 좌표계) — 수동 검토/디버깅용
-    dump_candidates_csv("drumrobot_server/data/scan/scan_" + ts + "_candidates.csv", drum_candidates);
-
-    // 5) 이전 좌표 대비 이동량 로그 (정합성 눈검사용)
-    for (const auto &e : entries) {
-        if (e.id < 1 || new_right.count(e.id) == 0) continue;
-        double dr = 0.0, dl = 0.0;
-        for (int i = 0; i < 3; i++) {
-            dr += std::pow(new_right.at(e.id)[i] - e.right_pos[i], 2);
-            dl += std::pow(new_left.at(e.id)[i]  - e.left_pos[i], 2);
-        }
-        dr = std::sqrt(dr);
-        dl = std::sqrt(dl);
-        std::cout << "[DrumDetector] " << e.name << ": |dR|=" << std::fixed << std::setprecision(3) << dr
-                  << "m |dL|=" << dl << "m"
-                  << ((dr > 0.15 || dl > 0.15) ? "  <-- 경고: 이동량 큼, 오검출 여부 확인 필요" : "") << "\n";
-    }
-
-    std::cout << "[DrumDetector] " << config_path << " 갱신 완료 (백업: " << backup_path << ")\n";
+    std::cout << "[DrumDetector] " << candidates_path << " 저장 완료 (악기 " << NUM_CIRCLES + 1 << "개, open hihat 포함)\n";
     return true;
 }
 

@@ -1,5 +1,7 @@
 #include "trajectory/play_motion_generator.hpp"
 
+#include <sstream>
+
 PlayMotionGenerator::PlayMotionGenerator(AppContext &ctxRef)
     : ctx(ctxRef) {
 }
@@ -64,8 +66,68 @@ void PlayMotionGenerator::initialize() {
     std::cout << "[PlayMotionGenerator] Loaded " << drum_coordinates.size()
               << " drum coordinates from " << config_path << "\n";
 
+    load_candidate_positions();
+
     base_motion_generator.initialize(drum_coordinates);
     head_motion_generator.initialize(drum_coordinates);
+}
+
+void PlayMotionGenerator::load_candidate_positions() {
+    using json = nlohmann::json;
+
+    const std::string candidates_path = "drumrobot_server/config/drum_candidates.json";
+    std::ifstream ifs(candidates_path);
+    if (!ifs.is_open()) {
+        std::cout << "[PlayMotionGenerator] " << candidates_path << " 없음 — 악기별 대표점 1개로 연주\n";
+        return;
+    }
+
+    // 파일 전체를 먼저 읽고(all-or-nothing) 이상이 없을 때만 적용
+    std::map<int, std::vector<std::array<double, 3>>> scanned_positions_by_id;
+    std::string scan_timestamp;
+    try {
+        json root;
+        ifs >> root;
+        scan_timestamp = root.value("scan_timestamp", "");
+
+        for (const auto& inst : root.at("instruments")) {
+            const std::string name = inst.at("name");
+            auto it = instrument_name_to_id.find(name);
+            if (it == instrument_name_to_id.end() || drum_coordinates.count(it->second) == 0) {
+                std::cerr << "[PlayMotionGenerator] 후보 파일: 대표점 파일에 없는 악기 '" << name << "' 건너뜀\n";
+                continue;
+            }
+            std::vector<std::array<double, 3>> positions;
+            for (const auto& p : inst.at("candidates")) {
+                positions.push_back({p.at(0).get<double>(), p.at(1).get<double>(), p.at(2).get<double>()});
+            }
+            if (!positions.empty()) scanned_positions_by_id[it->second] = positions;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "[PlayMotionGenerator] " << candidates_path << " 형식 이상: " << e.what()
+                  << " — 악기별 대표점 1개로 연주\n";
+        return;
+    }
+
+    // 팔 공용 후보 → 오른손 +x / 왼손 -x 로 분리
+    auto instrument_name_of_id = [](int id) {
+        for (const auto& [name, i] : instrument_name_to_id) if (i == id) return name;
+        return std::string("?");
+    };
+    std::ostringstream summary;
+    for (const auto& [id, positions] : scanned_positions_by_id) {
+        InstrumentCoordinate& coord = drum_coordinates.at(id);
+        coord.right_candidate_positions.clear();
+        coord.left_candidate_positions.clear();
+        for (auto p : positions) {
+            p[0] += ROBOT::CANDIDATE_HAND_X_OFFSET;
+            coord.right_candidate_positions.push_back(p);
+            p[0] -= 2.0 * ROBOT::CANDIDATE_HAND_X_OFFSET;
+            coord.left_candidate_positions.push_back(p);
+        }
+        summary << instrument_name_of_id(id) << " " << positions.size() << ", ";
+    }
+    std::cout << "[PlayMotionGenerator] 후보점 로드 (scan " << scan_timestamp << "): " << summary.str() << "\n";
 }
 
 bool PlayMotionGenerator::reset(std::array<double, ROBOT::NUM_JOINT>& q, int note_r, int note_l) {

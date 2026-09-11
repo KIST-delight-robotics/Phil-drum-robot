@@ -147,9 +147,9 @@ void MotionPlanner::run_drum_scan() {
 
     if (ok) {
         trajectory_generator.reload_drum_coordinates();   // 같은 스레드 → 안전
-        std::cerr << "[MotionPlanner] 스캔 완료: drum_coordinate.json 갱신 및 핫 리로드\n";
+        std::cerr << "[MotionPlanner] 스캔 완료: drum_candidates.json 갱신 및 핫 리로드\n";
     } else {
-        std::cerr << "[MotionPlanner] 스캔 실패: 드럼 좌표 미변경\n";
+        std::cerr << "[MotionPlanner] 스캔 실패: 후보 파일 미변경\n";
     }
 
     // 스캔 중 쌓인 명령 폐기 (QUIT만 예외 — 폐기하면 TcpServer가 quitting 상태로 고착됨)
