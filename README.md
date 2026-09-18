@@ -125,7 +125,7 @@ Phil/
     │   ├── motors.json                     # 모터 설정 (ID, 관절 범위, PDO ID 등)
     │   ├── robot_poses.json                # 사전 정의 포즈 (init / home / ready / shutdown)
     │   ├── kinematics.json                 # 관절 한계, 링크 길이
-    │   ├── drum_coordinate.json            # 악기별 손 끝 좌표 및 손목 각도
+    │   ├── drum_coordinate.json            # 악기별 원 중심·반지름·법선, 손목각(좌우 공용), 스캔 후보점
     │   └── can_ports.json                  # 머신별 USB 허브/포트 매핑 (CAN 리셋용)
     ├── data/
     │   ├── midi/                           # MIDI 원본

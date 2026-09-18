@@ -47,7 +47,7 @@
 //   적재하고, 큐 소진(= send_loop가 전부 전송)으로 이동 완료를 감지한다.
 // - 카메라는 스캔 동안에만 열린다 (생성 시 시작, 소멸 시 정지).
 // - 예외를 밖으로 던지지 않는다: run_scan()은 성공/실패만 반환.
-// - 성공 시 config/drum_candidates.json(악기별 후보점)을 생성한다.
+// - 성공 시 config/drum_coordinate.json 의 악기별 중심·반지름·법선·후보점을 갱신한다 (손목각은 보존).
 //   drum_coordinate.json(대표점·손목각)은 건드리지 않는다. (핫 리로드는 MotionPlanner가 수행)
 // =============================================================
 class DrumDetector {
@@ -56,7 +56,7 @@ public:
                  TrajectoryGenerator &trajectoryGeneratorRef, ControlQueue &controlQueueRef);
     ~DrumDetector();    // 카메라 정지
 
-    bool run_scan();    // 전체 스캔. true = drum_candidates.json 생성 완료
+    bool run_scan();    // 전체 스캔. true = drum_coordinate.json 갱신 완료
 
 private:
     AppContext          &ctx;
@@ -114,7 +114,8 @@ private:
                          const std::vector<std::vector<Eigen::VectorXd>> &drum_candidates = {});
 
     // ===== 결과 저장 =====
-    bool write_results(const std::vector<std::vector<Eigen::VectorXd>> &drum_candidates, const std::string &ts);
+    bool write_results(const std::vector<pcl::ModelCoefficients::Ptr> &drum_coeffs,
+                       const std::vector<std::vector<Eigen::VectorXd>> &drum_candidates, const std::string &ts);
     void dump_cloud_csv(const std::string &path, const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud);
     void dump_candidates_csv(const std::string &path, const std::vector<std::vector<Eigen::VectorXd>> &drum_candidates);
     static std::string timestamp_suffix();   // MMDD_HHMM

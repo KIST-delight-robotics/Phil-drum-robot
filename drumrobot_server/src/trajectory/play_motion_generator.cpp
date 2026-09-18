@@ -15,6 +15,7 @@ void PlayMotionGenerator::initialize() {
  
     solver.initialize();
 
+    // 악기 파일 하나: 원 중심·반지름·법선·손목각(좌우 공용)·스캔 후보(팔 공용). 후보가 없는 악기는 중심 1개로 연주
     const std::string config_path = "drumrobot_server/config/drum_coordinate.json";
     std::ifstream ifs(config_path);
     if (!ifs.is_open()) {
@@ -23,111 +24,56 @@ void PlayMotionGenerator::initialize() {
         return;
     }
 
-    json root;
-    try {
-        ifs >> root;
-    } catch (const json::parse_error& e) {
-        std::cerr << "[PlayMotionGenerator] JSON parse error in "
-                  << config_path << ": " << e.what() << "\n";
-        return;
-    }
-
-    drum_coordinates.clear();
-
-    for (const auto& inst : root.at("instruments")) {
-        InstrumentCoordinate coord;
-
-        std::string name = inst.at("name");
-        int id = instrument_name_to_id.at(name);
-
-        const auto& right = inst.at("right");
-        const auto& left  = inst.at("left");
-
-        auto right_pos = right.at("position");
-        auto left_pos  = left.at("position");
-
-        coord.right_position = {
-            right_pos.at(0).get<double>(),
-            right_pos.at(1).get<double>(),
-            right_pos.at(2).get<double>()
-        };
-        coord.right_wrist_angle = right.at("wrist_angle_deg").get<double>() * M_PI / 180.0;
-
-        coord.left_position = {
-            left_pos.at(0).get<double>(),
-            left_pos.at(1).get<double>(),
-            left_pos.at(2).get<double>()
-        };
-        coord.left_wrist_angle = left.at("wrist_angle_deg").get<double>() * M_PI / 180.0;
-
-        drum_coordinates[id] = coord;
-    }
-
-    std::cout << "[PlayMotionGenerator] Loaded " << drum_coordinates.size()
-              << " drum coordinates from " << config_path << "\n";
-
-    load_candidate_positions();
-
-    base_motion_generator.initialize(drum_coordinates);
-    head_motion_generator.initialize(drum_coordinates);
-}
-
-void PlayMotionGenerator::load_candidate_positions() {
-    using json = nlohmann::json;
-
-    const std::string candidates_path = "drumrobot_server/config/drum_candidates.json";
-    std::ifstream ifs(candidates_path);
-    if (!ifs.is_open()) {
-        std::cout << "[PlayMotionGenerator] " << candidates_path << " 없음 — 악기별 대표점 1개로 연주\n";
-        return;
-    }
-
-    // 파일 전체를 먼저 읽고(all-or-nothing) 이상이 없을 때만 적용
-    std::map<int, std::vector<std::array<double, 3>>> scanned_positions_by_id;
+    std::map<int, InstrumentCoordinate> loaded;
     std::string scan_timestamp;
+    std::ostringstream summary;
     try {
         json root;
         ifs >> root;
-        scan_timestamp = root.value("scan_timestamp", "");
+        scan_timestamp = root.value("scan_timestamp", "-");
 
         for (const auto& inst : root.at("instruments")) {
+            InstrumentCoordinate coord;
             const std::string name = inst.at("name");
-            auto it = instrument_name_to_id.find(name);
-            if (it == instrument_name_to_id.end() || drum_coordinates.count(it->second) == 0) {
-                std::cerr << "[PlayMotionGenerator] 후보 파일: 대표점 파일에 없는 악기 '" << name << "' 건너뜀\n";
-                continue;
+            const int id = instrument_name_to_id.at(name);
+
+            const auto& c = inst.at("center");
+            coord.center = {c.at(0).get<double>(), c.at(1).get<double>(), c.at(2).get<double>()};
+            coord.wrist_angle = inst.at("wrist_angle_deg").get<double>() * M_PI / 180.0;
+            // radius / normal 은 스캔 기록용 — 코드에서 쓰지 않아 읽지 않는다
+
+            std::vector<std::array<double, 3>> candidates;   // 팔 공용 스캔 후보
+            for (const auto& p : inst.value("candidates", json::array())) {
+                candidates.push_back({p.at(0).get<double>(), p.at(1).get<double>(), p.at(2).get<double>()});
             }
-            std::vector<std::array<double, 3>> positions;
-            for (const auto& p : inst.at("candidates")) {
-                positions.push_back({p.at(0).get<double>(), p.at(1).get<double>(), p.at(2).get<double>()});
+            summary << name << " " << candidates.size() << ", ";
+
+            // 팔 공용 후보 → 오른손 +x / 왼손 -x. 후보가 없으면 중심 1개 (선택 로직이 즉시 반환)
+            if (candidates.empty()) candidates.push_back(coord.center);
+            for (auto p : candidates) {
+                p[0] += ROBOT::CANDIDATE_HAND_X_OFFSET;
+                coord.right_candidate_positions.push_back(p);
+                p[0] -= 2.0 * ROBOT::CANDIDATE_HAND_X_OFFSET;
+                coord.left_candidate_positions.push_back(p);
             }
-            if (!positions.empty()) scanned_positions_by_id[it->second] = positions;
+            loaded[id] = coord;
+        }
+        // 궤적 생성기는 좌표 없는 악기를 검사하지 않으므로 팔 악기(1~9) 는 여기서 모두 있어야 한다
+        for (const auto& [name, id] : instrument_name_to_id) {
+            if (id != 0 && !loaded.count(id)) throw std::runtime_error("instrument '" + name + "' 없음");
         }
     } catch (const std::exception& e) {
-        std::cerr << "[PlayMotionGenerator] " << candidates_path << " 형식 이상: " << e.what()
-                  << " — 악기별 대표점 1개로 연주\n";
+        // 파일 전체를 먼저 읽고(all-or-nothing) 이상이 없을 때만 적용
+        std::cerr << "[PlayMotionGenerator] " << config_path << " 형식 이상: " << e.what() << " — 좌표 미적용\n";
         return;
     }
 
-    // 팔 공용 후보 → 오른손 +x / 왼손 -x 로 분리
-    auto instrument_name_of_id = [](int id) {
-        for (const auto& [name, i] : instrument_name_to_id) if (i == id) return name;
-        return std::string("?");
-    };
-    std::ostringstream summary;
-    for (const auto& [id, positions] : scanned_positions_by_id) {
-        InstrumentCoordinate& coord = drum_coordinates.at(id);
-        coord.right_candidate_positions.clear();
-        coord.left_candidate_positions.clear();
-        for (auto p : positions) {
-            p[0] += ROBOT::CANDIDATE_HAND_X_OFFSET;
-            coord.right_candidate_positions.push_back(p);
-            p[0] -= 2.0 * ROBOT::CANDIDATE_HAND_X_OFFSET;
-            coord.left_candidate_positions.push_back(p);
-        }
-        summary << instrument_name_of_id(id) << " " << positions.size() << ", ";
-    }
-    std::cout << "[PlayMotionGenerator] 후보점 로드 (scan " << scan_timestamp << "): " << summary.str() << "\n";
+    drum_coordinates = loaded;
+    std::cout << "[PlayMotionGenerator] Loaded " << drum_coordinates.size() << " drum coordinates from " << config_path
+              << " (scan " << scan_timestamp << "), 후보: " << summary.str() << "\n";
+
+    base_motion_generator.initialize(drum_coordinates);
+    head_motion_generator.initialize(drum_coordinates);
 }
 
 bool PlayMotionGenerator::reset(std::array<double, ROBOT::NUM_JOINT>& q, int note_r, int note_l) {

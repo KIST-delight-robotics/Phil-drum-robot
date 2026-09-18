@@ -970,6 +970,13 @@ bool BehaviorPlanner::make_drum_event(const std::vector<std::string>& items, dou
         std::cerr << "[BehaviorPlanner] PLAY: 악보 숫자 파싱 실패: " << e.what() << "\n";
         return false;
     }
+    // 악보의 악기 번호는 0(없음)~8. 범위 밖은 0 으로 지운다.
+    for (int* note : {&out.note_num_R, &out.note_num_L}) {
+        if (*note < 0 || *note > 8) {
+            // std::cerr << "[BehaviorPlanner] PLAY: bar " << out.bar << " 악기 번호 범위 밖 " << *note << " → 0\n";
+            *note = 0;
+        }
+    }
     out.t = out.beat * 100.0 / bpm + last_t;
     return true;
 }

@@ -15,22 +15,26 @@ void BaseMotionGenerator::initialize(const std::map<int, InstrumentCoordinate>& 
     solver.initialize();
     drum_coordinates = coordinates;
 
-    // 후보점이 없는 악기는 대표점 1개가 유일 후보 (선택 로직이 즉시 반환 → 기존 동작과 동일)
+    // 팔별 타격점이 비어 있으면(로더를 거치지 않은 맵) 중심 ± x 오프셋 1개가 유일 후보 (선택 로직이 즉시 반환)
     for (auto& [instrument, coord] : drum_coordinates) {
-        if (coord.right_candidate_positions.empty()) coord.right_candidate_positions = {coord.right_position};
-        if (coord.left_candidate_positions.empty())  coord.left_candidate_positions  = {coord.left_position};
+        std::array<double, 3> right = coord.center, left = coord.center;
+        right[0] += ROBOT::CANDIDATE_HAND_X_OFFSET;
+        left[0]  -= ROBOT::CANDIDATE_HAND_X_OFFSET;
+        if (coord.right_candidate_positions.empty()) coord.right_candidate_positions = {right};
+        if (coord.left_candidate_positions.empty())  coord.left_candidate_positions  = {left};
     }
 
     // 후보점별 팔 단독 허리 가능 집합 사전 계산 (핫 리로드마다 재계산)
+    // trajectory_generator.cpp:reload_drum_coordinates() -> play_motion_generator.initialize() -> base_motion_generator.initialize()
     candidate_waist_feasibility = {};
     int num_candidates = 0;
     for (const auto& [instrument, coord] : drum_coordinates) {
         for (const auto& position : coord.right_candidate_positions) {
-            candidate_waist_feasibility[0][position] = sweep_arm_waist_feasibility(Arm::RIGHT, position, coord.right_wrist_angle);
+            candidate_waist_feasibility[0][position] = compute_feasible_waist_range(Arm::RIGHT, position, coord.wrist_angle);
             num_candidates++;
         }
         for (const auto& position : coord.left_candidate_positions) {
-            candidate_waist_feasibility[1][position] = sweep_arm_waist_feasibility(Arm::LEFT, position, coord.left_wrist_angle);
+            candidate_waist_feasibility[1][position] = compute_feasible_waist_range(Arm::LEFT, position, coord.wrist_angle);
             num_candidates++;
         }
     }
@@ -38,9 +42,9 @@ void BaseMotionGenerator::initialize(const std::map<int, InstrumentCoordinate>& 
 }
 
 BaseMotionPoint BaseMotionGenerator::reset(int note_r, int note_l) {
-    BaseMotionPoint point;
-    note_to_target(note_r, Arm::RIGHT, point.right_position, point.right_wrist);
-    note_to_target(note_l, Arm::LEFT, point.left_position, point.left_wrist);
+    BaseMotionPoint point{};
+    point.right_wrist = get_wrist_angle(note_r);
+    point.left_wrist  = get_wrist_angle(note_l);
 
     // 시작 위치: 양팔 동시 허리 가능 집합이 가장 넓은 후보 쌍 (후보가 각 1개면 대표점 = 기존 동작)
     const auto* right_candidates = get_candidate_positions(Arm::RIGHT, note_r);
@@ -56,8 +60,8 @@ BaseMotionPoint BaseMotionGenerator::reset(int note_r, int note_l) {
                     const auto& pR = (*right_candidates)[i];
                     const auto& pL = (*left_candidates)[j];
                     if (pass == 0 && same_instrument && !(pR[0] > pL[0])) continue;
-                    int count = (int)(get_arm_waist_feasibility(Arm::RIGHT, pR, point.right_wrist)
-                                    & get_arm_waist_feasibility(Arm::LEFT,  pL, point.left_wrist)).count();
+                    int count = (int)(get_feasible_waist_range(Arm::RIGHT, pR, point.right_wrist)
+                                    & get_feasible_waist_range(Arm::LEFT,  pL, point.left_wrist)).count();
                     if (count > best_count) { best_count = count; best_i = i; best_j = j; }
                 }
             }
@@ -67,11 +71,15 @@ BaseMotionPoint BaseMotionGenerator::reset(int note_r, int note_l) {
     }
 
     right_context = MotionContext{};
-    right_context.last_instrument = note_r;
-    right_context.last_position   = point.right_position;
+    right_context.last_start_instrument = note_r;
+    right_context.last_end_instrument   = note_r;
+    right_context.last_start_position   = point.right_position;
+    right_context.last_end_position     = point.right_position;
     left_context = MotionContext{};
-    left_context.last_instrument = note_l;
-    left_context.last_position   = point.left_position;
+    left_context.last_start_instrument = note_l;
+    left_context.last_end_instrument   = note_l;
+    left_context.last_start_position   = point.left_position;
+    left_context.last_end_position     = point.left_position;
 
     auto [opt, range] = compute_waist_range(point.right_position, point.left_position, point.right_wrist, point.left_wrist);
     point.waist = opt;
@@ -94,9 +102,9 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
         return out;
     }
 
-    // 오른팔은 왼팔의 직전 계획을, 왼팔은 오른팔의 새 계획을 보고 후보를 고른다 (verbose: 선택 로그)
-    MotionSegment seg_R = get_motion_segment(rds, Arm::RIGHT, right_context, make_segment_from_context(Arm::LEFT, left_context), true);
-    MotionSegment seg_L = get_motion_segment(rds, Arm::LEFT,  left_context,  seg_R, true);
+    std::pair<MotionSegment, MotionSegment> segments = get_motion_segments(rds, right_context, left_context, true);   // verbose: 선택 로그
+    MotionSegment seg_R = segments.first;
+    MotionSegment seg_L = segments.second;
 
     WaistSegment seg_w = get_waist_segment(rds);
 
@@ -143,317 +151,492 @@ bool BaseMotionGenerator::get_error() {
     return base_end_error;
 }
 
-BaseMotionGenerator::MotionSegment BaseMotionGenerator::get_motion_segment(const std::vector<DrumEvent>& rds, Arm arm, const MotionContext& context,
-                                                                           const MotionSegment& other_arm_segment, bool verbose) {
-    MotionSegment seg;
+std::pair<BaseMotionGenerator::MotionSegment, BaseMotionGenerator::MotionSegment> BaseMotionGenerator::get_motion_segments(const std::vector<DrumEvent>& rds, const MotionContext& context_R, const MotionContext& context_L, bool verbose) {
+    MotionSegment seg_R;
+    MotionSegment seg_L;
 
-    seg.t0 = rds[0].t;
-    seg.t1 = rds[1].t;
+    seg_R.t0 = rds[0].t;    seg_L.t0 = rds[0].t;
+    seg_R.t1 = rds[1].t;    seg_L.t1 = rds[1].t;
 
     // 팔에 따라 참조할 note 선택
-    auto note_of = [&](int i) {
-        int note = (arm == Arm::RIGHT) ? rds[i].note_num_R : rds[i].note_num_L;
+    auto note_of_R = [&](int i) {
+        int note = rds[i].note_num_R;
+        if (note == 5 && !rds[i].is_closed_hihat) note = 9; // 오픈 하이햇 처리
+        return note;
+    };
+    auto note_of_L = [&](int i) {
+        int note = rds[i].note_num_L;
         if (note == 5 && !rds[i].is_closed_hihat) note = 9; // 오픈 하이햇 처리
         return note;
     };
 
-    // ===== 타격 감지 =====
+    // ===== 양팔 개별로 타격 감지 =====
     const double e = 0.00001;
     int rds_size = (int)rds.size();
 
-    bool   is_hit   = false;
-    double t_hit    = 0.0;
-    int    note_hit = 0;
+    bool   find_hit_R = false, find_hit_L = false;
+    double t_hit_R = 0.0, t_hit_L = 0.0;
+    int    note_hit_R = 0, note_hit_L = 0;
 
     for (int i = 1; i < rds_size; i++) {
         if (round(10000 * (HIT_DETECTION_THRESHOLD + e)) < round(10000 * (rds[i].t - rds[0].t))) {
             break;
         }
 
-        if (note_of(i) != 0) {
-            is_hit   = true;
-            t_hit    = rds[i].t;
-            note_hit = note_of(i);
+        if (note_of_R(i) != 0) {
+            find_hit_R   = true;
+            t_hit_R    = rds[i].t;
+            note_hit_R = note_of_R(i);
+            break;
+        }
+    }
+    for (int i = 1; i < rds_size; i++) {
+        if (round(10000 * (HIT_DETECTION_THRESHOLD + e)) < round(10000 * (rds[i].t - rds[0].t))) {
+            break;
+        }
+
+        if (note_of_L(i) != 0) {
+            find_hit_L   = true;
+            t_hit_L    = rds[i].t;
+            note_hit_L = note_of_L(i);
             break;
         }
     }
 
+    // find_hit_RL  : 현재 함수 실행에서 타격을 찾았는지
+    // found_hit_RL : 이전 실행에서 타격을 찾았는지
+    bool found_hit_L = (context_L.state == State::REST_TO_HIT || context_L.state == State::HIT_TO_HIT);
+    bool found_hit_R = (context_R.state == State::REST_TO_HIT || context_R.state == State::HIT_TO_HIT);    
+
     // ===== 악기 & 시간 =====
-    // 위치는 컨텍스트에 잠긴 점을 쓰고, 손목각만 악기별 값으로 조회한다
-    // (잘못된 악기 번호의 오류 처리는 note_to_target에 그대로 둔다)
-    const bool flying = (context.state == State::REST_TO_HIT || context.state == State::HIT_TO_HIT);
-    std::array<double, 3> unused_position;
+    // 새 비행 시작 여부 = end_position 선정 필요 (비행 중에는 find_hit 이 잠긴 목표를 다시 찾으므로 제외)
+    bool need_select_R = find_hit_R && !(note_of_R(0) == 0 && found_hit_R);     // todo : find_hit_R만 있어도됌(0917)
+    bool need_select_L = find_hit_L && !(note_of_L(0) == 0 && found_hit_L);
 
-    auto set_start = [&](int instrument, const std::array<double, 3>& position) {
-        note_to_target(instrument, arm, unused_position, seg.start_wrist_angle);
-        seg.start_position   = position;
-        seg.start_instrument = instrument;
-    };
-    auto set_end = [&](int instrument, const std::array<double, 3>& position) {
-        note_to_target(instrument, arm, unused_position, seg.end_wrist_angle);
-        seg.end_position   = position;
-        seg.end_instrument = instrument;
-    };
-    auto hold_position = [&]() {   // 다음 타격 없음: 현재 위치 유지
-        seg.end_position    = seg.start_position;
-        seg.end_wrist_angle = seg.start_wrist_angle;
-        seg.end_instrument  = seg.start_instrument;
-    };
+    MotionContext next_context_R, next_context_L;
 
-    MotionContext next_context = context;
+    // ===== R =====
+    // 이전에 타격을 찾아서 이동중
+    if(note_of_R(0) == 0 && found_hit_R)
+    {
+        // 이전 이동 궤적 유지 (재선정 없음)
+        seg_R.start_instrument = context_R.last_start_instrument;
+        seg_R.end_instrument   = context_R.last_end_instrument;
+        seg_R.start_position   = context_R.last_start_position;
+        seg_R.end_position     = context_R.last_end_position;
+        seg_R.start_time       = context_R.last_t;
+        seg_R.end_time         = t_hit_R;
 
-    if (note_of(0) == 0) {
-        if (flying) {
-            // 비행 지속: 출발 시 잠긴 목표를 그대로 사용 (재선택 없음)
-            set_start(context.last_instrument, context.last_position);
-            set_end(context.target_instrument, context.target_position);
-
-            seg.start_time = context.last_t;
-            seg.end_time   = context.target_time;
-        } else if (is_hit) {
-            // 휴식 중 다음 타격 찾음 → 비행 시작: 후보 선택 후 잠금
-            set_start(context.last_instrument, context.last_position);
-            set_end(note_hit, select_hit_position(arm, note_hit, t_hit, other_arm_segment,
-                                                  context.last_instrument, context.last_position, verbose));
-
-            seg.start_time = rds[0].t;
-            seg.end_time   = t_hit;
-
-            next_context.state             = State::REST_TO_HIT;
-            next_context.last_t            = rds[0].t;
-            next_context.target_instrument = note_hit;
-            next_context.target_position   = seg.end_position;
-            next_context.target_time       = t_hit;
-        } else {
-            // 휴식 중 다음 타격 없음 (현재 위치 유지)
-            set_start(context.last_instrument, context.last_position);
-            hold_position();
-
-            seg.start_time = rds[0].t;
-            seg.end_time   = rds[1].t;
-
-            next_context.state             = State::REST_TO_REST;
-            next_context.last_t            = rds[0].t;
-            next_context.target_instrument = 0;
+        next_context_R = context_R;
+    }
+    // 그 외 상황
+    else
+    {
+        // 지금 서 있는(타격하는) 악기와 점
+        int cur_instrument_R = (note_of_R(0) == 0) ? context_R.last_end_instrument : note_of_R(0);
+        std::array<double, 3> cur_position_R = context_R.last_end_position;
+        if(note_of_R(0) != 0 && note_of_R(0) != context_R.last_end_instrument)
+        {
+            // 비행 없이 다른 악기를 치는 경우 (악보상 순간이동): 첫 후보로 점프. 경고 경로라 후보 선정은 안 한다
+            if(verbose) std::cerr << "[BaseMotionGenerator] 비행 없는 타격: t=" << rds[0].t << " arm=R instrument "
+                                  << context_R.last_end_instrument << " -> " << note_of_R(0) << "\n";
+            if (const auto* c = get_candidate_positions(Arm::RIGHT, note_of_R(0))) cur_position_R = c->front();
         }
-    } else {
-        // 타격 순간의 위치: 비행 중이던 목표점, 또는 서 있던 점
-        std::array<double, 3> arrival_position;
-        if (flying && context.target_instrument == note_of(0)) {
-            arrival_position = context.target_position;
-        } else if (!flying && context.last_instrument == note_of(0)) {
-            arrival_position = context.last_position;
-        } else {
-            // 비행 없이 다른 악기를 치는 경우 (악보상 순간이동): 후보 중 골라 점프
-            if (verbose) {
-                std::cerr << "[BaseMotionGenerator] 비행 없는 타격: t=" << rds[0].t
-                          << " arm=" << (arm == Arm::RIGHT ? "R" : "L")
-                          << " instrument " << (flying ? context.target_instrument : context.last_instrument)
-                          << " -> " << note_of(0) << "\n";
-            }
-            arrival_position = select_hit_position(arm, note_of(0), rds[0].t, other_arm_segment, 0, {}, verbose);
+
+        seg_R.start_instrument = cur_instrument_R;
+        seg_R.start_position   = cur_position_R;
+        seg_R.start_time       = rds[0].t;
+
+        next_context_R.last_t                = rds[0].t;
+        next_context_R.last_start_instrument = cur_instrument_R;
+        next_context_R.last_start_position   = cur_position_R;
+
+        if(!need_select_R)
+        {
+            // 현 위치 유지
+            seg_R.end_instrument = cur_instrument_R;
+            seg_R.end_position   = cur_position_R;
+            seg_R.end_time       = rds[1].t;
+
+            next_context_R.state               = (note_of_R(0) == 0) ? State::REST_TO_REST : State::HIT_TO_REST;
+            next_context_R.last_end_instrument = cur_instrument_R;
+            next_context_R.last_end_position   = cur_position_R;
         }
-        set_start(note_of(0), arrival_position);
+        else
+        {
+            // 새 비행 시작: end_position 은 아래 select() 뒤에 채운다
+            seg_R.end_instrument = note_hit_R;
+            seg_R.end_time       = t_hit_R;
 
-        next_context = MotionContext{};
-        next_context.last_t          = rds[0].t;
-        next_context.last_instrument = note_of(0);
-        next_context.last_position   = arrival_position;
-
-        if (is_hit) {
-            // 타격 후 다음 타격 찾음 → 비행 시작
-            set_end(note_hit, select_hit_position(arm, note_hit, t_hit, other_arm_segment,
-                                                  note_of(0), arrival_position, verbose));
-
-            seg.start_time = rds[0].t;
-            seg.end_time   = t_hit;
-
-            next_context.state             = State::HIT_TO_HIT;
-            next_context.target_instrument = note_hit;
-            next_context.target_position   = seg.end_position;
-            next_context.target_time       = t_hit;
-        } else {
-            // 타격 후 다음 타격 없음 (현재 위치 유지)
-            hold_position();
-
-            seg.start_time = rds[0].t;
-            seg.end_time   = rds[1].t;
-
-            next_context.state = State::HIT_TO_REST;
+            next_context_R.state               = (note_of_R(0) == 0) ? State::REST_TO_HIT : State::HIT_TO_HIT;
+            next_context_R.last_end_instrument = note_hit_R;
+            // next_context_R.last_end_position 은 select() 결과
         }
     }
 
-    seg.next_context = next_context;
+    // ===== L =====
+    if(note_of_L(0) == 0 && found_hit_L)
+    {
+        // 이전 이동 궤적 유지 (재선정 없음)
+        seg_L.start_instrument = context_L.last_start_instrument;
+        seg_L.end_instrument   = context_L.last_end_instrument;
+        seg_L.start_position   = context_L.last_start_position;
+        seg_L.end_position     = context_L.last_end_position;
+        seg_L.start_time       = context_L.last_t;
+        seg_L.end_time         = t_hit_L;
 
-    return seg;
+        next_context_L = context_L;
+    }
+    else
+    {
+        // 지금 서 있는(타격하는) 악기와 점
+        int cur_instrument_L = (note_of_L(0) == 0) ? context_L.last_end_instrument : note_of_L(0);
+        std::array<double, 3> cur_position_L = context_L.last_end_position;
+        if(note_of_L(0) != 0 && note_of_L(0) != context_L.last_end_instrument)
+        {
+            // 비행 없이 다른 악기를 치는 경우 (악보상 순간이동): 첫 후보로 점프. 경고 경로라 후보 선정은 안 한다
+            if(verbose) std::cerr << "[BaseMotionGenerator] 비행 없는 타격: t=" << rds[0].t << " arm=L instrument "
+                                  << context_L.last_end_instrument << " -> " << note_of_L(0) << "\n";
+            if (const auto* c = get_candidate_positions(Arm::LEFT, note_of_L(0))) cur_position_L = c->front();
+        }
+
+        seg_L.start_instrument = cur_instrument_L;
+        seg_L.start_position   = cur_position_L;
+        seg_L.start_time       = rds[0].t;
+
+        next_context_L.last_t                = rds[0].t;
+        next_context_L.last_start_instrument = cur_instrument_L;
+        next_context_L.last_start_position   = cur_position_L;
+
+        if(!need_select_L)
+        {
+            // 현 위치 유지
+            seg_L.end_instrument = cur_instrument_L;
+            seg_L.end_position   = cur_position_L;
+            seg_L.end_time       = rds[1].t;
+
+            next_context_L.state               = (note_of_L(0) == 0) ? State::REST_TO_REST : State::HIT_TO_REST;
+            next_context_L.last_end_instrument = cur_instrument_L;
+            next_context_L.last_end_position   = cur_position_L;
+        }
+        else
+        {
+            // 새 비행 시작: end_position 은 아래 select() 뒤에 채운다
+            seg_L.end_instrument = note_hit_L;
+            seg_L.end_time       = t_hit_L;
+
+            next_context_L.state               = (note_of_L(0) == 0) ? State::REST_TO_HIT : State::HIT_TO_HIT;
+            next_context_L.last_end_instrument = note_hit_L;
+            // next_context_L.last_end_position 은 select() 결과
+        }
+    }
+
+    // ===== 손목각 =====
+    // select_hit_position 이 반대손의 내 타격 시각 손목각을 보간하므로 select() 앞에서 채운다
+    seg_R.start_wrist_angle = get_wrist_angle(seg_R.start_instrument);
+    seg_R.end_wrist_angle   = get_wrist_angle(seg_R.end_instrument);
+    seg_L.start_wrist_angle = get_wrist_angle(seg_L.start_instrument);
+    seg_L.end_wrist_angle   = get_wrist_angle(seg_L.end_instrument);
+
+    // ===== end_position 선정 =====
+    if(need_select_R || need_select_L)
+    {
+        auto [end_R, end_L] = select_end_positions(seg_R, seg_L, need_select_R, need_select_L, verbose);
+        if(need_select_R) { seg_R.end_position = end_R;  next_context_R.last_end_position = end_R; }
+        if(need_select_L) { seg_L.end_position = end_L;  next_context_L.last_end_position = end_L; }
+    }
+
+    seg_R.next_context = next_context_R;
+    seg_L.next_context = next_context_L;
+
+    return std::pair<MotionSegment, MotionSegment>(seg_R, seg_L);
 }
 
-double BaseMotionGenerator::get_wrist_angle(Arm arm, int instrument) {
+double BaseMotionGenerator::get_wrist_angle(int instrument) {
     auto it = drum_coordinates.find(instrument);
     if (it == drum_coordinates.end()) return 0.0;
-    return (arm == Arm::RIGHT) ? it->second.right_wrist_angle : it->second.left_wrist_angle;
+    return it->second.wrist_angle;
 }
 
+// ===== 팔별 타격점 선정 기준 관련  =====
+
 const std::vector<std::array<double, 3>>* BaseMotionGenerator::get_candidate_positions(Arm arm, int instrument) {
+    // 인자로 받은 arm쪽 후보점 리스트를 반환.
     auto it = drum_coordinates.find(instrument);
     if (it == drum_coordinates.end()) return nullptr;
     return (arm == Arm::RIGHT) ? &it->second.right_candidate_positions : &it->second.left_candidate_positions;
 }
 
-BaseMotionGenerator::WaistFeasibility BaseMotionGenerator::sweep_arm_waist_feasibility(Arm arm, const std::array<double, 3>& position, double wrist_angle) {
+BaseMotionGenerator::WaistFeasibility BaseMotionGenerator::compute_feasible_waist_range(Arm arm, const std::array<double, 3>& position, double wrist_angle) {
+    /* 
+    카메라로 드럼을 스캔하여 후보점 생성
+    각 후보점에 대해 ROBOT::CANDIDATE_HAND_X_OFFSET 만큼 x 좌표를 이동시킨 각 팔에 대한 후보점을 개별 생성
+    right/left_candidate_positions에 저장
+    각 팔, 각 후보점에 대해 팔 단독으로 IK 해가 존재하는 범위를 계산하는 함수
+    */
     WaistFeasibility feasibility;
     const auto side = (arm == Arm::RIGHT) ? KinematicsSolver::ArmSide::RIGHT : KinematicsSolver::ArmSide::LEFT;
 
     for (int i = 0; i < NUM_WAIST_SAMPLES; i++) {
-        const double theta0 = waist_sample_angle(i);
-        feasibility[i] = solver.check_joint_limit(0, theta0)
-                      && solver.solve_arm_ik(position, theta0, wrist_angle, side, false).success;
+        const double theta0 = -0.5 * M_PI + M_PI / 1800.0 * i;      //theta_0 : -90 deg ~ 90 deg
+        feasibility[i] = solver.check_joint_limit(0, theta0) && solver.solve_arm_ik(position, theta0, wrist_angle, side, false).success;
     }
     return feasibility;
 }
 
-BaseMotionGenerator::WaistFeasibility BaseMotionGenerator::get_arm_waist_feasibility(Arm arm, const std::array<double, 3>& position, double wrist_angle) {
+BaseMotionGenerator::WaistFeasibility BaseMotionGenerator::get_feasible_waist_range(Arm arm, const std::array<double, 3>& position, double wrist_angle) {
+    // 후보점에 대한 허리 범위 조회
     const auto& cache = candidate_waist_feasibility[(arm == Arm::RIGHT) ? 0 : 1];
     auto it = cache.find(position);
     if (it != cache.end()) return it->second;
 
-    // 비행 중 보간점 (후보가 아님): 스윕만 하고 캐시에는 넣지 않는다
-    return sweep_arm_waist_feasibility(arm, position, wrist_angle);
+    // 비행 중 보간점에 대한 허리 범위 계산
+    return compute_feasible_waist_range(arm, position, wrist_angle);
 }
 
-BaseMotionGenerator::MotionSegment BaseMotionGenerator::make_segment_from_context(Arm arm, const MotionContext& context) {
-    MotionSegment seg{};
-    const bool flying = (context.state == State::REST_TO_HIT || context.state == State::HIT_TO_HIT);
+BaseMotionGenerator::CandidateScore BaseMotionGenerator::compute_candidate_scores(Arm arm, const MotionSegment& seg, const MotionSegment& other_seg) {
+    CandidateScore score;
+    const auto* candidates = get_candidate_positions(arm, seg.end_instrument);
+    if (!candidates) return score;
 
-    seg.start_position    = context.last_position;
-    seg.start_wrist_angle = get_wrist_angle(arm, context.last_instrument);
-    seg.start_instrument  = context.last_instrument;
-    seg.start_time        = context.last_t;
+    const Arm    other_arm = (arm == Arm::RIGHT) ? Arm::LEFT : Arm::RIGHT;
+    const double my_wrist  = get_wrist_angle(seg.end_instrument);
+    const auto&  other     = other_seg;
 
-    if (flying) {
-        seg.end_position    = context.target_position;
-        seg.end_wrist_angle = get_wrist_angle(arm, context.target_instrument);
-        seg.end_instrument  = context.target_instrument;
-        seg.end_time        = context.target_time;
-    } else {
-        seg.end_position    = seg.start_position;
-        seg.end_wrist_angle = seg.start_wrist_angle;
-        seg.end_instrument  = seg.start_instrument;
-        seg.end_time        = seg.start_time;
+    // 1) 반대손의 내 타격 시각 위치 → 반대팔 단독 허리 가능 집합 (실제 궤적과 같은 time_scaling + make_path)
+    const double s = time_scaling(0.0, other.end_time - other.start_time, seg.end_time - other.start_time); // 검증필요
+    const std::array<double, 3> other_position_at_hit = make_path(other.start_position, other.end_position, s);
+    const double other_wrist_at_hit = s * (other.end_wrist_angle - other.start_wrist_angle) + other.start_wrist_angle;
+    const WaistFeasibility other_arm_feasibility = get_feasible_waist_range(other_arm, other_position_at_hit, other_wrist_at_hit);
+
+    // 2) 같은 물리 악기 위의 반대손과 좌우 순서 제약 (R.x > L.x). 기준점: 반대손 도착점, 아직 도착 전이면 출발점도
+    std::vector<std::array<double, 3>> hand_order_anchors;
+    if (physical_instrument_id(other.end_instrument) == physical_instrument_id(seg.end_instrument)) {
+        hand_order_anchors.push_back(other.end_position);
+    }
+    if (s < 1.0 && physical_instrument_id(other.start_instrument) == physical_instrument_id(seg.end_instrument)) {
+        hand_order_anchors.push_back(other.start_position);
     }
 
-    seg.t0 = seg.start_time;
-    seg.t1 = seg.end_time;
-    return seg;
+    score.waist_width.reserve(candidates->size());
+    score.hand_order_ok.reserve(candidates->size());
+    for (const auto& candidate : *candidates) {
+        score.waist_width.push_back((int)(get_feasible_waist_range(arm, candidate, my_wrist) & other_arm_feasibility).count());
+        bool ok = true;
+        for (const auto& anchor : hand_order_anchors) {
+            ok = ok && ((arm == Arm::RIGHT) ? (candidate[0] > anchor[0]) : (candidate[0] < anchor[0]));
+        }
+        score.hand_order_ok.push_back(ok);
+    }
+
+    // 3) 같은 악기 반복 타격: 현 후보 인덱스 (closed/open hihat은 리스트가 z만 달라 같은 인덱스가 대응)
+    if (seg.start_instrument != 0 && physical_instrument_id(seg.start_instrument) == physical_instrument_id(seg.end_instrument)) {
+        const auto* start_candidates = get_candidate_positions(arm, seg.start_instrument);
+        if (start_candidates) {
+            auto it = std::find(start_candidates->begin(), start_candidates->end(), seg.start_position);
+            const size_t k = it - start_candidates->begin();
+            if (it != start_candidates->end() && k < candidates->size()) score.keep_idx = (int)k;
+        }
+    }
+    return score;
 }
 
-std::array<double, 3> BaseMotionGenerator::select_hit_position(Arm arm, int instrument, double hit_time,
-                                                               const MotionSegment& other_arm_segment,
-                                                               int start_instrument, const std::array<double, 3>& start_position,
-                                                               bool verbose) {
-    const auto* candidates = get_candidate_positions(arm, instrument);
+std::array<double, 3> BaseMotionGenerator::select_hit_position(Arm arm, const MotionSegment& seg, const MotionSegment& other_seg, bool verbose) {
+    const auto* candidates = get_candidate_positions(arm, seg.end_instrument);
     if (!candidates || candidates->empty()) {
-        return {0.0, 0.0, 0.0};   // 잘못된 악기 번호: 호출 측 note_to_target이 오류 플래그를 세운다
+        return {0.0, 0.0, 0.0};   // 좌표 없는 악기: 악보 파서(0~8)와 좌표 로더(1~9 필수)가 막으므로 정상 경로에선 오지 않는다
     }
     if (candidates->size() == 1) {
         return (*candidates)[0];  // 후보 1개 (대표점 폴백): 선택 없음
     }
 
-    const Arm    other_arm = (arm == Arm::RIGHT) ? Arm::LEFT : Arm::RIGHT;
-    const double my_wrist  = get_wrist_angle(arm, instrument);
-    const auto&  other     = other_arm_segment;
+    const CandidateScore score = compute_candidate_scores(arm, seg, other_seg);
+    const size_t n = candidates->size();
 
-    // 1) 반대손의 내 타격 시각 위치 → 반대팔 단독 허리 가능 집합 (실제 궤적과 같은 time_scaling + make_path)
-    const double s = time_scaling(0.0, other.end_time - other.start_time, hit_time - other.start_time);
-    const std::array<double, 3> other_position_at_hit = make_path(other.start_position, other.end_position, s);
-    const double other_wrist_at_hit = s * (other.end_wrist_angle - other.start_wrist_angle) + other.start_wrist_angle;
-    const WaistFeasibility other_arm_feasibility = get_arm_waist_feasibility(other_arm, other_position_at_hit, other_wrist_at_hit);
+    // 좌우 순서 제약: 만족 후보가 없으면 해제
+    const bool use_hand_order = std::any_of(score.hand_order_ok.begin(), score.hand_order_ok.end(), [](bool ok) { return ok; });
+    auto allowed = [&](size_t i) { return !use_hand_order || score.hand_order_ok[i]; };
 
-    auto feasible_waist_count = [&](const std::array<double, 3>& candidate) {
-        return (int)(get_arm_waist_feasibility(arm, candidate, my_wrist) & other_arm_feasibility).count();
-    };
-
-    // 2) 같은 물리 악기 위의 반대손과 좌우 순서 제약 (R.x > L.x). 기준점: 반대손 도착점, 아직 도착 전이면 출발점도
-    std::vector<std::array<double, 3>> hand_order_anchors;
-    if (physical_instrument_id(other.end_instrument) == physical_instrument_id(instrument)) {
-        hand_order_anchors.push_back(other.end_position);
-    }
-    if (s < 1.0 && physical_instrument_id(other.start_instrument) == physical_instrument_id(instrument)) {
-        hand_order_anchors.push_back(other.start_position);
-    }
-    auto satisfies_hand_order = [&](const std::array<double, 3>& candidate) {
-        for (const auto& anchor : hand_order_anchors) {
-            const bool ok = (arm == Arm::RIGHT) ? (candidate[0] > anchor[0]) : (candidate[0] < anchor[0]);
-            if (!ok) return false;
-        }
-        return true;
-    };
-    const bool use_hand_order = std::any_of(candidates->begin(), candidates->end(), satisfies_hand_order);   // 만족 후보가 없으면 제약 해제
-    auto allowed = [&](const std::array<double, 3>& candidate) { return !use_hand_order || satisfies_hand_order(candidate); };
-
-    // 3) 같은 악기 반복 타격: 현 후보 유지 (순서 제약 만족 + 폭 > 0 일 때)
+    // 같은 악기 반복 타격: 현 후보 유지 (순서 제약 만족 + 폭 > 0 일 때)
     int  chosen       = -1;
     bool keep_current = false;
-    if (start_instrument != 0 && physical_instrument_id(start_instrument) == physical_instrument_id(instrument)) {
-        const auto* start_candidates = get_candidate_positions(arm, start_instrument);
-        if (start_candidates) {
-            auto it = std::find(start_candidates->begin(), start_candidates->end(), start_position);
-            const size_t k = it - start_candidates->begin();   // closed/open hihat은 리스트가 z만 달라 같은 인덱스가 대응
-            if (it != start_candidates->end() && k < candidates->size()
-                && allowed((*candidates)[k]) && feasible_waist_count((*candidates)[k]) > 0) {
-                chosen = (int)k;
-                keep_current = true;
-            }
-        }
+    if (score.keep_idx >= 0 && allowed(score.keep_idx) && score.waist_width[score.keep_idx] > 0) {
+        chosen       = score.keep_idx;
+        keep_current = true;
     }
 
-    // 4) 허리 가능 폭 최대 후보 (동률: 낮은 인덱스)
+    // 허리 가능 폭 최대 후보 (동률: 낮은 인덱스)
     if (chosen < 0) {
         int best_count = -1;
-        for (size_t i = 0; i < candidates->size(); i++) {
-            if (!allowed((*candidates)[i])) continue;
-            const int count = feasible_waist_count((*candidates)[i]);
-            if (count > best_count) { best_count = count; chosen = (int)i; }
+        for (size_t i = 0; i < n; i++) {
+            if (!allowed(i)) continue;
+            if (score.waist_width[i] > best_count) { best_count = score.waist_width[i]; chosen = (int)i; }
         }
         if (best_count == 0) {
             // 반대손 위치와 양립하는 허리각이 없음: 내 팔 단독 폭 최대로 폴백 (이후 compute_waist_range가 오류 처리)
-            for (size_t i = 0; i < candidates->size(); i++) {
-                const int count = (int)get_arm_waist_feasibility(arm, (*candidates)[i], my_wrist).count();
+            const double my_wrist = get_wrist_angle(seg.end_instrument);
+            for (size_t i = 0; i < n; i++) {
+                const int count = (int)get_feasible_waist_range(arm, (*candidates)[i], my_wrist).count();
                 if (count > best_count) { best_count = count; chosen = (int)i; }
             }
         }
     }
 
     if (verbose) {
-        std::cerr << "[BaseMotionGenerator] select t=" << hit_time
+        const double s = time_scaling(0.0, other_seg.end_time - other_seg.start_time, seg.end_time - other_seg.start_time);
+        std::cerr << "[BaseMotionGenerator] select t=" << seg.end_time
                   << " arm=" << (arm == Arm::RIGHT ? "R" : "L")
-                  << " instrument=" << instrument
-                  << " candidate=" << chosen << "/" << candidates->size()
+                  << " instrument=" << seg.end_instrument
+                  << " candidate=" << chosen << "/" << n
                   << " position=[" << (*candidates)[chosen][0] << ", " << (*candidates)[chosen][1] << ", " << (*candidates)[chosen][2] << "]"
-                  << " waist_width=" << feasible_waist_count((*candidates)[chosen]) * 0.1 << "deg"
+                  << " waist_width=" << score.waist_width[chosen] * 0.1 << "deg"
                   << " keep_current=" << keep_current
-                  << " hand_order=" << hand_order_anchors.size()
-                  << " | other instrument=" << other.end_instrument
+                  << " hand_order=" << use_hand_order
+                  << " | other instrument=" << other_seg.end_instrument
                   << ((s > 0.0 && s < 1.0) ? " flying" : " rest") << "\n";
     }
 
     return (*candidates)[chosen];
 }
 
-void BaseMotionGenerator::note_to_target(int note_num, Arm arm, std::array<double, 3>& out_position, double& out_wrist_angle_deg) {
-    auto it = drum_coordinates.find(note_num);
-    if (it == drum_coordinates.end()) {
-        std::cerr << "[BaseMotionGenerator] note_to_target: invalid note number "
-                  << note_num << "\n";
-        out_position = {0.0, 0.0, 0.0};
-        out_wrist_angle_deg = 0.0;
-        base_end_error = true;  // 악보 오류: 연주 종료
-        return;
+std::pair<std::array<double, 3>, std::array<double, 3>> BaseMotionGenerator::select_end_positions(const MotionSegment& seg_R, const MotionSegment& seg_L,
+                                                                                    bool need_select_R, bool need_select_L, bool verbose) {
+    std::array<double, 3> end_R = seg_R.end_position;   // 선정 안 하는 팔은 그대로 돌려준다
+    std::array<double, 3> end_L = seg_L.end_position;
+
+    const auto* candidates_R = get_candidate_positions(Arm::RIGHT, seg_R.end_instrument);
+    const auto* candidates_L = get_candidate_positions(Arm::LEFT,  seg_L.end_instrument);
+    const size_t n_R = candidates_R ? candidates_R->size() : 0;
+    const size_t n_L = candidates_L ? candidates_L->size() : 0;
+
+    bool pending_R = need_select_R;
+    bool pending_L = need_select_L;
+
+    // 후보가 0~1개인 팔은 선택의 여지가 없다 → 먼저 확정하고 선택 대상에서 제외 (select_hit_position 의 즉시 반환 경로)
+    MotionSegment fixed_R = seg_R, fixed_L = seg_L;
+    if (pending_R && n_R <= 1) { end_R = fixed_R.end_position = select_hit_position(Arm::RIGHT, seg_R, seg_L, verbose); pending_R = false; }
+    if (pending_L && n_L <= 1) { end_L = fixed_L.end_position = select_hit_position(Arm::LEFT,  seg_L, seg_R, verbose); pending_L = false; }
+
+    // 한 손만: 상대는 확정 → 기존 단일 선정 그대로
+    if (pending_R != pending_L) {
+        if (pending_R) end_R = select_hit_position(Arm::RIGHT, seg_R, fixed_L, verbose);
+        else               end_L = select_hit_position(Arm::LEFT,  seg_L, fixed_R, verbose);
+        return {end_R, end_L};
     }
-    const InstrumentCoordinate& coord = it->second;
-    if (arm == Arm::RIGHT) { out_position = coord.right_position; out_wrist_angle_deg = coord.right_wrist_angle; }
-    else                   { out_position = coord.left_position;  out_wrist_angle_deg = coord.left_wrist_angle; }
+    if (!pending_R) return {end_R, end_L};
+
+    // ===== 양손 쌍 탐색 =====
+    // 상대 후보 j 마다 내 후보 전체 평가 → 스윕은 N+M 회 (동시 타격이면 보간점 = 후보 → 캐시 히트 0회)
+    std::vector<CandidateScore> scores_R(n_L);   // scores_R[j].waist_width[i] : L 이 j 로 갈 때 R 후보 i 의 폭
+    std::vector<CandidateScore> scores_L(n_R);   // scores_L[i].waist_width[j] : R 이 i 로 갈 때 L 후보 j 의 폭
+    MotionSegment tmp_R = seg_R, tmp_L = seg_L;
+    for (size_t j = 0; j < n_L; j++) { tmp_L.end_position = (*candidates_L)[j]; scores_R[j] = compute_candidate_scores(Arm::RIGHT, seg_R, tmp_L); }
+    for (size_t i = 0; i < n_R; i++) { tmp_R.end_position = (*candidates_R)[i]; scores_L[i] = compute_candidate_scores(Arm::LEFT,  seg_L, tmp_R); }
+
+    auto pair_width = [&](size_t i, size_t j) { return std::min(scores_R[j].waist_width[i], scores_L[i].waist_width[j]); };   // 허리는 좁은 손이 병목
+    auto pair_order = [&](size_t i, size_t j) { return scores_R[j].hand_order_ok[i] && scores_L[i].hand_order_ok[j]; };
+
+    bool use_hand_order = false;   // 만족 쌍이 없으면 제약 해제
+    for (size_t i = 0; i < n_R && !use_hand_order; i++) {
+        for (size_t j = 0; j < n_L && !use_hand_order; j++) use_hand_order = pair_order(i, j);
+    }
+
+    const int keep_idx_R = scores_R[0].keep_idx;   // 반대손 무관
+    const int keep_idx_L = scores_L[0].keep_idx;
+
+    // 탐색 집합을 좁은 것부터 (같은 악기 반복 유지 우선): {kR}×{kL} → {kR}×전체 → 전체×{kL} → 전체×전체. 최선 폭 > 0 인 첫 집합에서 멈춤
+    struct Range { size_t lo, hi; };   // [lo, hi)
+    const Range all_R{0, n_R}, all_L{0, n_L};
+    const Range keep_R{(size_t)std::max(keep_idx_R, 0), (size_t)std::max(keep_idx_R, 0) + 1};
+    const Range keep_L{(size_t)std::max(keep_idx_L, 0), (size_t)std::max(keep_idx_L, 0) + 1};
+    std::vector<std::pair<Range, Range>> passes;
+    if (keep_idx_R >= 0 && keep_idx_L >= 0) passes.push_back({keep_R, keep_L});
+    if (keep_idx_R >= 0)                    passes.push_back({keep_R, all_L});
+    if (keep_idx_L >= 0)                    passes.push_back({all_R, keep_L});
+    passes.push_back({all_R, all_L});
+
+    int best_i = -1, best_j = -1, best_width = -1;
+    for (const auto& [range_R, range_L] : passes) {
+        best_i = -1; best_j = -1; best_width = -1;
+        for (size_t i = range_R.lo; i < range_R.hi; i++) {
+            for (size_t j = range_L.lo; j < range_L.hi; j++) {
+                if (use_hand_order && !pair_order(i, j)) continue;
+                const int width = pair_width(i, j);
+                if (width > best_width) { best_width = width; best_i = (int)i; best_j = (int)j; }   // 동률: 낮은 i, 낮은 j
+            }
+        }
+        if (best_width > 0) break;
+    }
+
+    if (best_width <= 0) {
+        // 반대손과 양립하는 허리각이 없음: 팔별 단독 폭 최대로 폴백 (이후 compute_waist_range가 오류 처리)
+        auto solo_best = [&](Arm arm, const std::vector<std::array<double, 3>>& candidates, int instrument) {
+            const double wrist = get_wrist_angle(instrument);
+            int best = 0, best_count = -1;
+            for (size_t i = 0; i < candidates.size(); i++) {
+                const int count = (int)get_feasible_waist_range(arm, candidates[i], wrist).count();
+                if (count > best_count) { best_count = count; best = (int)i; }
+            }
+            return best;
+        };
+        best_i = solo_best(Arm::RIGHT, *candidates_R, seg_R.end_instrument);
+        best_j = solo_best(Arm::LEFT,  *candidates_L, seg_L.end_instrument);
+    }
+
+    if (verbose) {
+        std::cerr << "[BaseMotionGenerator] select pair t_R=" << seg_R.end_time << " t_L=" << seg_L.end_time
+                  << " R instrument=" << seg_R.end_instrument << " candidate=" << best_i << "/" << n_R
+                  << " L instrument=" << seg_L.end_instrument << " candidate=" << best_j << "/" << n_L
+                  << " width=" << std::max(best_width, 0) * 0.1 << "deg"
+                  << " keep_idx=" << keep_idx_R << "," << keep_idx_L
+                  << " hand_order=" << use_hand_order << "\n";
+    }
+
+    return {(*candidates_R)[best_i], (*candidates_L)[best_j]};
 }
+
+std::pair<std::array<double, 3>, std::array<double, 3>> BaseMotionGenerator::get_end_positions(const MotionSegment& seg_R, const MotionSegment& seg_L,
+                                                                                    bool need_select_R, bool need_select_L, bool verbose) 
+{
+    // 반환값
+    std::array<double, 3> end_pos_R = seg_R.end_position;
+    std::array<double, 3> end_pos_L = seg_L.end_position;
+
+    // 후보점 position 로드
+    const std::vector<std::array<double, 3>>* candidates_R = get_candidate_positions(Arm::RIGHT, seg_R.end_instrument);
+    const std::vector<std::array<double, 3>>* candidates_L = get_candidate_positions(Arm::LEFT,  seg_L.end_instrument);
+
+    // 후보점 개수
+    const size_t num_cand_R = candidates_R ? candidates_R->size() : 0;
+    const size_t num_cand_L = candidates_L ? candidates_L->size() : 0;
+
+    // 선정 여부 복사
+    bool pending_R = need_select_R;
+    bool pending_L = need_select_L;
+
+    // 후보가 0~1개인 팔 예외처리
+    // todo : fallback 좌표를 선정. 현재는 center임. 근데 bell류는 중심 치면 안됨.
+    MotionSegment fixed_R = seg_R, fixed_L = seg_L;
+    if (pending_R && num_cand_R <= 1) { end_pos_R = fixed_R.end_position = get_fallback_position(Arm::RIGHT, seg_R.end_instrument); pending_R = false; }
+    if (pending_L && num_cand_L <= 1) { end_pos_L = fixed_L.end_position = get_fallback_position(Arm::LEFT, seg_L.end_instrument); pending_L = false; }
+
+    // 한 손만 선정
+    if (pending_R != pending_L) {
+        if (pending_R) end_pos_R = select_hit_position(Arm::RIGHT, seg_R, fixed_L, verbose);
+        else           end_pos_L = select_hit_position(Arm::LEFT,  seg_L, fixed_R, verbose);
+        return {end_pos_R, end_pos_L};
+    }
+    if (!pending_R) return {end_pos_R, end_pos_L};
+
+
+    return {end_pos_R, end_pos_L};
+}
+
+std::array<double, 3> BaseMotionGenerator::get_fallback_position(Arm arm, int instrument){
+
+}
+
+// =====================================
 
 double BaseMotionGenerator::time_scaling(double ti, double tf, double t) {
     if (tf <= ti) {
@@ -584,9 +767,7 @@ std::pair<double, std::array<double, 2>> BaseMotionGenerator::get_waist_angle(co
     MotionContext tmp_context_L = left_context;
 
     for (int i = 0; i < (int)rds.size() - 1; i++) {
-        std::vector<DrumEvent> rds_from_i(rds.begin() + i, rds.end());
-        MotionSegment seg_R = get_motion_segment(rds_from_i, Arm::RIGHT, tmp_context_R, make_segment_from_context(Arm::LEFT, tmp_context_L));
-        MotionSegment seg_L = get_motion_segment(rds_from_i, Arm::LEFT,  tmp_context_L, seg_R);
+        auto [seg_R, seg_L] = get_motion_segments(std::vector<DrumEvent>(rds.begin() + i, rds.end()), tmp_context_R, tmp_context_L);
 
         if (i + 1 == idx) {
             double t_R = seg_R.t1 - seg_R.start_time;
@@ -618,7 +799,7 @@ std::pair<double, std::array<double, 2>> BaseMotionGenerator::compute_waist_rang
     int num_sol = 0;
 
     for (int i = 0; i < NUM_WAIST_SAMPLES; i++) {
-        double the0 = waist_sample_angle(i);  // 범위 : -90deg ~ 90deg
+        double the0 = -0.5 * M_PI + M_PI / 1800.0 * i;  //theta_0 : -90 deg ~ 90 deg
 
         KinematicsSolver::IKResult result = solver.solve_ik(pR, pL, the0, the7, the8, false);
 

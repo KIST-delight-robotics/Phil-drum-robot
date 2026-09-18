@@ -20,7 +20,7 @@ HeadMotionPoint HeadMotionGenerator::reset(int note_r) {
 
     HeadMotionPoint point;
     point.pitch = ready_angle;
-    point.yaw = std::atan2(drum_coordinates[note_r].right_position[1], drum_coordinates[note_r].right_position[0]) - 90.0*M_PI/180.0;
+    point.yaw = std::atan2(drum_coordinates[note_r].center[1], drum_coordinates[note_r].center[0]) - 90.0*M_PI/180.0;
 
     return point;
 }
@@ -40,9 +40,9 @@ std::queue<HeadMotionPoint> HeadMotionGenerator::generate_motion(const std::vect
 
     // TODO: 오른손만 따라가는게 급하게 움직이거나 왼팔만 타격이 있을 때 어색해 보임 
     double cur_angle = (cur_note == 0) ? 0.0 : 
-        std::atan2(drum_coordinates[cur_note].right_position[1], drum_coordinates[cur_note].right_position[0]);
+        std::atan2(drum_coordinates[cur_note].center[1], drum_coordinates[cur_note].center[0]);
     double next_angle = (next_note == 0) ? 0.0 : 
-        std::atan2(drum_coordinates[next_note].right_position[1], drum_coordinates[next_note].right_position[0]);
+        std::atan2(drum_coordinates[next_note].center[1], drum_coordinates[next_note].center[0]);
 
     double nod_intensity = get_nod_intensity(rds);
 

@@ -1,4 +1,6 @@
 #include "vision/drum_detector.hpp"
+#include "nlohmann/json.hpp"
+#include <map>
 
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
@@ -145,7 +147,7 @@ bool DrumDetector::run_scan() {
         dump_candidates_csv("drumrobot_server/data/scan/scan_" + ts + "_drum_candidates.csv", drum_candidates);
         visualize_drums(drum_clouds, drum_candidates);
 
-        return write_results(drum_candidates, ts);
+        return write_results(drum_coeffs, drum_candidates, ts);
     } catch (const std::exception &e) {
         std::cerr << "[DrumDetector] 예외 발생: " << e.what() << " — 스캔 중단\n";
         return false;
@@ -760,27 +762,54 @@ void DrumDetector::visualize_drums(const std::vector<pcl::PointCloud<pcl::PointX
 // =============================================================
 // 결과 저장
 // =============================================================
-bool DrumDetector::write_results(const std::vector<std::vector<Eigen::VectorXd>> &drum_candidates, const std::string &ts) {
+bool DrumDetector::write_results(const std::vector<pcl::ModelCoefficients::Ptr> &drum_coeffs,
+                                 const std::vector<std::vector<Eigen::VectorXd>> &drum_candidates, const std::string &ts) {
     namespace fs = std::filesystem;
 
-    // 스캔 산출물은 이 파일 하나. drum_coordinate.json(대표점·손목각)은 읽지도 쓰지도 않는다.
-    const std::string candidates_path = "drumrobot_server/config/drum_candidates.json";
+    // 악기 파일 하나(drum_coordinate.json)에 원 중심·반지름·법선·후보를 갱신한다. 손목각은 스캔 대상이 아니라 기존 파일 값을 보존
+    const std::string config_path = "drumrobot_server/config/drum_coordinate.json";
 
-    if (drum_candidates.size() != static_cast<size_t>(NUM_CIRCLES)) {
-        std::cerr << "[DrumDetector] 후보 목록이 " << NUM_CIRCLES << "개 악기가 아님 (n="
-                  << drum_candidates.size() << ") — 저장 중단\n";
+    if (drum_coeffs.size() != static_cast<size_t>(NUM_CIRCLES) || drum_candidates.size() != static_cast<size_t>(NUM_CIRCLES)) {
+        std::cerr << "[DrumDetector] 검출 결과가 " << NUM_CIRCLES << "개 악기가 아님 (coeffs=" << drum_coeffs.size()
+                  << ", candidates=" << drum_candidates.size() << ") — 저장 중단\n";
         return false;
     }
 
-    // 검출 결과(레거시 좌표계)를 서버 좌표계로 변환
+    // 기존 파일의 손목각 (파일이 없거나 항목이 없으면 10도)
+    std::map<std::string, double> wrist_angle_deg;
+    {
+        std::ifstream ifs(config_path);
+        if (ifs.is_open()) {
+            try {
+                nlohmann::json root;
+                ifs >> root;
+                for (const auto &inst : root.at("instruments")) {
+                    wrist_angle_deg[inst.at("name").get<std::string>()] = inst.value("wrist_angle_deg", 10.0);
+                }
+            } catch (const std::exception &e) {
+                std::cerr << "[DrumDetector] " << config_path << " 읽기 실패 (" << e.what() << ") — 손목각 기본값 10도 사용\n";
+            }
+        }
+    }
+    auto wrist_of = [&](const std::string &name) {
+        auto it = wrist_angle_deg.find(name);
+        return (it == wrist_angle_deg.end()) ? 10.0 : it->second;
+    };
+
+    // 검출 결과(레거시 좌표계)를 서버 좌표계로 변환 (z 평행이동 — 법선은 불변)
     auto round3 = [](double v) { return std::round(v * 1000.0) / 1000.0; };
     auto to_server = [&](const Eigen::VectorXd &p) {
         return std::array<double, 3>{round3(p(0)), round3(p(1)), round3(p(2) - LEGACY_TO_SERVER_Z)};
     };
-    auto fmt_pos = [](const std::array<double, 3> &p) {
+    auto fmt_vec = [](const std::array<double, 3> &p) {
         std::ostringstream oss;
         oss << std::fixed << std::setprecision(3)
             << "[" << p[0] << ", " << p[1] << ", " << p[2] << "]";
+        return oss.str();
+    };
+    auto fmt_num = [](double v, int precision) {
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(precision) << v;
         return oss.str();
     };
     auto instrument_name_of_id = [](int id) {
@@ -789,40 +818,51 @@ bool DrumDetector::write_results(const std::vector<std::vector<Eigen::VectorXd>>
     };
 
     // .tmp에 쓰고 rename — 중간 크래시에도 반쯤 쓰인 파일이 남지 않음
-    const std::string tmp_path = candidates_path + ".tmp";
+    const std::string tmp_path = config_path + ".tmp";
     {
         std::ofstream ofs(tmp_path);
         if (!ofs.is_open()) {
             std::cerr << "[DrumDetector] " << tmp_path << " 쓰기 실패 — 저장 중단\n";
             return false;
         }
-        // 악기 한 줄: 후보를 서버 좌표계로 변환하고 z_shift(open hihat용)를 더해 기록
-        auto write_instrument = [&](int id, const std::vector<Eigen::VectorXd> &cand, double z_shift, bool last) {
-            ofs << "    { \"name\": \"" << instrument_name_of_id(id) << "\", \"candidates\": [";
+        // 악기 한 항목: 중심·반지름·법선은 원 계수에서, 후보는 select_candidates 결과에서. z_shift 는 open hihat 용
+        auto write_instrument = [&](int id, const pcl::ModelCoefficients::Ptr &coeffs, const std::vector<Eigen::VectorXd> &cand, double z_shift, bool last) {
+            const std::string name = instrument_name_of_id(id);
+            const std::array<double, 3> center = {round3(coeffs->values[0]), round3(coeffs->values[1]),
+                                                  round3(coeffs->values[2] - LEGACY_TO_SERVER_Z + z_shift)};
+            Eigen::Vector3d n(coeffs->values[4], coeffs->values[5], coeffs->values[6]);
+            n.normalize();
+            if (n.z() < 0.0) n = -n;   // 위쪽(+z)을 향하게
+            const std::array<double, 3> normal = {round3(n.x()), round3(n.y()), round3(n.z())};
+
+            ofs << "    { \"name\": \"" << name << "\", \"wrist_angle_deg\": " << fmt_num(wrist_of(name), 1) << ",\n"
+                << "      \"center\": " << fmt_vec(center) << ", \"radius\": " << fmt_num(round3(coeffs->values[3]), 3)
+                << ", \"normal\": " << fmt_vec(normal) << ",\n"
+                << "      \"candidates\": [";
             for (size_t j = 0; j < cand.size(); j++) {
                 std::array<double, 3> p = to_server(cand[j]);
                 p[2] = round3(p[2] + z_shift);
-                ofs << (j > 0 ? ", " : "") << fmt_pos(p);
+                ofs << (j > 0 ? ", " : "") << fmt_vec(p);
             }
             ofs << "] }" << (last ? "" : ",") << "\n";
         };
 
         ofs << "{\n  \"scan_timestamp\": \"" << ts << "\",\n  \"instruments\": [\n";
         for (int id = 1; id <= NUM_CIRCLES; id++) {       // drum_id 1..8 == 악기 id (index_circles가 정렬)
-            write_instrument(id, drum_candidates[id - 1], 0.0, false);
+            write_instrument(id, drum_coeffs[id - 1], drum_candidates[id - 1], 0.0, false);
         }
-        // open hihat(9) = closed hihat(5) 후보에서 z만 +OPEN_HIHAT_Z_OFFSET (같은 물리 심벌)
-        write_instrument(9, drum_candidates[5 - 1], ROBOT::OPEN_HIHAT_Z_OFFSET, true);
+        // open hihat(9) = closed hihat(5) 의 중심·후보에서 z만 +OPEN_HIHAT_Z_OFFSET (같은 물리 심벌)
+        write_instrument(9, drum_coeffs[5 - 1], drum_candidates[5 - 1], ROBOT::OPEN_HIHAT_Z_OFFSET, true);
         ofs << "  ]\n}\n";
     }
     try {
-        fs::rename(tmp_path, candidates_path);
+        fs::rename(tmp_path, config_path);
     } catch (const std::exception &e) {
-        std::cerr << "[DrumDetector] " << candidates_path << " 교체 실패: " << e.what() << "\n";
+        std::cerr << "[DrumDetector] " << config_path << " 교체 실패: " << e.what() << "\n";
         return false;
     }
 
-    std::cout << "[DrumDetector] " << candidates_path << " 저장 완료 (악기 " << NUM_CIRCLES + 1 << "개, open hihat 포함)\n";
+    std::cout << "[DrumDetector] " << config_path << " 저장 완료 (악기 " << NUM_CIRCLES + 1 << "개, open hihat 포함)\n";
     return true;
 }
 
