@@ -2,3 +2,11 @@
 drumrobot_server/log/
 drumrobot_server/obj/
 drumrobot_server/bin/*.out
+drumrobot_server/data/scan/
+
+Phil_Live_plotter/logs/
+Phil_Live_plotter/docs/
+
+
+__pycache__/
+*.pyc
