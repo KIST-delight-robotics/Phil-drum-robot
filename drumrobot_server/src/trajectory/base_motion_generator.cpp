@@ -3,7 +3,16 @@
 #include <algorithm>
 
 BaseMotionGenerator::BaseMotionGenerator() {
-
+    // 창(rds[0] ~ rds[1])마다 한 행. state: hold(고정) / new(이번 창에서 출발, 선정) / flying(비행 중, 잠김)
+    std::vector<std::string> header = {"song_t", "t1"};
+    for (const std::string arm : {"R", "L"}) {
+        for (const std::string col : {"state", "note_now", "start_inst", "end_inst", "start_time", "end_time", "cand", "n_cand",
+                                      "x", "y", "z", "mode", "keep_idx", "hand_order", "width_deg", "order_ok"}) {
+            header.push_back(arm + "_" + col);
+        }
+    }
+    for (const std::string col : {"waist_t0_deg", "waist_t1_deg", "waist_min_t1_deg", "waist_max_t1_deg"}) header.push_back(col);
+    select_log.set_header(header);
 }
 
 BaseMotionGenerator::~BaseMotionGenerator() {
@@ -102,11 +111,45 @@ std::queue<BaseMotionPoint> BaseMotionGenerator::generate_motion(const std::vect
         return out;
     }
 
+    select_trace = {};
     std::pair<MotionSegment, MotionSegment> segments = get_motion_segments(rds, right_context, left_context, true);   // verbose: 선택 로그
     MotionSegment seg_R = segments.first;
     MotionSegment seg_L = segments.second;
 
     WaistSegment seg_w = get_waist_segment(rds);
+
+    // ===== 선정 로그 =====
+    {
+        auto num = [](double v) { std::ostringstream os; os << std::fixed << std::setprecision(4) << v; return os.str(); };
+        auto deg = [&](double rad) { return num(rad * 180.0 / M_PI); };
+        std::vector<std::string> row = {num(rds[0].t), num(rds[1].t)};
+        for (Arm arm : {Arm::RIGHT, Arm::LEFT}) {
+            const MotionSegment& seg = (arm == Arm::RIGHT) ? seg_R : seg_L;
+            const SelectTrace& tr = select_trace[arm == Arm::RIGHT ? 0 : 1];
+            const bool flying = (seg.next_context.state == State::REST_TO_HIT || seg.next_context.state == State::HIT_TO_HIT);
+            const auto* cands = get_candidate_positions(arm, seg.end_instrument);
+            int cand = -1;
+            if (cands) {
+                auto it = std::find(cands->begin(), cands->end(), seg.end_position);
+                if (it != cands->end()) cand = (int)(it - cands->begin());
+            }
+            std::string widths, order_ok;
+            for (size_t i = 0; i < tr.waist_width.size(); i++) {
+                widths   += (i ? "|" : "") + num(tr.waist_width[i] * 0.1);
+                order_ok += (i ? "|" : "") + std::to_string((int)tr.hand_order_ok[i]);
+            }
+            row.insert(row.end(), {
+                !flying ? "hold" : (seg.start_time < rds[0].t ? "flying" : "new"),
+                std::to_string(arm == Arm::RIGHT ? rds[0].note_num_R : rds[0].note_num_L),
+                std::to_string(seg.start_instrument), std::to_string(seg.end_instrument),
+                num(seg.start_time), num(seg.end_time),
+                std::to_string(cand), std::to_string(cands ? cands->size() : 0),
+                num(seg.end_position[0]), num(seg.end_position[1]), num(seg.end_position[2]),
+                tr.mode, std::to_string(tr.keep_idx), std::to_string((int)tr.hand_order), widths, order_ok});
+        }
+        row.insert(row.end(), {deg(seg_w.q0), deg(seg_w.q1), deg(cur_q0_min), deg(cur_q0_max)});
+        select_log.record(row);
+    }
 
     right_context = seg_R.next_context; // context update
     left_context = seg_L.next_context;
@@ -466,6 +509,7 @@ std::array<double, 3> BaseMotionGenerator::select_hit_position(Arm arm, const Mo
     }
 
     // 허리 가능 폭 최대 후보 (동률: 낮은 인덱스)
+    bool fallback = false;
     if (chosen < 0) {
         int best_count = -1;
         for (size_t i = 0; i < n; i++) {
@@ -474,6 +518,7 @@ std::array<double, 3> BaseMotionGenerator::select_hit_position(Arm arm, const Mo
         }
         if (best_count == 0) {
             // 반대손 위치와 양립하는 허리각이 없음: 내 팔 단독 폭 최대로 폴백 (이후 compute_waist_range가 오류 처리)
+            fallback = true;
             const double my_wrist = get_wrist_angle(seg.end_instrument);
             for (size_t i = 0; i < n; i++) {
                 const int count = (int)get_feasible_waist_range(arm, (*candidates)[i], my_wrist).count();
@@ -483,6 +528,8 @@ std::array<double, 3> BaseMotionGenerator::select_hit_position(Arm arm, const Mo
     }
 
     if (verbose) {
+        select_trace[arm == Arm::RIGHT ? 0 : 1] = {keep_current ? "keep" : (fallback ? "fallback" : "single"),
+                                                   score.keep_idx, use_hand_order, score.waist_width, score.hand_order_ok};
         const double s = time_scaling(0.0, other_seg.end_time - other_seg.start_time, seg.end_time - other_seg.start_time);
         std::cerr << "[BaseMotionGenerator] select t=" << seg.end_time
                   << " arm=" << (arm == Arm::RIGHT ? "R" : "L")
@@ -584,6 +631,14 @@ std::pair<std::array<double, 3>, std::array<double, 3>> BaseMotionGenerator::sel
     }
 
     if (verbose) {
+        // 각 손 후보별 쌍 폭 (상대는 최종 선정 후보로 고정)
+        SelectTrace& trace_R = select_trace[0];
+        SelectTrace& trace_L = select_trace[1];
+        trace_R = {best_width > 0 ? "pair" : "pair_fallback", keep_idx_R, use_hand_order, {}, {}};
+        trace_L = {trace_R.mode, keep_idx_L, use_hand_order, {}, {}};
+        for (size_t i = 0; i < n_R; i++) { trace_R.waist_width.push_back(pair_width(i, best_j)); trace_R.hand_order_ok.push_back(pair_order(i, best_j)); }
+        for (size_t j = 0; j < n_L; j++) { trace_L.waist_width.push_back(pair_width(best_i, j)); trace_L.hand_order_ok.push_back(pair_order(best_i, j)); }
+
         std::cerr << "[BaseMotionGenerator] select pair t_R=" << seg_R.end_time << " t_L=" << seg_L.end_time
                   << " R instrument=" << seg_R.end_instrument << " candidate=" << best_i << "/" << n_R
                   << " L instrument=" << seg_L.end_instrument << " candidate=" << best_j << "/" << n_L
@@ -594,7 +649,7 @@ std::pair<std::array<double, 3>, std::array<double, 3>> BaseMotionGenerator::sel
 
     return {(*candidates_R)[best_i], (*candidates_L)[best_j]};
 }
-
+/*
 std::pair<std::array<double, 3>, std::array<double, 3>> BaseMotionGenerator::get_end_positions(const MotionSegment& seg_R, const MotionSegment& seg_L,
                                                                                     bool need_select_R, bool need_select_L, bool verbose) 
 {
@@ -635,7 +690,7 @@ std::pair<std::array<double, 3>, std::array<double, 3>> BaseMotionGenerator::get
 std::array<double, 3> BaseMotionGenerator::get_fallback_position(Arm arm, int instrument){
 
 }
-
+*/
 // =====================================
 
 double BaseMotionGenerator::time_scaling(double ti, double tf, double t) {

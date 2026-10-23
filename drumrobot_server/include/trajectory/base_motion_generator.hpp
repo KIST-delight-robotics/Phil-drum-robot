@@ -108,9 +108,22 @@ private:
     // 새 비행을 시작하는 팔의 end_position 선정. 한 손이면 select_hit_position, 양손이면 (i, j) 쌍 탐색 (폭 = 두 손 중 작은 쪽)
     std::pair<std::array<double, 3>, std::array<double, 3>> select_end_positions(const MotionSegment& seg_R, const MotionSegment& seg_L, bool need_select_R, bool need_select_L, bool verbose);
     std::array<double, 3> select_hit_position(Arm arm, const MotionSegment& seg, const MotionSegment& other_seg, bool verbose);
+
+    // 선정 근거 기록 (verbose 호출만). generate_motion 이 창마다 select 로그 한 행으로 남긴다
+    struct SelectTrace {
+        std::string mode;                  // "" 선정 없음 / single / keep / fallback / pair / pair_fallback
+        int  keep_idx   = -1;
+        bool hand_order = false;           // 좌우 순서 제약 적용 여부
+        std::vector<int>  waist_width;     // 후보별 점수 (pair: 상대 확정 후보와의 쌍 폭 = min)
+        std::vector<bool> hand_order_ok;
+    };
+    std::array<SelectTrace, 2> select_trace;   // [R, L]
+    Logger select_log{"select"};
+    /*
     std::pair<std::array<double, 3>, std::array<double, 3>> get_end_positions(const MotionSegment& seg_R, const MotionSegment& seg_L,
                                                                                     bool need_select_R, bool need_select_L, bool verbose);
     std::array<double, 3> get_fallback_position(Arm arm, int instrument);
+    */
 // ========================================
 
     double time_scaling(double ti, double tf, double t);

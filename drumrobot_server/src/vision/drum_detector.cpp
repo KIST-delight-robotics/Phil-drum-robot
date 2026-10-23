@@ -838,13 +838,13 @@ bool DrumDetector::write_results(const std::vector<pcl::ModelCoefficients::Ptr> 
             ofs << "    { \"name\": \"" << name << "\", \"wrist_angle_deg\": " << fmt_num(wrist_of(name), 1) << ",\n"
                 << "      \"center\": " << fmt_vec(center) << ", \"radius\": " << fmt_num(round3(coeffs->values[3]), 3)
                 << ", \"normal\": " << fmt_vec(normal) << ",\n"
-                << "      \"candidates\": [";
+                << "      \"candidates\": [\n";
             for (size_t j = 0; j < cand.size(); j++) {
                 std::array<double, 3> p = to_server(cand[j]);
                 p[2] = round3(p[2] + z_shift);
-                ofs << (j > 0 ? ", " : "") << fmt_vec(p);
+                ofs << "        " << fmt_vec(p) << (j + 1 < cand.size() ? "," : "") << "\n";
             }
-            ofs << "] }" << (last ? "" : ",") << "\n";
+            ofs << "      ] }" << (last ? "" : ",") << "\n";
         };
 
         ofs << "{\n  \"scan_timestamp\": \"" << ts << "\",\n  \"instruments\": [\n";
