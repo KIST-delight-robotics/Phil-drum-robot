@@ -35,8 +35,7 @@ DrumDetector::~DrumDetector() {
 // =============================================================
 bool DrumDetector::run_scan() {
     try {
-        // 스캔 전 자세 스냅샷 (허리 이동의 기준이자 종료 시 복귀 목표)
-        std::vector<double> base_q;
+        std::vector<double> base_q;     // 스캔 전 자세 스냅샷 (허리 이동의 기준이자 종료 시 복귀 목표)
         {
             std::lock_guard<std::mutex> lock(ctx.last_q_mutex);
             base_q = ctx.last_q_target_snapshot;
@@ -51,7 +50,8 @@ bool DrumDetector::run_scan() {
         }
 
         // ===== 각도별 캡처 =====
-        std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> accumulated_clouds;
+        std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> accumulated_clouds;        // 각도별로 캡처한 point clouds
+        std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> raw_clouds;                 // 이상치 제거 전
         bool capture_ok = true;
         for (float deg : scan_angles_deg) {
             if (aborted()) { capture_ok = false; break; }
@@ -60,11 +60,11 @@ bool DrumDetector::run_scan() {
             if (!move_waist_and_wait(deg * M_PI / 180.0, base_q)) { capture_ok = false; break; }
 
             // 명령값이 아닌 실측 허리 각도로 변환 (레거시 getMotorPos와 동일 역할)
-            // 허리 모터 미연결(무하드웨어 테스트) 시에는 명령각으로 대체
             float actual_rad;
             auto waist_it = robot.motors.find(WAIST_JOINT);
             if (waist_it != robot.motors.end()) {
                 actual_rad = static_cast<float>(waist_it->second->current_joint_angle);
+            // 허리 모터 미연결 시에는 명령각으로 대체
             } else {
                 actual_rad = deg * static_cast<float>(M_PI) / 180.0f;
                 std::cout << "[DrumDetector] 허리 모터 미연결 — 명령각 " << deg << "도로 변환\n";
@@ -73,8 +73,12 @@ bool DrumDetector::run_scan() {
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = capture_cloud();
             if (!cloud || cloud->empty()) { capture_ok = false; break; }
 
-            cloud = remove_outliers(cloud);
             cloud = transform_to_robot_frame(cloud, actual_rad);
+            // 논문용
+            raw_clouds.push_back(cloud);
+            //
+
+            cloud = remove_outliers(cloud);
             accumulated_clouds.push_back(cloud);
         }
 
@@ -88,22 +92,24 @@ bool DrumDetector::run_scan() {
             return false;
         }
 
-        visualize_drums(accumulated_clouds);
+        visualize_drums(accumulated_clouds);        // 첫번째 뷰어 : 이상치 제거, 월드 좌표계로 변환됨.
 
-        // 병합 (레거시 use_registration=false 경로: 단순 합산)
+        // 포인트 클라우드 벡터를 하나의 클라우드로 합친다.
         pcl::PointCloud<pcl::PointXYZ>::Ptr full_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-        for (const auto &c : accumulated_clouds) {
-            *full_cloud += *c;
-        }
+        for (const auto &c : accumulated_clouds) { *full_cloud += *c; }
+        pcl::PointCloud<pcl::PointXYZ>::Ptr raw_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        for (const auto &c : raw_clouds) { *raw_cloud += *c; }
 
         const std::string ts = timestamp_suffix();
         std::filesystem::create_directories("drumrobot_server/data/scan");
-        pcl::PointCloud<pcl::PointXYZ>::Ptr indiv_sor_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-        for (const auto &c : accumulated_clouds) {
-            *indiv_sor_cloud += *c;
-        }
+
+        // 
+        // pcl::PointCloud<pcl::PointXYZ>::Ptr indiv_sor_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        // for (const auto &c : accumulated_clouds) { *indiv_sor_cloud += *c; }
+        // // 개별 각도에서 이상점 제거한 점군을 저장
         // dump_cloud_csv("drumrobot_server/data/scan/scan_" + ts + "_cloud_no_sor_no_ds.csv", indiv_sor_cloud);
-        indiv_sor_cloud = down_sampling(indiv_sor_cloud);
+        // indiv_sor_cloud = down_sampling(indiv_sor_cloud);
+        // // 개별 각도에서 이상점 제거 및 다운샘플링한 점군을 저장
         // dump_cloud_csv("drumrobot_server/data/scan/scan_" + ts + "_cloud_no_sor.csv", indiv_sor_cloud);
 
         if (aborted()) return false;
@@ -137,14 +143,23 @@ bool DrumDetector::run_scan() {
         // index_circles는 원 8개를 전제로 작성됨 (그 외 개수는 범위 밖 접근) — 개수 가드
         if (drum_coeffs.size() != static_cast<size_t>(NUM_CIRCLES)) {
             std::cerr << "[DrumDetector] 검출된 원이 " << NUM_CIRCLES << "개가 아님 (n="
-                      << drum_coeffs.size() << ") — 스캔 중단\n";
+                      << drum_coeffs.size() << ")\n";
             return false;
         }
 
         index_circles(drum_coeffs, drum_clouds);
-        std::vector<std::vector<Eigen::VectorXd>> drum_candidates = select_candidates(drum_coeffs);
+        std::vector<std::vector<Eigen::VectorXd>> drum_candidates;
+        if (single_target) {
+            for (int id = 1; id <= NUM_CIRCLES; ++id)     // index_circles 이후 drum_coeffs[id-1] == 악기 id
+                drum_candidates.push_back(single_hit_points_for_circle(drum_coeffs[id - 1], id));
+        } else {
+            drum_candidates = select_candidates(drum_coeffs);
+        }
 
         dump_candidates_csv("drumrobot_server/data/scan/scan_" + ts + "_drum_candidates.csv", drum_candidates);
+        
+        raw_cloud = down_sampling(raw_cloud, 0.001f);
+        visualize_detection_overlay(raw_cloud, drum_clouds, drum_candidates);
         visualize_drums(drum_clouds, drum_candidates);
 
         return write_results(drum_coeffs, drum_candidates, ts);
@@ -175,11 +190,11 @@ bool DrumDetector::init_camera() {
 
         if (depth_sensor.supports(RS2_OPTION_VISUAL_PRESET)) {
             depth_sensor.set_option(RS2_OPTION_VISUAL_PRESET, RS2_RS400_VISUAL_PRESET_HIGH_DENSITY);
-            std::cout << "[DrumDetector] High Density 프리셋 적용\n";
+            // std::cout << "[DrumDetector] High Density 프리셋 적용\n";
         }
         if (depth_sensor.supports(RS2_OPTION_LASER_POWER)) {
             depth_sensor.set_option(RS2_OPTION_LASER_POWER, 200.0f);
-            std::cout << "[DrumDetector] 레이저 파워 200 설정\n";
+            // std::cout << "[DrumDetector] 레이저 파워 200 설정\n";
         }
 
         // 드럼이 0.4~0.6m 사이만 남긴다. (단위: 미터)
@@ -301,18 +316,18 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr DrumDetector::remove_outliers(pcl::PointClou
     pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
     sor.setInputCloud(pointcloud);
     sor.setMeanK(50);
-    sor.setStddevMulThresh(3.0);    // 1 agressive, 2~3해보기
+    sor.setStddevMulThresh(3.0);        // 이 값을 낮출수록 이상점을 더 많이 제거한다.
     sor.filter(*filtered);
 
     return filtered;
 }
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr DrumDetector::down_sampling(pcl::PointCloud<pcl::PointXYZ>::Ptr pointcloud) {
+pcl::PointCloud<pcl::PointXYZ>::Ptr DrumDetector::down_sampling(pcl::PointCloud<pcl::PointXYZ>::Ptr pointcloud, float leaf_size) {
     pcl::PointCloud<pcl::PointXYZ>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZ>);
 
     pcl::VoxelGrid<pcl::PointXYZ> vg;
     vg.setInputCloud(pointcloud);
-    vg.setLeafSize(0.005f, 0.005f, 0.005f);
+    vg.setLeafSize(leaf_size, leaf_size, leaf_size);
     vg.filter(*filtered);
 
     return filtered;
@@ -349,10 +364,9 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr DrumDetector::transform_to_robot_frame(pcl::
 }
 
 Eigen::Matrix4f DrumDetector::make_cam2robot_matrix(float waist_angle_rad) {
-    // 카메라로 얻은 점군을 (레거시) 로봇 프레임으로 변환하기 위한 동차 변환 행렬.
+    // 카메라로 얻은 점군을 서버 로봇 프레임(허리축 위, 어깨 높이 원점)으로 변환하기 위한 동차 변환 행렬.
     // rot은 지면으로부터 카메라 설치 높이 및 허리 회전 각도에 따른 동적 좌표계.
-    // 주의: 결과는 레거시 좌표계 기준이다. 서버 좌표계로는 출력 시 z에서
-    //       LEGACY_TO_SERVER_Z(0.955)를 빼서 변환한다 (외인성 캘리브레이션 보존).
+    // z 이동 0.174 = 레거시 1.129 - 0.955 (서버 원점이 레거시보다 0.955 m 위).
     Eigen::Matrix4f T_cam2rot, T_rot2robot, T_cam2robot;
 
     T_cam2rot << -0.01219f,  0.999661f, -0.02301f,  0.004527f,
@@ -362,7 +376,7 @@ Eigen::Matrix4f DrumDetector::make_cam2robot_matrix(float waist_angle_rad) {
 
     T_rot2robot << cos(waist_angle_rad), -sin(waist_angle_rad), 0, 0,
                    sin(waist_angle_rad), cos(waist_angle_rad), 0, 0,
-                   0, 0, 1, 1.129,
+                   0, 0, 1, 0.174,
                    0, 0, 0, 1;
 
     T_cam2robot = T_rot2robot * T_cam2rot;
@@ -379,7 +393,7 @@ void DrumDetector::detect_circles(pcl::PointCloud<pcl::PointXYZ>::Ptr &pointclou
     seg.setOptimizeCoefficients(true);
     seg.setModelType(pcl::SACMODEL_CIRCLE3D);
     seg.setMethodType(pcl::SAC_RANSAC);
-    seg.setDistanceThreshold(0.03);
+    seg.setDistanceThreshold(0.01);
     seg.setMaxIterations(5000);
     seg.setRadiusLimits(0.100, 0.205); // 드럼 반경 제약
 
@@ -577,6 +591,42 @@ std::vector<std::vector<Eigen::VectorXd>> DrumDetector::select_candidates(const 
 
     return all_candidates;
 }
+
+// todo : 타격점 선정 알고리즘 수정
+
+// 악기 id별 손별 고정 타격점 2개만 생성
+std::vector<Eigen::VectorXd> DrumDetector::single_hit_points_for_circle(const pcl::ModelCoefficients::Ptr &coeffs, int instrument_id) {
+    const Eigen::Vector3f c(coeffs->values[0], coeffs->values[1], coeffs->values[2]);
+    const float r = coeffs->values[3];
+    const Eigen::Vector3f n = Eigen::Vector3f(coeffs->values[4], coeffs->values[5], coeffs->values[6]).normalized();
+    // 방향을 원 평면에 투영 — 기울어진 헤드 면 위에 점이 머물도록
+    auto on_plane = [&](const Eigen::Vector3f &dir) { return Eigen::Vector3f(dir - dir.dot(n) * n).normalized(); };
+
+    Eigen::Vector3f left, right;
+    if (instrument_id <= 4) {
+        // 드럼: 1,2 - 중심보다 0.5r 위, 3,4 - 중심보다 0.5r 아래
+        const float y_sign = (instrument_id <= 2) ? 1.0f : -1.0f;
+        const Eigen::Vector3f base = c + 0.5f * r * on_plane(Eigen::Vector3f(0.0f, y_sign, 0.0f));
+        const Eigen::Vector3f dx = static_cast<float>(ROBOT::CANDIDATE_HAND_X_OFFSET) * on_plane(Eigen::Vector3f::UnitX());
+        left  = base - dx;
+        right = base + dx;
+    } else {
+        // 심벌: 6~8 - 왼손 = 로봇 원점 방향 0.8r, 오른손 = 그 방향을 법선축으로 45° 돌려 x가 커지는 쪽
+        const float ratio = 0.8f;
+        const Eigen::Vector3f d = on_plane(-c);          // 서버 원점(0,0,0) 방향
+        const Eigen::Vector3f side = n.cross(d);         // 평면 위에서 d에 수직
+        const float k = std::sqrt(0.5f);                 // cos45 = sin45
+        const Eigen::Vector3f a = k * d + k * side;
+        const Eigen::Vector3f b = k * d - k * side;
+        left  = c + ratio * r * d;
+        right = c + ratio * r * (a.x() > b.x() ? a : b);
+    }
+
+    std::cout << "[DrumDetector] single_hit_points: id=" << instrument_id
+              << "  L=(" << left.transpose() << ")  R=(" << right.transpose() << ")\n";
+    return {left.cast<double>(), right.cast<double>()};
+}
+
 /*
 std::vector<Eigen::VectorXd> DrumDetector::select_candidates_for_circle(const pcl::ModelCoefficients::Ptr &coeffs, char DB) {
     std::vector<Eigen::VectorXd> candidate;
@@ -707,7 +757,7 @@ void DrumDetector::visualize_drums(const std::vector<pcl::PointCloud<pcl::PointX
             color_handler(drum_clouds[i], c[0], c[1], c[2]);
         viewer->addPointCloud<pcl::PointXYZ>(drum_clouds[i], color_handler, id);
         viewer->setPointCloudRenderingProperties(
-            pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, id);
+            pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, id);
     }
 
     for (size_t i = 0; i < drum_candidates.size(); ++i) {
@@ -723,6 +773,61 @@ void DrumDetector::visualize_drums(const std::vector<pcl::PointCloud<pcl::PointX
         }
     }
 
+    spin_viewer(viewer);
+}
+
+void DrumDetector::visualize_detection_overlay(const pcl::PointCloud<pcl::PointXYZ>::Ptr &raw_cloud,
+                                               const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &drum_clouds,
+                                               const std::vector<std::vector<Eigen::VectorXd>> &drum_candidates) {
+    // raw cloud(서버 원점 거리 컬러맵) 위에 inlier 원(옅은 흰색)과 후보점(흰 구)을 겹쳐 검출 결과 확인
+    if (!visualize) return;
+    if (!std::getenv("DISPLAY")) {
+        std::cerr << "[DrumDetector] DISPLAY 없음 — 시각화 생략\n";
+        return;
+    }
+
+    pcl::visualization::PCLVisualizer::Ptr viewer(
+        new pcl::visualization::PCLVisualizer("Drum Detector v2"));
+    viewer->setBackgroundColor(0.1, 0.1, 0.1);     // 흰 inlier·후보가 보이도록 어두운 배경
+    viewer->addCoordinateSystem(0.1);
+    viewer->initCameraParameters();
+
+    // (1) raw cloud: 서버 프레임 원점까지 거리를 intensity에 넣고 컬러맵(min~max 자동)으로 표시
+    if (raw_cloud && !raw_cloud->empty()) {
+        pcl::PointCloud<pcl::PointXYZI>::Ptr dist_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+        pcl::copyPointCloud(*raw_cloud, *dist_cloud);
+        for (auto &p : dist_cloud->points) {
+            p.intensity = std::sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+        }
+        pcl::visualization::PointCloudColorHandlerGenericField<pcl::PointXYZI> dist_color(dist_cloud, "intensity");
+        viewer->addPointCloud<pcl::PointXYZI>(dist_cloud, dist_color, "raw");
+        viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "raw");
+    }
+
+    // (2) RANSAC inlier: 옅은 흰색, 조금 크게
+    for (size_t i = 0; i < drum_clouds.size(); ++i) {
+        if (!drum_clouds[i] || drum_clouds[i]->empty())
+            continue;
+        const std::string id = "inlier_" + std::to_string(i);
+        pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> white(drum_clouds[i], 220, 220, 220);
+        viewer->addPointCloud<pcl::PointXYZ>(drum_clouds[i], white, id);
+        viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, id);
+        viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_OPACITY, 0.6, id);
+    }
+
+    // (3) 타격 후보점: 흰 구 (색은 0~1 범위)
+    for (size_t i = 0; i < drum_candidates.size(); ++i) {
+        for (size_t j = 0; j < drum_candidates[i].size(); ++j) {
+            const Eigen::VectorXd &pt = drum_candidates[i][j];
+            pcl::PointXYZ p(static_cast<float>(pt(0)), static_cast<float>(pt(1)), static_cast<float>(pt(2)));
+            viewer->addSphere(p, 0.005, 1.0, 1.0, 1.0, "cand_" + std::to_string(i) + "_" + std::to_string(j));
+        }
+    }
+
+    spin_viewer(viewer);
+}
+
+void DrumDetector::spin_viewer(pcl::visualization::PCLVisualizer::Ptr &viewer) {
     // ===== 이벤트 루프: 사용자가 창을 닫을 때까지 대기 =====
     // q 키 입력 시 명시적으로 창 종료 (X 버튼은 wasStopped()로 처리됨)
     viewer->registerKeyboardCallback([&](const pcl::visualization::KeyboardEvent &event) {
@@ -799,7 +904,7 @@ bool DrumDetector::write_results(const std::vector<pcl::ModelCoefficients::Ptr> 
     // 검출 결과(레거시 좌표계)를 서버 좌표계로 변환 (z 평행이동 — 법선은 불변)
     auto round3 = [](double v) { return std::round(v * 1000.0) / 1000.0; };
     auto to_server = [&](const Eigen::VectorXd &p) {
-        return std::array<double, 3>{round3(p(0)), round3(p(1)), round3(p(2) - LEGACY_TO_SERVER_Z)};
+        return std::array<double, 3>{round3(p(0)), round3(p(1)), round3(p(2))};
     };
     auto fmt_vec = [](const std::array<double, 3> &p) {
         std::ostringstream oss;
@@ -825,11 +930,11 @@ bool DrumDetector::write_results(const std::vector<pcl::ModelCoefficients::Ptr> 
             std::cerr << "[DrumDetector] " << tmp_path << " 쓰기 실패 — 저장 중단\n";
             return false;
         }
-        // 악기 한 항목: 중심·반지름·법선은 원 계수에서, 후보는 select_candidates 결과에서. z_shift 는 open hihat 용
+        // 악기 한 항목: 중심·반지름·법선은 원 계수에서, 후보는 select_candidates 결과에서. z_shift 는 closed hihat 용
         auto write_instrument = [&](int id, const pcl::ModelCoefficients::Ptr &coeffs, const std::vector<Eigen::VectorXd> &cand, double z_shift, bool last) {
             const std::string name = instrument_name_of_id(id);
             const std::array<double, 3> center = {round3(coeffs->values[0]), round3(coeffs->values[1]),
-                                                  round3(coeffs->values[2] - LEGACY_TO_SERVER_Z + z_shift)};
+                                                  round3(coeffs->values[2] + z_shift)};
             Eigen::Vector3d n(coeffs->values[4], coeffs->values[5], coeffs->values[6]);
             n.normalize();
             if (n.z() < 0.0) n = -n;   // 위쪽(+z)을 향하게
@@ -848,11 +953,12 @@ bool DrumDetector::write_results(const std::vector<pcl::ModelCoefficients::Ptr> 
         };
 
         ofs << "{\n  \"scan_timestamp\": \"" << ts << "\",\n  \"instruments\": [\n";
+        // 스캔은 open 상태 하이햇을 찍는다 → drum_id 5 원 = open hihat(9) 그대로, closed hihat(5) = z −OPEN_HIHAT_Z_OFFSET
         for (int id = 1; id <= NUM_CIRCLES; id++) {       // drum_id 1..8 == 악기 id (index_circles가 정렬)
-            write_instrument(id, drum_coeffs[id - 1], drum_candidates[id - 1], 0.0, false);
+            const double z_shift = (id == 5) ? -ROBOT::OPEN_HIHAT_Z_OFFSET : 0.0;
+            write_instrument(id, drum_coeffs[id - 1], drum_candidates[id - 1], z_shift, false);
         }
-        // open hihat(9) = closed hihat(5) 의 중심·후보에서 z만 +OPEN_HIHAT_Z_OFFSET (같은 물리 심벌)
-        write_instrument(9, drum_coeffs[5 - 1], drum_candidates[5 - 1], ROBOT::OPEN_HIHAT_Z_OFFSET, true);
+        write_instrument(9, drum_coeffs[5 - 1], drum_candidates[5 - 1], 0.0, true);
         ofs << "  ]\n}\n";
     }
     try {
@@ -877,7 +983,7 @@ void DrumDetector::dump_cloud_csv(const std::string &path, const pcl::PointCloud
     for (const auto &point : cloud->points) {
         if (std::isfinite(point.x) && std::isfinite(point.y) && std::isfinite(point.z)) {
             // 서버 좌표계로 변환해 저장
-            file << point.x << "," << point.y << "," << (point.z - LEGACY_TO_SERVER_Z) << "\n";
+            file << point.x << "," << point.y << "," << point.z << "\n";
         }
     }
     std::cout << "[DrumDetector] " << path << " 저장 완료\n";
@@ -897,7 +1003,7 @@ void DrumDetector::dump_candidates_csv(const std::string &path, const std::vecto
         for (size_t j = 0; j < drum_candidates[i].size(); ++j) {
             const Eigen::VectorXd &pt = drum_candidates[i][j];
             // 서버 좌표계로 변환해 저장
-            file << drum_id << "," << j << "," << pt(0) << "," << pt(1) << "," << (pt(2) - LEGACY_TO_SERVER_Z) << "\n";
+            file << drum_id << "," << j << "," << pt(0) << "," << pt(1) << "," << pt(2) << "\n";
         }
     }
     std::cout << "[DrumDetector] " << path << " 저장 완료\n";

@@ -50,11 +50,18 @@ void PlayMotionGenerator::initialize() {
 
             // 팔 공용 후보 → 오른손 +x / 왼손 -x. 후보가 없으면 중심 1개 (선택 로직이 즉시 반환)
             if (candidates.empty()) candidates.push_back(coord.center);
-            for (auto p : candidates) {
-                p[0] += ROBOT::CANDIDATE_HAND_X_OFFSET;
-                coord.right_candidate_positions.push_back(p);
-                p[0] -= 2.0 * ROBOT::CANDIDATE_HAND_X_OFFSET;
-                coord.left_candidate_positions.push_back(p);
+            if (candidates.size() == 2) {
+                // 후보 2개 = 스캔이 만든 손별 타격점 → x 큰 쪽 오른손, 작은 쪽 왼손 고정 (이미 손별이라 x 오프셋 없음)
+                if (candidates[0][0] > candidates[1][0]) std::swap(candidates[0], candidates[1]);
+                coord.left_candidate_positions.push_back(candidates[0]);
+                coord.right_candidate_positions.push_back(candidates[1]);
+            } else {
+                for (auto p : candidates) {
+                    p[0] += ROBOT::CANDIDATE_HAND_X_OFFSET;
+                    coord.right_candidate_positions.push_back(p);
+                    p[0] -= 2.0 * ROBOT::CANDIDATE_HAND_X_OFFSET;
+                    coord.left_candidate_positions.push_back(p);
+                }
             }
             loaded[id] = coord;
         }

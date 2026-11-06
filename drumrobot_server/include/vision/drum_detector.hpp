@@ -70,13 +70,13 @@ private:
     static constexpr double WAIST_MOVE_TIME    = 3.0;                    // 허리 이동 시간 [s]
     static constexpr double WAIST_WAIT_TIMEOUT = WAIST_MOVE_TIME + 10.0; // control_queue 소진 대기 타임아웃 [s]
     static constexpr double SETTLE_TIME        = 1.0;                    // 이동 후 진동 정착 대기 [s]
-    static constexpr double LEGACY_TO_SERVER_Z = 0.955;                  // 서버 z = 레거시 z - 0.955 (좌표 파일 대조로 검증)
 
     // 스캔 허리 각도 목록 [deg] — 레거시처럼 코드에 하드코딩
     // const std::vector<float> scan_angles_deg = {0.0f};
     const std::vector<float> scan_angles_deg = {40.0f, 30.0f, 20.0f, 10.0f, 0.0f, -10.0f, -20.0f, -30.0f, -40.0f, -50.0f};
 
     bool visualize = true;
+    bool single_target = true;   // true: 악기별 손별 타격점 2개, false: 기존 다중 후보(3/9개)
     bool camera_started = false;
 
     // ===== RealSense 멤버 (레거시 동일) =====
@@ -99,7 +99,7 @@ private:
     pcl::PointCloud<pcl::PointXYZ>::Ptr convert_rs2_points_to_pcl(const rs2::points &points);
     rs2::depth_frame apply_filters(const rs2::frameset &frames);
     pcl::PointCloud<pcl::PointXYZ>::Ptr remove_outliers(pcl::PointCloud<pcl::PointXYZ>::Ptr pointcloud);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr down_sampling(pcl::PointCloud<pcl::PointXYZ>::Ptr pointcloud);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr down_sampling(pcl::PointCloud<pcl::PointXYZ>::Ptr pointcloud, float leaf_size = 0.005f);
     std::vector<pcl::PointIndices> extract_clusters(pcl::PointCloud<pcl::PointXYZ>::Ptr &pointcloud);
     pcl::PointCloud<pcl::PointXYZ>::Ptr transform_to_robot_frame(pcl::PointCloud<pcl::PointXYZ>::Ptr pointcloud, float waist_angle_rad);
     Eigen::Matrix4f make_cam2robot_matrix(float waist_angle_rad);
@@ -110,8 +110,13 @@ private:
                                    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &drum_clouds);  // 원 8개 전제
     std::vector<Eigen::VectorXd> select_candidates_for_circle(const pcl::ModelCoefficients::Ptr &coeffs, char DB);
     std::vector<std::vector<Eigen::VectorXd>> select_candidates(const std::vector<pcl::ModelCoefficients::Ptr> &drum_coeffs);
+    std::vector<Eigen::VectorXd> single_hit_points_for_circle(const pcl::ModelCoefficients::Ptr &coeffs, int instrument_id);  // [왼손, 오른손]
     void visualize_drums(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &drum_clouds,
                          const std::vector<std::vector<Eigen::VectorXd>> &drum_candidates = {});
+    void visualize_detection_overlay(const pcl::PointCloud<pcl::PointXYZ>::Ptr &raw_cloud,
+                                     const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> &drum_clouds,
+                                     const std::vector<std::vector<Eigen::VectorXd>> &drum_candidates);
+    void spin_viewer(pcl::visualization::PCLVisualizer::Ptr &viewer);   // 이벤트 루프 + 창/VTK 정리
 
     // ===== 결과 저장 =====
     bool write_results(const std::vector<pcl::ModelCoefficients::Ptr> &drum_coeffs,
